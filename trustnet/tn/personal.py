@@ -9,6 +9,7 @@ from pathlib import Path
 from trustnet.gate.commands import Answer, Dm, Quoted
 from trustnet.gate.dm import main_agent
 from trustnet.gate.facts import REPO_ROOT, resolve_data_dir
+from trustnet.room_pool import wait_until_live
 from trustnet.switch_client import SwitchClient, SwitchError
 
 
@@ -174,7 +175,9 @@ async def ask(person: str, friend: str, fields: list[str]):
             if rooms:
                 room = rooms[-1]["room_id"]
                 await client.connect_to_room(room)
-                result = await client.post_message(f"@{friend}-gate ask {' '.join(command.facts)}")
+                line = f"@{friend}-gate ask {' '.join(command.facts)}"
+                await wait_until_live(client, room, line)
+                result = await client.post_message(line)
                 return {"room": room, "message": result}
             await asyncio.sleep(0.1)
     raise SwitchError("Timed out waiting for facts DM membership")

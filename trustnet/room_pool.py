@@ -35,6 +35,25 @@ SYNC_EVERY = 2.0
 _ADDRESSED_GATE = re.compile(r"@([a-z0-9][a-z0-9_-]*-gate)\b")
 
 
+async def wait_until_live(client, room: str, body: str, timeout: float = LIVE_WAIT) -> None:
+    """If ``body`` addresses ``@x-gate``, wait until Switch shows that gate live in ``room``.
+
+    Used by the pool and by the personal tools, which post from short-lived
+    connections right after a room is created.
+    """
+    target = _ADDRESSED_GATE.match(body)
+    if not target:
+        return
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        detail = await client.get_room_detail(room)
+        if (detail.get("agent_statuses") or {}).get(target.group(1)) == "live":
+            return
+        await asyncio.sleep(0.5)
+    LOG.warning("%s not live in %s after %ss; posting anyway", target.group(1), room, timeout)
+
+
 class RoomPool:
     def __init__(self, main: SwitchClient):
         self.main = main
@@ -149,20 +168,9 @@ class RoomPool:
             return self.main
         return self.anchors[self.current]
 
-    async def _await_live(self, room: str, agent: str) -> None:
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + LIVE_WAIT
-        while loop.time() < deadline:
-            detail = await self.main.get_room_detail(room)
-            if (detail.get("agent_statuses") or {}).get(agent) == "live":
-                return
-            await asyncio.sleep(0.5)
-        LOG.warning("%s not live in %s after %ss; posting anyway", agent, room, LIVE_WAIT)
-
     async def post_message(self, body: str, thread_id: str | None = None) -> Any:
-        target = _ADDRESSED_GATE.match(body)
-        if target and self.current is not None:
-            await self._await_live(self.current, target.group(1))
+        if self.current is not None:
+            await wait_until_live(self.main, self.current, body)
         return await self._here().post_message(body, thread_id)
 
     async def list_participants(self) -> Any:

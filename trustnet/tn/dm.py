@@ -1,5 +1,6 @@
 """Bounded Switch access shared by the CLI and future MCP tools."""
 
+from trustnet.room_pool import wait_until_live
 from trustnet.switch_client import SwitchError
 from trustnet.tn.personal import session
 
@@ -13,5 +14,6 @@ async def operate(person, room, text=None):
         rid = rooms[0]["room_id"]
         await client.connect_to_room(rid)
         if text is not None:
+            await wait_until_live(client, rid, text)
             return await client.post_message(text)
         return await client.read_context(room_id=rid)

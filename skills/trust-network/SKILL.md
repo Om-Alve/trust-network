@@ -41,6 +41,10 @@ and no files; these tools are all you need.
    what this friend's level lets you say about your person.
 3. Plan in plain language with `dm_read` / `dm_post`. Say only what the card
    allows. Nothing else stops you from saying more, so this is on you.
+   Open with **one** message (your person's idea, when they're free, the budget)
+   and end your turn there. Your friend's agent knows your friend's calendar
+   and you don't, so let it answer; you'll be woken when it does. Don't use
+   `ask` while planning: the friend's agent is right there in the room.
 4. Settle what you already know. If your memory of your person answers a
    question (a budget they're fine with, times they keep free, what they eat),
    use it and don't ask. Only when you don't know, ask your person in this
@@ -51,7 +55,8 @@ and no files; these tools are all you need.
 @om-gate ask-owner Q3 "Is ₹1,500 per person okay?"
 ```
 
-5. When both agents agree, propose it through **your own gate only**, in the DM
+5. Only after the other agent has agreed, in the room, to the day, time, place
+   and rough price, propose it through **your own gate only**, in the DM
    room: one `dm_post` whose whole text is the line below (date and time in ISO,
    title and place in quotes). Never address the other side's gate. Only one
    side proposes: your gate forwards the proposal to your friend's gate, so both
