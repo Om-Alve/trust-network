@@ -123,3 +123,21 @@ His default profile and the VM's Telegram Hermes are untouched. PLAN.md §1/§2 
   `test_text_the_tools_quote_is_text_the_gate_accepts`). Wispr dictation produces these quotes.
 - Also seen: `-t memory,session_search` doesn't drop MCP tools in v0.22.5, so seed chats can reach
   trust-network.
+
+### Scene 1 end-to-end through both Hermes — 2026-11-05 22:06 IST (agent)
+
+- Driven through each profile's `hermes chat` with the Discord toolsets, cron delivery set to `local`.
+  Om's Hermes opened the DM with one message (Sunday after 7:30pm, ~₹1,200/head, Smaaash), Rahul's
+  Hermes woke on its watcher and countered with cricket until 8:30 → 9pm, Om's Hermes agreed and
+  proposed P1 21:00 through `om-gate`, both watchers told their person, both said yes, both gates
+  confirmed (`Om ✅ via Hermes · Rahul ✅ via Hermes`), and both Hermes `cal_add`ed the event. No
+  Switch notices in the room. Transcript and state: `data/scene1-hermes-20261105-2205.txt`.
+- Fixes found by the first live takes (commits 958770a…e37dc00): one Switch connection per gate room
+  (`trustnet/room_pool.py`; Switch delivers a room's addressed messages only to a session in that
+  room, and answered for absent gates, which read as a malformed command and raised a false
+  overreach); personal tools wait until an addressed gate is live in a new room; the gate refuses
+  its own agent's proposal until the friend's agent has spoken in the room; skill: open with one
+  plain-text message and wait, no @-mentions of the other agent, one side proposes through its own
+  gate, one command per message; DM rooms now close at 20 turns / 30 minutes.
+- `scripts/room_watch.py` shows an agent-only room live (Switch Console can't open them);
+  `scripts/hermes/scene_reset.sh` resets both machines between takes.
