@@ -21,10 +21,10 @@ Every external piece the code will talk to exists and is reachable: Switch serve
 - [x] Write a runbook in `docs/setup-laptop.md` and `docs/setup-vm.md` with the exact commands below, so they can be re-run and later folded into the README.
 
 **[human] Laptop:**
-- [ ] Docker running. Switch Console **0.40.1** installed, local Switch server started (switch-core **0.31.0**).
-- [ ] `docker ps` → write down the **switch-core** port (not the Gateway's) in `docs/day0.md`.
-- [ ] Check 1: Switch users `rahul` and `priya` exist; a registration key for each (Gateway → API Keys, signed in as each), plus Om's. Keys go into `.env` only.
-- [ ] Check 2: `tailscale serve --bg <switch-core port>` (Serve, never Funnel). Record the `https://<laptop>.<tailnet>.ts.net` address as `SWITCH_URL` in `.env`.
+- [x] Docker running. Switch Console **0.40.1** installed, local Switch server started (switch-core **0.31.0**).
+- [x] `docker ps` → write down the **switch-core** port (not the Gateway's) in `docs/day0.md`.
+- [x] Check 1: Switch users `rahul` and `priya` exist; a registration key for each (Gateway → API Keys, signed in as each), plus Om's. Keys go into `.env` only.
+- [x] Check 2: `tailscale serve --bg <switch-core port>` (Serve, never Funnel). Record the `https://<laptop>.<tailnet>.ts.net` address as `SWITCH_URL` in `.env`.
 - [ ] `caffeinate -dims` during work sessions and the demo.
 
 **[human] VM:**
@@ -38,7 +38,7 @@ Every external piece the code will talk to exists and is reachable: Switch serve
 - [ ] `docs/day0.md` has a recorded result for checks 1, 2, 3 and the first half of 12.
 - [ ] For each failed check, the fallback from PLAN.md §8 is written under *Decision taken* (e.g. check 2 fails → Rahul's controller runs on the laptop with its own `--data-dir` over `localhost`).
 - [ ] Gateway's Machines page shows the laptop and the VM (screenshot path in *Log*), or the fallback is recorded.
-- [ ] `.env` has `SWITCH_URL` and the keys; `git check-ignore .env` confirms it's ignored.
+- [x] `.env` has `SWITCH_URL` and the keys; `git check-ignore .env` confirms it's ignored.
 
 ## Commit
 `phase 02: day-0 infra checks and setup runbooks`
@@ -85,3 +85,16 @@ fails, use `docs/setup-vm.md` §8 (Rahul's controller on the laptop, own
 - Check 2's fallback moves only the controller, but `rahul-gate` and Hermes also
   need to reach switch-core. If check 2 fails they must run on the laptop too, or
   phase 16 is cut (PLAN.md §9). Noted in `docs/setup-vm.md` §8.
+
+### Progress 2026-11-05 (laptop side)
+
+- Switch Console 0.40.1 runs switch-core 0.31.0 **natively, not in Docker** (deviation from
+  PLAN.md §2 "Docker, run by Console"). switch-core is `127.0.0.1:53330`; the port map is in
+  `~/Library/Application Support/switchdash/local-switch-server/ports.json`, not `docker ps`.
+- Check 1 **pass**: users and keys created by `scripts/switch_users.py --console-env`
+  through the Gateway API (no UI clicks). Om is the local `admin@switch.local` account.
+- Check 2 laptop half: `tailscale serve --bg --https=8443 http://127.0.0.1:53330` (443 was
+  already serving another local app). `SWITCH_URL=https://<your-mac>.<tailnet>.ts.net:8443`;
+  `/health` → 200 from the laptop. VM half pending.
+- `.env` has `SWITCH_URL` and the three keys; `git check-ignore .env` → `.env`.
+- Still open: VM (checks 2 VM half, 3; needs SSH access to `hermes`), Discord (12a), caffeinate.

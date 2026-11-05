@@ -31,15 +31,15 @@ Fill these in first. They are referenced by almost every later phase.
 
 | Item | Value | How it was found |
 |---|---|---|
-| switch-core host port | `____` | `docker ps` on the laptop |
-| Gateway host port | `____` | `docker ps`, for comparison — **never serve this one** |
-| `SWITCH_URL` | `https://____.____.ts.net` | `tailscale serve --bg <switch-core port>`, then copied into `.env` |
+| switch-core host port | `53330` (binds `127.0.0.1`) | Console 0.40.1 runs switch-core **natively, not in Docker**: `~/Library/Application Support/switchdash/local-switch-server/ports.json` (`api`), process `switch-core/0.31.0/venv/bin/python -m switch_core.main`; `curl http://127.0.0.1:53330/health` → `{"status":"ok"}` (2026-11-05) |
+| Gateway host port | `53329` | `ports.json` (`gateway`); also mattermost `53331`, postgres `53332`. `docker ps` shows no Switch containers. Note: `switch-core.env` sets `GATEWAY_PUBLIC_URL`/`FRONTEND_BASE_URL` to `http://localhost:53330`, so links Gateway generates may point at localhost |
+| `SWITCH_URL` | `https://<your-mac>.<tailnet>.ts.net:8443` | `tailscale serve --bg --https=8443 http://127.0.0.1:53330` (port 443 was already serving another local app, so switch-core is on 8443). Tailnet only, no Funnel. From the laptop, `curl $SWITCH_URL/health` → `{"status":"ok"}` [200] (2026-11-05). In `.env`. |
 | HTTP probe path | `____` | Switch agent-protocol docs; PLAN.md only writes `/v1/…` |
 | WebSocket path | `____` | same |
 | Laptop machine name (Switch) | `____` | Gateway → Machines |
 | VM machine name (Switch) | `____` | Gateway → Machines |
-| Switch Console | `0.40.1` | pinned by PLAN.md §11 |
-| switch-core | `0.31.0` | pinned by PLAN.md §11 |
+| Switch Console | `0.40.1` | confirmed: app `CFBundleShortVersionString` |
+| switch-core | `0.31.0` | confirmed: install path `native/switch-core/0.31.0` |
 | `switch-agent-controller` | `0.31.0` | pinned by PLAN.md §11; check with `switch-agent-controller --version` |
 
 ---
@@ -49,10 +49,19 @@ Fill these in first. They are referenced by almost every later phase.
 - **Check:** Switch users `rahul` and `priya`, and a registration key for each
   (Gateway → API Keys, signed in as each)
 - **Filled in by:** phase 02
-- **Result:** `pending`
-- **Date:** —
-- **Evidence:** —
-- **Decision taken:** If fail: n/a (blocking)
+- **Result:** `pass`
+- **Date:** 2026-11-05
+- **Evidence:** `uv run python scripts/switch_users.py --console-env` signed in as the
+  local admin (`Admin <admin@switch.local>`, which is Om's Console account), created
+  `rahul@switch.local` and `priya@switch.local` through `POST /gateway/users`, then signed in
+  as each of Om, Rahul and Priya and created one registration key labelled
+  `trust-network gate` (`POST /gateway/api-keys`). Keys are in `.env` as `OM_GATE_KEY`,
+  `RAHUL_GATE_KEY` and `PRIYA_GATE_KEY`; Rahul's and Priya's sign-in passwords are in
+  `.env` as `RAHUL_SWITCH_PASSWORD` / `PRIYA_SWITCH_PASSWORD`. The first set of keys was
+  rotated after being echoed to a terminal by mistake; the old keys were deleted.
+- **Decision taken:** No Console UI needed. Users are created through the Gateway API with
+  the admin login Console starts switch-core with (`GATEWAY_ADMIN_EMAIL` /
+  `GATEWAY_ADMIN_PASSWORD` in `switch-core.env`). Om = the local admin account.
 
 Notes: Om's own key is needed too. Keys go into `.env` only
 (`OM_GATE_KEY`, `RAHUL_GATE_KEY`, `PRIYA_GATE_KEY`); `RAHUL_HERMES_KEY` belongs
