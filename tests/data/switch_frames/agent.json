@@ -1,0 +1,15 @@
+{
+  "event": "message",
+  "id": 1,
+  "data": {
+    "type": "message",
+    "room_id": "room-1",
+    "sequence": 1,
+    "payload": {
+      "sender": "sender-1",
+      "body": "@gate hello",
+      "addressed": true,
+      "sender_kind": "agent"
+    }
+  }
+}
