@@ -255,7 +255,8 @@ Switch's Discord connection, never in this repo.
 - **Decision taken:** If fail: Mattermost
 
 Phase 11: template passes installed core 0.31.0 compiler/schema validation; live
-run is blocked by pending 12a and the Console/OpenCode readiness mismatch.
+run is blocked by pending 12a. Om's main agent is now managed Codex; the
+managed Codex stand-in home exchange passed (phase 11 log).
 Agent-only home substitution passed a direct Om Gateway calendar request; this
 does not establish Discord or managed-agent delivery. See phases/11-gate-runtime.md.
 

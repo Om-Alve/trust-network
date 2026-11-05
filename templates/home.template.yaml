@@ -1,17 +1,15 @@
 version: 2
 params:
-  provider: {type: provider, default: opencode}
-  machine: {type: machine, default: [$first]}
+  machine: {type: machine, default: "Om’s MacBook Pro"}
   directory: {type: directory, default: '{$agents_dir}/om-agent'}
   bridge: {type: bridge, description: Discord connection display name}
 resources:
   main:
     type: agent
     name: om-agent
-    provider: '{provider}'
+    provider: codex
     machine: '{machine}'
     directory: '{directory}'
-    model: opencode-go/deepseek-v4.1-flash
     allow_existing: true
     addressing: owner
     instructions: Ask @om-gate for personal facts and availability. Read SKILL.md in the room.

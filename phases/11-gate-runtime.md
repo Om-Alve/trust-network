@@ -20,7 +20,7 @@ A running gate process per person (`python -m trustnet.gate`) that listens on Sw
 - [x] Silence rule: if `room_level` is `None`, the gate posts nothing at all (a log line only).
 - [x] Handlers: `free` (calendar view at level), `ask` (values or "not shared at this level"), owner-only `view-as`, `ledger`, `trust`. Unknown commands → command list (overreach note comes in phase 21).
 - [x] `trustnet/gate/relay.py`: `post_home(person, text)`, which finds the person's home room (`#om-home` for Om; `rahul-home` / `priya-home` agent-only rooms for others, created on first use).
-- [x] `templates/home.template.yaml`: private Discord channel `om-home`; an OpenCode agent `om-agent` (`provider: "{provider}"` = `opencode`, `model: "opencode-go/deepseek-v4.1-flash"`, `allow_existing`, addressing `owner`); `om-gate`; `SKILL.md` as a room doc.
+- [x] `templates/home.template.yaml`: private Discord channel `om-home`; a managed Codex agent `om-agent` (`provider: codex`, no model override, laptop `Om’s MacBook Pro`, `allow_existing`, addressing `owner`); `om-gate`; `SKILL.md` as a room doc.
 - [x] Stub `skills/trust-network/SKILL.md` with the command list and examples (replaced by the dictated version in phase 18).
 - [x] Offline tests with `FakeSwitch`: gate answers Rahul-level in a room with `rahul-gate`, friend-level with `priya-gate`, stays silent with a stranger, refuses `trust` from Om's agent, answers `self` level in the home room.
 - [ ] **[human]** Run the template; confirm `#om-home` is a private Discord channel with Om, `om-agent`, `om-gate` (finishes check 12 in `docs/day0.md`).
@@ -106,11 +106,47 @@ om-agent and om-gate. Verify external identity claims through the server mapping
 before accepting Discord commands. Finally ask om-agent to send the free command
 and record the Discord reply/check 12b evidence.
 
-Managed om-agent is independently blocked: Console 0.40.1's controller waits
+Superseded by Om's Codex decision below. The original managed OpenCode blocker was: Console 0.40.1's controller waits
 for `opencode server listening`; OpenCode 2.1.4 prints `server listening`.
-No shell config, PATH, global package or Console files were changed. Parent/Om
-must decide that fix before the managed-agent Discord end-to-end check.
+No shell config, PATH, global package or Console files were changed. Om later
+selected managed Codex for the main agent; see the subsequent evidence below.
 
 Final validation immediately before commit: `make check` → `73 files already
 formatted`, `All checks passed!`, `433 passed in 1.04s`; `git diff --check`
 clean. Concurrent phase 12 changes had settled by this run.
+
+### Om's main-agent decision and managed live check — 2026-11-05
+
+Om selected managed Codex for `om-agent`, with no model override, on
+`Om’s MacBook Pro`. The OpenCode startup blocker no longer applies to the main
+agent. Om's envoy remains OpenCode with OpenCode Go DeepSeek V4.1 Flash through
+the trust-network runner in phase 13b. `examples/om/trust.yaml` is unchanged.
+The template now fixes `provider: codex`, omits `model`, and defaults to Om's
+laptop machine. Installed v2 compilation and room schema validation passed,
+including assertions that the compiled agent is Codex and has no model field.
+
+`uv run python -m scripts.gate_codex_probe` passed one short real managed-agent
+exchange in an internal Switch room standing in for Discord:
+
+1. Om's actual Gateway user posted `@om-agent ask my gate what I'm doing Sunday`.
+2. The managed Codex agent posted `@om-gate free 2026-11-08..2026-11-09`.
+3. The gate replied `2026-11-08T17:00:00+05:30 .. 2026-11-08T19:00:00+05:30 Family video call`.
+4. The temporary ledger contained exactly the `calendar` field. No calendar or
+   committed example data was changed.
+
+Retained `om-agent` ID: `30919e05-a808-4eda-b86e-7afb2b382ab3`.
+The management API confirmed provider `codex`, model `null`, machine
+`Om’s MacBook Pro`, process `running`. Its working directory is the gitignored
+`data/om-agent` directory. Addressing is owner-only. After the probe, general
+main-agent instructions replaced the date-specific probe brief (HTTP 200).
+The probe room was deleted (HTTP 200); the agent remains for the demo.
+
+Current blocker: Discord setup/check 12a and the actual private Discord home
+run/check 12b remain pending, including verifying the linked external sender's
+identity. The managed Codex home exchange itself has now passed with the
+explicitly authorized agent-only room substitution. No OpenCode or Console
+installation changes were needed.
+
+Decision-update validation: `make check` passed with `76 files already formatted`,
+`All checks passed!`, and `433 passed in 1.37s`. `git diff --check` passed.
+Existing APIs and Om's envoy trust configuration were not changed.
