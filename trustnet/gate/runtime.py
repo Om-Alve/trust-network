@@ -8,13 +8,14 @@ owner gets one alert in their home room. Gift rooms are the exception (surprise
 mode): there the gate logs the overreach and posts nothing home.
 """
 
+import asyncio
 import logging
 from collections.abc import Callable, Mapping
 from datetime import datetime, time, timedelta
 from typing import Any
 
 from trustnet.gate import commands as c
-from trustnet.gate import ledger, relay
+from trustnet.gate import dm, ledger, relay
 from trustnet.gate.calendar import TIME_ZONE, busy
 from trustnet.gate.facts import Level, load_profile, load_trust, resolve_data_dir, save_trust
 from trustnet.gate.policy import (
@@ -45,10 +46,32 @@ class Gate:
         self.person, self.client, self.identities = person, client, identities
         self._clock: Callable[[], datetime] = clock or (lambda: datetime.now(TIME_ZONE))
         self._gift_room = gift_room or relay.is_gift_room
+        self.watches = {}
+        self._dispatch_lock = asyncio.Lock()
         self._notes: dict[tuple[str, str], datetime] = {}
 
     async def handle(self, event):
+        async with self._dispatch_lock:
+            await self._handle(event)
+
+    async def _handle(self, event):
+        watch = self.watches.get(event.room_id)
+        if watch:
+            if watch.closed:
+                return
+            identity = self.identities().get(event.sender_id)
+            if (
+                identity
+                and identity.id in {dm.main_agent(self.person), dm.main_agent(identity.person)}
+                and identity.person
+            ):
+                await watch.turn(event.text)
+            if watch.closed:
+                return
         if not event.addressed:
+            return
+        room_detail = await self._room_detail(event.room_id)
+        if room_detail and room_detail.get("archived"):
             return
         await self.client.connect_to_room(event.room_id)
         participants = await self.client.list_participants()
@@ -97,7 +120,16 @@ class Gate:
             type(command), type(command).__name__.lower()
         )
         direction = Direction.OUTBOUND if sender.person == self.person else Direction.INBOUND
-        decision = authorize(name, sender, self.person, trust.consent_default, direction=direction)
+        decision = authorize(
+            name,
+            sender,
+            self.person,
+            trust.consent_default,
+            direction=direction,
+            room_name=room_detail.get("name", room_detail.get("room_name", ""))
+            if room_detail
+            else "",
+        )
         LOG.info(
             "command=%s room=%s level=%s decision=%s", name, event.room_id, level, bool(decision)
         )
@@ -137,6 +169,13 @@ class Gate:
             return
         # Consent is a gate relay, never an alias for the owner's yes command.
         if isinstance(command, c.Consent):
+            return
+        if isinstance(command, c.Dm):
+            if level == Level.SELF:
+                await dm.setup(self, command.person, command.goal)
+            return
+        if isinstance(command, c.JoinDm):
+            await dm.setup(self, sender.person, command.goal, command.room)
             return
         profile = load_profile(self.person)
         disclosed = {}
@@ -260,7 +299,22 @@ class Gate:
             return value.replace(tzinfo=TIME_ZONE)
         return value.astimezone(TIME_ZONE)
 
+    async def _timeouts(self):
+        while True:
+            await asyncio.sleep(1)
+            async with self._dispatch_lock:
+                for watch in list(self.watches.values()):
+                    await watch.check()
+
     async def run(self):
+        timer = asyncio.create_task(self._timeouts())
+        try:
+            await self._events()
+        finally:
+            timer.cancel()
+            await asyncio.gather(timer, return_exceptions=True)
+
+    async def _events(self):
         async for event in self.client.events():
             try:
                 await self.handle(event)

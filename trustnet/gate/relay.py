@@ -19,7 +19,11 @@ async def post_home(person, text, *, client):
     detail = await client.get_agent_detail(client.agent_id)
     name = person + "-home"
     room = next(
-        (r["room_id"] for r in detail["rooms"] if r["room_name"] == name and not r.get("archived")),
+        (
+            r["room_id"]
+            for r in detail["rooms"]
+            if r["room_name"].lstrip("#") == name and not r.get("archived")
+        ),
         None,
     )
     if room is None:

@@ -2,7 +2,4 @@
 people:
   om: close
 consent:
-  default: via-agent         # Rahul's answers may come through Hermes; others see "via Hermes"
-envoy:
-  provider: codex
-  machine: "<VM machine name in Switch>"   # filled in by scripts/demo_up.py
+  default: via-agent

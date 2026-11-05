@@ -61,8 +61,7 @@ def test_every_fixture_loads(person: str) -> None:
     assert profile.owner == person
     assert profile.calendar_path.is_file()
     assert trust.consent_default in {"direct", "via-agent"}
-    assert trust.envoy_provider
-    assert trust.envoy_machine.startswith("<")
+    assert trust.envoy_provider == ("opencode" if person == "priya" else "")
 
 
 def test_om_matches_the_plan() -> None:
@@ -70,9 +69,8 @@ def test_om_matches_the_plan() -> None:
     trust = load_trust("om")
 
     assert trust.people == {"rahul": Level.CLOSE, "priya": Level.FRIEND}
-    assert trust.consent_default == "direct"
-    assert trust.envoy_provider == "opencode"
-    assert trust.envoy_model == "opencode-go/deepseek-v4.1-flash"
+    assert trust.consent_default == "via-agent"
+    assert trust.envoy_provider == ""
 
     assert profile.facts["diet"] == Fact("vegetarian", Level.ACQUAINTANCE)
     assert profile.facts["drinks"] == Fact("no alcohol", Level.FRIEND)
@@ -92,7 +90,7 @@ def test_rahul_is_close_to_om_and_has_no_tent() -> None:
 
     assert trust.level_for("om") is Level.CLOSE
     assert trust.consent_default == "via-agent"
-    assert trust.envoy_provider == "codex"
+    assert trust.envoy_provider == ""
     assert {fact.level for fact in profile.facts.values()} == {
         Level.ACQUAINTANCE,
         Level.FRIEND,

@@ -76,7 +76,9 @@ CROSS_BOUNDARY_COMMANDS: Final[frozenset[str]] = frozenset(
 OWNER_COMMANDS: Final[frozenset[str]] = (
     OWNER_DIRECT_COMMANDS | OWNER_ONLY_COMMANDS | OWNER_AGENT_COMMANDS
 )
-KNOWN_COMMANDS: Final[frozenset[str]] = OWNER_COMMANDS | CROSS_BOUNDARY_COMMANDS
+KNOWN_COMMANDS: Final[frozenset[str]] = (
+    OWNER_COMMANDS | CROSS_BOUNDARY_COMMANDS | {"join-dm", "consent"}
+)
 
 DecisionMode = Literal["direct", "via-agent", "cross-boundary"]
 
@@ -267,6 +269,7 @@ def authorize(
     consent_mode: ConsentMode,
     personal_agents: Iterable[str] = (),
     direction: Direction = Direction.OUTBOUND,
+    room_name: str = "",
 ) -> Decision:
     """Decide whether ``sender`` may run ``command`` for ``owner`` (Rule 2).
 
@@ -296,6 +299,17 @@ def authorize(
 
     if name not in KNOWN_COMMANDS:
         return Denied(DenialCode.UNKNOWN_COMMAND, f"unknown command {name!r}")
+
+    if name in {"join-dm", "consent"}:
+        pair = "-".join(sorted((owner_key, sender.person or "")))
+        if (
+            sender.kind is SenderKind.AGENT
+            and sender.person != owner_key
+            and sender.id == f"{sender.person}-gate"
+            and room_name == f"conn-{pair}"
+        ):
+            return Allowed("cross-boundary")
+        return Denied(DenialCode.NOT_OWNER_AGENT, "gate relay requires the matching connection")
 
     if direction is Direction.INBOUND:
         if name in OWNER_DIRECT_COMMANDS or name in OWNER_ONLY_COMMANDS or name == "dm":

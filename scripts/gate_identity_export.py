@@ -45,12 +45,12 @@ async def main():
                 if person:
                     result[uid] = {"kind": "user", "id": person}
             rows = await db.fetch(
-                "SELECT c.id,c.matrix_user_id,c.user_id,a.id AS agent_id,a.owner_id FROM clients c LEFT JOIN agents a ON a.client_id=c.id"
+                "SELECT c.id,c.matrix_user_id,c.user_id,a.id AS agent_id,a.name AS agent_name,a.owner_id FROM clients c LEFT JOIN agents a ON a.client_id=c.id"
             )
             for row in rows:
                 if row["agent_id"]:
                     owner = people.get(row["owner_id"])
-                    identity = {"kind": "agent", "id": row["agent_id"], "owner_id": owner}
+                    identity = {"kind": "agent", "id": row["agent_name"], "owner_id": owner}
                 elif people.get(row["user_id"]):
                     identity = {"kind": "user", "id": people[row["user_id"]]}
                 else:

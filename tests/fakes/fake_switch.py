@@ -33,6 +33,7 @@ class FakeSwitch:
 class FakeSwitchClient(Operations):
     def __init__(self, server: FakeSwitch, name: str, owner_id: str, kind: str):
         self.server, self.name, self.owner_id, self.kind = server, name, owner_id, kind
+        self.agent_id = name
         self.room_id: str | None = None
         self.queue: asyncio.Queue[Event] = asyncio.Queue()
 
@@ -75,6 +76,11 @@ class FakeSwitchClient(Operations):
                     raise PermissionError("May update only another agent of your owner")
                 agent.update({k: v for k, v in a.items() if v is not None and k != "agent_id"})
             result = deepcopy(agent)
+            result["rooms"] = [
+                {"room_id": r["id"], "room_name": r["name"], "archived": r["archived"]}
+                for r in self.server.rooms.values()
+                if agent["name"] in r["members"]
+            ]
             if agent["owner_id"] != self.owner_id:
                 result.pop("instructions", None)
             return result

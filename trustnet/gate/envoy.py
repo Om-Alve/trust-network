@@ -61,7 +61,7 @@ class ConversationWatch:
         async with self.lock:
             if self.closed or (len(self.turns) < 12 and self.clock() - self.started < 600):
                 return
-            summary = f"Conversation {self.room} ended after {len(self.turns)} envoy turns. "
+            summary = f"Conversation {self.room} ended after {len(self.turns)} agent turns. "
             summary += "Latest messages: " + " | ".join(t[:300] for t in self.turns[-2:])
             await post_home(self.owner, summary, client=self.client)
             await self.client.archive_room(self.room)

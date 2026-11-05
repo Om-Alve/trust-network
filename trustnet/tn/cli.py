@@ -57,6 +57,7 @@ from trustnet.gate.facts import (
 )
 from trustnet.gate.policy import Actor, can_set_level
 from trustnet.gate.view_as import ViewAsError, view_as
+from trustnet.switch_client import SwitchError
 
 __all__ = ["main"]
 
@@ -147,7 +148,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="tn",
         description=(
             "Your own trust-network data: trust levels, facts, calendar and view-as. "
-            "Offline: nothing here connects to Switch."
+            "dm-read and dm-post connect to Switch using your main-agent identity."
         ),
         parents=[_global_options(suppress=False)],
     )
@@ -237,6 +238,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     view.set_defaults(handler=_cmd_view_as)
 
+    for name in ("dm-read", "dm-post"):
+        sub = commands.add_parser(name, parents=[common])
+        sub.add_argument("room")
+        if name == "dm-post":
+            sub.add_argument("text")
+        sub.set_defaults(handler=_cmd_dm)
     return parser
 
 
@@ -255,7 +262,7 @@ def main(argv: list[str] | None = None) -> int:
     handler: Handler = args.handler
     try:
         return handler(context, args)
-    except (CliError, FactsError, CalendarError, ViewAsError) as exc:
+    except (CliError, FactsError, CalendarError, ViewAsError, SwitchError) as exc:
         print(f"tn: error: {exc}", file=sys.stderr)
         return 1
     except OSError as exc:
@@ -609,6 +616,15 @@ def _jsonable(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): _jsonable(item) for key, item in value.items()}
     return str(value)
+
+
+def _cmd_dm(context, args):
+    import asyncio
+
+    from trustnet.tn.dm import operate
+
+    result = asyncio.run(operate(context.owner(), args.room, getattr(args, "text", None)))
+    return context.emit(result, json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":

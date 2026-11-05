@@ -291,7 +291,7 @@ def test_room_level_requires_an_owner_name(om_trust: TrustList) -> None:
 
 @pytest.mark.parametrize("command", ["yes", "no", "answer"])
 def test_hermes_carries_rahul_consent_as_via_agent(rahul_trust: TrustList, command: str) -> None:
-    decision = authorize(command, HERMES, "rahul", rahul_trust.consent_default, {"rahul-hermes"})
+    decision = authorize(command, HERMES, "rahul", "via-agent", {"rahul-hermes"})
     assert decision == Allowed("via-agent")
     assert decision.allowed
     assert bool(decision)
@@ -299,7 +299,7 @@ def test_hermes_carries_rahul_consent_as_via_agent(rahul_trust: TrustList, comma
 
 @pytest.mark.parametrize("command", ["yes", "no", "answer"])
 def test_hermes_cannot_carry_om_consent(om_trust: TrustList, command: str) -> None:
-    decision = authorize(command, HERMES, "om", om_trust.consent_default, {"om-agent"})
+    decision = authorize(command, HERMES, "om", "direct", {"om-agent"})
     assert isinstance(decision, Denied)
     assert decision.code is DenialCode.NOT_OWNER_AGENT
     assert not decision
@@ -326,6 +326,7 @@ def test_authorize_has_no_message_text_parameter() -> None:
         "consent_mode",
         "personal_agents",
         "direction",
+        "room_name",
     ]
 
 
@@ -334,12 +335,12 @@ def test_om_direct_mode_accepts_om_himself(om_trust: TrustList) -> None:
 
 
 def test_rahul_via_agent_mode_still_accepts_rahul_himself(rahul_trust: TrustList) -> None:
-    decision = authorize("yes", RAHUL, "rahul", rahul_trust.consent_default, {"rahul-hermes"})
+    decision = authorize("yes", RAHUL, "rahul", "via-agent", {"rahul-hermes"})
     assert decision == Allowed("direct")
 
 
 def test_om_direct_mode_refuses_his_own_agent(om_trust: TrustList) -> None:
-    decision = authorize("yes", OM_AGENT, "om", om_trust.consent_default, {"om-agent"})
+    decision = authorize("yes", OM_AGENT, "om", "direct", {"om-agent"})
     assert isinstance(decision, Denied)
     assert decision.code is DenialCode.CONSENT_MODE
 
