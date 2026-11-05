@@ -44,6 +44,13 @@ async def start_conversation(room, envoy, *, client):
     await client.invite_agent_to_room(room, envoy)
 
 
+# A DM room closes after this many main-agent turns or seconds, whichever comes first.
+# Both Hermes wake on a 1-minute watcher and wait on their people, so 10 minutes was
+# too short for one plan; 30 minutes still bounds an agent-to-agent loop.
+MAX_TURNS = 20
+MAX_SECONDS = 1800
+
+
 class ConversationWatch:
     def __init__(self, room, owner, client, *, clock=time.monotonic):
         self.room, self.owner, self.client = room, owner, client
@@ -59,7 +66,9 @@ class ConversationWatch:
 
     async def check(self):
         async with self.lock:
-            if self.closed or (len(self.turns) < 12 and self.clock() - self.started < 600):
+            if self.closed or (
+                len(self.turns) < MAX_TURNS and self.clock() - self.started < MAX_SECONDS
+            ):
                 return
             summary = f"Conversation {self.room} ended after {len(self.turns)} agent turns. "
             summary += "Latest messages: " + " | ".join(t[:300] for t in self.turns[-2:])

@@ -4,6 +4,7 @@ import pytest
 from fakes.fake_switch import FakeSwitch
 
 from trustnet.gate import dm, relay
+from trustnet.gate.envoy import MAX_TURNS
 from trustnet.gate.policy import Identity, authorize
 from trustnet.gate.runtime import Gate
 from trustnet.switch_client import Event
@@ -56,10 +57,10 @@ async def test_dm_setup_private_cards_and_limits(tmp_path, monkeypatch):
     assert room["messages"] == []
     assert len(list(tmp_path.glob("*/share-cards/*.json"))) == 2
     assert "Share card" in switch.rooms[homes["rahul"]]["messages"][-1]["body"]
-    for i in range(12):
+    for i in range(MAX_TURNS):
         await gates["om"].handle(Event(room["id"], "om-hermes", "agent", f"Plan {i}", False))
     assert room["archived"]
     before = len(room["messages"])
     await gates["om"].handle(Event(room["id"], "rahul-agent", "agent", "@om-gate ask diet", True))
     assert len(room["messages"]) == before
-    assert "12 agent turns" in switch.rooms[homes["om"]]["messages"][-1]["body"]
+    assert f"{MAX_TURNS} agent turns" in switch.rooms[homes["om"]]["messages"][-1]["body"]

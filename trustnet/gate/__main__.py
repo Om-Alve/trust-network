@@ -9,6 +9,7 @@ from pathlib import Path
 
 from trustnet.gate.identity import IdentitySource, read_identities
 from trustnet.gate.runtime import Gate
+from trustnet.room_pool import RoomPool
 from trustnet.switch_client import SwitchClient
 
 __all__ = ["read_identities"]
@@ -29,6 +30,9 @@ async def run(args):
         args.state.chmod(0o600)
     else:
         client = SwitchClient(os.environ["SWITCH_URL"], credentials["id"], credentials["api_key"])
+    # One connection per open room: Switch only delivers a room's addressed
+    # messages to a session in that room (see trustnet/room_pool.py).
+    pool = RoomPool(client)
     try:
         identities = IdentitySource(args.identity_map, args.identity_url)
 
@@ -38,13 +42,11 @@ async def run(args):
                 await asyncio.sleep(5)
 
         refresh_task = asyncio.create_task(refresh())
-        gate_task = asyncio.create_task(Gate(args.person, client, identities).run())
+        pool.start()
+        gate_task = asyncio.create_task(Gate(args.person, pool, identities).run())
         try:
             await client.ready.wait()
-            detail = await client.get_agent_detail(client.agent_id)
-            for room in detail["rooms"]:
-                if not room.get("archived"):
-                    await client.connect_to_room(room["room_id"])
+            await pool.start_sync()
             await gate_task
         finally:
             refresh_task.cancel()
@@ -52,7 +54,7 @@ async def run(args):
             gate_task.cancel()
             await asyncio.gather(gate_task, return_exceptions=True)
     finally:
-        await client.aclose()
+        await pool.aclose()
 
 
 def main():

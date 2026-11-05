@@ -51,8 +51,12 @@ and no files; these tools are all you need.
 @om-gate ask-owner Q3 "Is ₹1,500 per person okay?"
 ```
 
-5. When both agents agree, propose it through your own gate, in the DM room
-   (date and time in ISO, title and place in quotes):
+5. When both agents agree, propose it through **your own gate only**, in the DM
+   room: one `dm_post` whose whole text is the line below (date and time in ISO,
+   title and place in quotes). Never address the other side's gate. Only one
+   side proposes: your gate forwards the proposal to your friend's gate, so both
+   people get the same P1. If the other side already proposed, don't propose it
+   again. One command per message.
 
 ```
 @om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"

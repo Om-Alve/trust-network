@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from trustnet.envoy_runner import Runner, invocation, prompt
-from trustnet.gate.envoy import ConversationWatch, brief_envoy
+from trustnet.gate.envoy import MAX_SECONDS, MAX_TURNS, ConversationWatch, brief_envoy
 from trustnet.switch_client import Event
 
 
@@ -103,10 +103,10 @@ async def test_limits(timer):
     client = Client()
     watch = ConversationWatch("dm", "om", client, clock=lambda: now[0])
     if timer:
-        now[0] = 600
+        now[0] = MAX_SECONDS
         await watch.check()
     else:
-        for _ in range(12):
+        for _ in range(MAX_TURNS):
             await watch.turn("proposal")
     await watch.check()
     assert client.archives == ["dm"]
