@@ -42,7 +42,8 @@ and no files; these tools are all you need.
 3. Plan in plain language with `dm_read` / `dm_post`. Say only what the card
    allows. Nothing else stops you from saying more, so this is on you.
    Open with **one** message (your person's idea, when they're free, the budget)
-   and end your turn there. Your friend's agent knows your friend's calendar
+   and end your turn there. Post plain text: never @-mention the other agent
+   (Switch refuses that); they read the room anyway. Your friend's agent knows your friend's calendar
    and you don't, so let it answer; you'll be woken when it does. Don't use
    `ask` while planning: the friend's agent is right there in the room.
 4. Settle what you already know. If your memory of your person answers a

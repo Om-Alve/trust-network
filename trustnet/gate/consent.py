@@ -23,6 +23,29 @@ def save(person, state):
     temp.replace(path)
 
 
+async def _friend_spoke(client, room, agent):
+    """Whether ``agent`` has posted in ``room`` itself.
+
+    Not counted: Switch's automatic greeting (sent under the agent's name within
+    two seconds of it joining) and Switch's notices, which start by addressing
+    whoever triggered them (``@om-hermes You're not permitted …``).
+    """
+    context = await client.read_context(room_id=room, limit=200)
+    messages = [m for t in context.get("threads", []) for m in (t["root"], *t.get("replies", []))]
+    joined = None
+    for m in sorted(messages, key=lambda m: m.get("timestamp", 0)):
+        if (m.get("sender_name") or m.get("sender")) != agent:
+            continue
+        if m.get("kind") == "room_join":
+            joined = m.get("timestamp", 0)
+            continue
+        if joined is not None and m.get("timestamp", 0) - joined < 2_000:
+            continue
+        if not m.get("body", "").lstrip().startswith("@"):
+            return True
+    return False
+
+
 def digest(card):
     return hashlib.sha256(card.encode()).hexdigest()
 
@@ -45,6 +68,15 @@ async def handle(gate, event, command, sender, mode):
             if sender.id not in {main_agent(person), friend + "-gate"}:
                 return
             ref = command.proposal_id
+            if sender.id == main_agent(person) and not await _friend_spoke(
+                client, event.room_id, main_agent(friend)
+            ):
+                # A plan is agreed between two agents; one alone can't propose it.
+                await client.connect_to_room(event.room_id)
+                await client.post_message(
+                    f"{ref} not recorded: wait for {main_agent(friend)} to reply here first."
+                )
+                return
             card = (
                 f"{command.start.isoformat()} {int(command.duration.total_seconds() / 60)}m "
                 f'"{command.title}" @ "{command.place}"'
