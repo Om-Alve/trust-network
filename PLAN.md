@@ -250,9 +250,9 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 
 1. **Om tells his own Hermes, on Discord:** "ask around if anyone can lend me a tent for Nov 14–16." `om-hermes` calls `ask_around("tent to borrow, Nov 14-16")` over `tn mcp`, reaching `om-gate`.
 2. **`om-gate`** posts the question in each connection room (`conn-om-rahul`, `conn-om-priya`).
-3. **`priya-gate`** finds `tent` in her `has` facts (friend level) and answers right away: "Priya: 2-person tent."
-4. **`rahul-gate`** has no matching fact, so it **asks its person** by relaying to `rahul-home`. `rahul-hermes` picks it up via `inbox` and relays it to Rahul on Discord; Rahul says "no, sorry" to his own Hermes, and the answer comes back through `rahul-hermes`.
-5. **`om-hermes` tells Om (on Discord):** "Priya can lend a 2-person tent. Rahul can't." (Om can also check `#om-home` directly.) Recommendations work the same way, e.g. "a good dentist nearby?" is answered from friends' `recommends` facts.
+3. **`priya-gate`** returns her visible `has` and `recommends` facts immediately, including the friend-level 2-person tent. This is provisional information, not consent to lend.
+4. **Each receiving gate whose person has a registered main agent asks its person** through their home inbox for a relevant answer. Priya has only a gate, so her provisional profile answer needs no confirmation. `rahul-hermes` relays Rahul's `answer A<n> "no, sorry"` back through his gate. Responses are quoted and collected for five minutes.
+5. **`om-hermes` reads Om's home summary**, which updates as facts and personal answers arrive. Om's Hermes judges relevance from raw quoted profile items and must not treat ownership as a promise to lend. Gates do not judge meaning. Both `has` and `recommends` use the same level filtering.
 
 ### Overreach and view-as (P1, about 1 h)
 

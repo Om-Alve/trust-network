@@ -9,7 +9,9 @@ mode): there the gate logs the overreach and posts nothing home.
 """
 
 import asyncio
+import json
 import logging
+import time as wall_time
 from collections.abc import Callable, Mapping
 from datetime import datetime, time, timedelta
 from typing import Any
@@ -124,6 +126,10 @@ class Gate:
             type(command), type(command).__name__.lower()
         )
         direction = Direction.OUTBOUND if sender.person == self.person else Direction.INBOUND
+        if isinstance(command, c.AskAround):
+            name = "ask-around"
+        if isinstance(command, c.Answer) and command.reference.startswith("A") and not own_side:
+            name = "around-reply"
         decision = authorize(
             name,
             sender,
@@ -171,6 +177,11 @@ class Gate:
                 )
             return
         if isinstance(command, (c.ViewAs, c.Ledger, c.Trust)) and level != Level.SELF:
+            return
+        if isinstance(command, c.AskAround) or (
+            isinstance(command, c.Answer) and command.reference.startswith("A")
+        ):
+            await self._around(event, command, sender, level, own_side, room_detail)
             return
         # Consent is a gate relay, never an alias for the owner's yes command.
         if isinstance(command, (c.AskOwner, c.Answer, c.Propose, c.Yes, c.No, c.Consent)):
@@ -243,6 +254,174 @@ class Gate:
                 ledger.record(field, value, recipient, event.room_id, "answer", person=self.person)
         for field, note in overreach:
             await self._overreach(event, sender, field, note)
+
+    def _around_state(self):
+        path = resolve_data_dir(self.person) / "ask-around.json"
+        return json.loads(path.read_text()) if path.exists() else {}
+
+    def _save_around(self, state):
+        path = resolve_data_dir(self.person) / "ask-around.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch(mode=0o600)
+        path.write_text(json.dumps(state))
+
+    async def _around(self, event, command, sender, level, own_side, detail):
+        state = self._around_state()
+        if isinstance(command, c.AskAround) and own_side:
+            if level != Level.SELF or command.reference:
+                return
+            ref = "A" + str(wall_time.time_ns())
+            entry = {
+                "question": command.question.text,
+                "expires": self._now().timestamp() + 300,
+                "peers": {},
+                "answers": {},
+            }
+            state[ref] = entry
+            self._save_around(state)
+            memberships = (await self.client.get_agent_detail(self.client.agent_id))["rooms"]
+            for friend in load_trust(self.person).people:
+                name = "conn-" + "-".join(sorted((self.person, friend)))
+                room = next(
+                    (
+                        r["room_id"]
+                        for r in memberships
+                        if r["room_name"].lstrip("#") == name and not r.get("archived")
+                    ),
+                    None,
+                )
+                if room is None:
+                    result = await self.client.create_room(
+                        name, "Gate connection", [self.person + "-gate"], internal_only=True
+                    )
+                    room = result.get("room_id", result.get("id"))
+                    await self.client.connect_to_room(room)
+                    await self.client.invite_agent_to_room(room, friend + "-gate")
+                entry["peers"][friend] = room
+                self._save_around(state)
+                await self.client.connect_to_room(room)
+                await self.client.post_message(
+                    f"@{friend}-gate ask-around {ref} {command.question}"
+                )
+                ledger.record(
+                    "question",
+                    command.question.text,
+                    friend,
+                    room,
+                    "ask-around",
+                    person=self.person,
+                )
+            await relay.post_home(
+                self.person, f"{ref} asking around: {command.question}", client=self.client
+            )
+            return
+        if isinstance(command, c.AskAround):
+            pair = "-".join(sorted((self.person, sender.person)))
+            name = (detail or {}).get("name", (detail or {}).get("room_name", "")).lstrip("#")
+            if (
+                sender.id != sender.person + "-gate"
+                or name != "conn-" + pair
+                or not command.reference
+            ):
+                return
+            key = sender.person + ":" + command.reference
+            if key in state:
+                return
+            state[key] = {
+                "room": event.room_id,
+                "peer": sender.person,
+                "reference": command.reference,
+                "expires": self._now().timestamp() + 300,
+                "question": command.question.text,
+                "answered": False,
+            }
+            self._save_around(state)
+            # Return permitted facts verbatim. No inference about intent or willingness to lend.
+            values = visible_facts(load_profile(self.person), level)
+            facts = {k: values[k] for k in ("has", "recommends") if values.get(k)}
+            text = (
+                "Profile lists, no lending promise: "
+                + "; ".join(f"{k}: {v}" for k, v in facts.items())
+                if facts
+                else ""
+            )
+            try:
+                quoted = c.Quoted(text)
+            except ValueError:
+                quoted = None
+            if quoted:
+                await self._around_send(state, key, quoted)
+            if not any(
+                i.id == dm.main_agent(self.person) and i.person == self.person
+                for i in self.identities().values()
+            ):
+                return
+            state[key]["answered"] = False
+            local = "A" + str(wall_time.time_ns())
+            state[key]["local"] = local
+            self._save_around(state)
+            await relay.post_home(
+                self.person,
+                f"{local} {sender.person} asks {command.question}. Reply with answer {local}.",
+                client=self.client,
+            )
+            return
+        ref = command.reference
+        if own_side:
+            if level != Level.SELF:
+                return
+            key = next((k for k, v in state.items() if v.get("local") == ref), None)
+            if key:
+                pending = state[key]
+                # Membership and trust must still permit disclosure at answer time.
+                await self.client.connect_to_room(pending["room"])
+                ids = self.identities()
+                members = [ids.get(p["id"]) for p in await self.client.list_participants()]
+                if (
+                    None in members
+                    or room_level(self.person, members, load_trust(self.person)) is None
+                ):
+                    return
+                await self._around_send(state, key, command.text)
+            return
+        entry = state.get(ref)
+        if not entry or entry.get("expires", 0) < self._now().timestamp():
+            return
+        if entry.get("peers", {}).get(sender.person) != event.room_id:
+            return
+        entry["answers"][sender.person] = command.text.text
+        self._save_around(state)
+        ledger.record(
+            "answer:" + sender.person,
+            command.text.text,
+            self.person,
+            event.room_id,
+            "ask-around",
+            person=self.person,
+        )
+        summary = "\n".join(f"{p}: {c.Quoted(t)}" for p, t in entry["answers"].items())
+        await relay.post_home(
+            self.person,
+            f"{ref} answers to {c.Quoted(entry['question'])}:\n{summary}",
+            client=self.client,
+        )
+
+    async def _around_send(self, state, key, text):
+        entry = state[key]
+        if entry["answered"] or entry["expires"] < self._now().timestamp():
+            return
+        await self.client.connect_to_room(entry["room"])
+        await self.client.post_message(f"@{entry['peer']}-gate answer {entry['reference']} {text}")
+        ledger.record(
+            "ask-around-answer",
+            text.text,
+            entry["peer"],
+            entry["room"],
+            "ask-around",
+            person=self.person,
+        )
+        entry["answered"] = True
+        self._save_around(state)
 
     async def _overreach(self, event, sender, field, text):
         """Alert the owner about one boundary breach, unless surprise mode applies."""

@@ -108,7 +108,7 @@ _PERSON_RE: Final = re.compile(r"[a-z0-9][a-z0-9_-]*")
 _FACT_RE: Final = re.compile(r"[a-z][a-z0-9_-]*")
 _ROOM_RE: Final = re.compile(r"[a-z0-9][a-z0-9_-]*")
 _PROPOSAL_ID_RE: Final = re.compile(r"P\d+", re.IGNORECASE)
-_REFERENCE_RE: Final = re.compile(r"[QP]\d+", re.IGNORECASE)
+_REFERENCE_RE: Final = re.compile(r"[AQP]\d+", re.IGNORECASE)
 _PLACE_RE: Final = re.compile(r"[A-Za-z0-9 ,.'&-]+")
 _TITLE_FORBIDDEN: Final = frozenset('\n\r"@')
 _DURATION_RE: Final = re.compile(
@@ -307,6 +307,7 @@ class AskAround(_Addressed):
     """``ask-around "<question>"``: inbound from a friend's gate, or owner-sent."""
 
     question: Quoted
+    reference: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -870,7 +871,12 @@ def _handle_claim(args: str, *, target: str | None, now: datetime, raw: str) -> 
 def _handle_ask_around(args: str, *, target: str | None, now: datetime, raw: str) -> Command:
     if not args:
         raise _err("ask-around", "ask-around needs a quoted question", raw)
+    reference = None
+    parts = args.split(maxsplit=1)
+    if len(parts) == 2 and re.fullmatch(r"A\d+", parts[0]):
+        reference, args = parts
     return AskAround(
+        reference=reference,
         question=_quoted(args, command="ask-around", raw=raw),
         target=target,
     )
@@ -905,7 +911,7 @@ def _handle_no(args: str, *, target: str | None, now: datetime, raw: str) -> Com
 
 
 def _handle_answer(args: str, *, target: str | None, now: datetime, raw: str) -> Command:
-    match = re.fullmatch(r"(?P<ref>[QP]\d+)\s+(?P<text>.+)", args, re.IGNORECASE)
+    match = re.fullmatch(r"(?P<ref>[AQP]\d+)\s+(?P<text>.+)", args, re.IGNORECASE)
     if not match:
         raise _err("answer", "answer needs a question or proposal ID and a text", raw)
     return Answer(

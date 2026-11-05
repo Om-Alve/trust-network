@@ -100,3 +100,11 @@ async def dm_post(person, room, text):
     from trustnet.tn.dm import operate
 
     return await operate(person, room, text)
+
+
+async def ask_around(person: str, question: str):
+    """Ask the owner gate to fan out a quoted question to listed friends."""
+    quoted = Quoted(question)
+    async with session(person) as client:
+        await client.connect_to_room(await home(person, client))
+        return await client.post_message(f"@{person}-gate ask-around {quoted}")

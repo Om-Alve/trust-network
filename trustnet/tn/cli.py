@@ -238,8 +238,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     view.set_defaults(handler=_cmd_view_as)
 
-    for name in ("inbox", "answer", "dm"):
+    for name in ("inbox", "answer", "dm", "ask-around"):
         sub = commands.add_parser(name, parents=[common])
+        if name == "ask-around":
+            sub.add_argument("question")
         if name == "answer":
             sub.add_argument("id")
             sub.add_argument("text")
@@ -644,10 +646,13 @@ def _cmd_personal(context, args):
 
     values = {
         "inbox": (),
+        "ask-around": (getattr(args, "question", None),),
         "answer": (getattr(args, "id", None), getattr(args, "text", None)),
         "dm": (getattr(args, "friend", None), getattr(args, "goal", None)),
     }
-    result = asyncio.run(getattr(personal, args.command)(context.owner(), *values[args.command]))
+    result = asyncio.run(
+        getattr(personal, args.command.replace("-", "_"))(context.owner(), *values[args.command])
+    )
     return context.emit(result, json.dumps(result, ensure_ascii=False))
 
 
