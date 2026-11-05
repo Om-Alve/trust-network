@@ -47,9 +47,9 @@ async def wait_until_live(client, room: str, body: str, timeout: float = LIVE_WA
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
     while loop.time() < deadline:
-        detail = await client.get_room_detail(room)
-        if (detail.get("agent_statuses") or {}).get(target.group(1)) == "live":
-            return
+        statuses = (await client.get_room_detail(room) or {}).get("agent_statuses")
+        if statuses is None or statuses.get(target.group(1)) == "live":
+            return  # a server that doesn't report sessions can't be waited on
         await asyncio.sleep(0.5)
     LOG.warning("%s not live in %s after %ss; posting anyway", target.group(1), room, timeout)
 
