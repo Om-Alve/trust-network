@@ -16,7 +16,7 @@
 | Who talks across people | **Envoys**: OpenCode with OpenCode Go DeepSeek V4.1 Flash for Om and Codex for Rahul, launched by the trust-network runner (phase 13b). One envoy per friend. Its **instructions are the brief**, rewritten before each conversation, holding only what the trust level allows. File and shell tools are off. Each DM room gets a fresh session. Main agents never meet other people's agents. |
 | Who holds private data | Each person's **gate**: our code, no LLM, running on the person's own machine |
 | Machines | **Om's side on the laptop**: Switch server (Docker, run by Console), Console, `om-gate`, `priya-gate`. **Rahul's side on the Azure VM**: `rahul-gate`, Hermes, and Switch's headless `switch-agent-controller` running his envoy. Joined by **Tailscale**: `tailscale serve` gives the laptop's Switch server an https address only tailnet devices can reach. |
-| Custom envoy runner | **Fallback only**, if the managed-agent path fails a Day-0 check (§8 checks 3–5) |
+| Custom envoy runner | **Selected by Day-0**. Phase 13b runs both envoys with native tool denial and isolated state; macOS Seatbelt adds read confinement. Linux requires a separate OS user/container. |
 | Planner agent | None. Your envoy plans with their envoy. |
 | Tally / group secrets | Dropped. When an agent lacks a fact, it **asks its person**. |
 | Trust levels | **close / friend / acquaintance**, per person, in each owner's own list. Mutual: each side sets its own level. |
@@ -52,7 +52,7 @@
 | Person | Runs on | Main agent (knows their life) | Where they talk to it | Envoy (talks to other people's envoys) | Gate | Trust list |
 |---|---|---|---|---|---|---|
 | **Om** | laptop | Codex (managed, Switch Console) | Discord `#om-home` | `om-envoy-rahul`: OpenCode (`opencode-go/deepseek-v4.1-flash`), via the trust-network runner on the laptop | `om-gate` | Rahul: close, Priya: friend |
-| **Rahul** | Azure VM | Hermes (Telegram), joined through `tn mcp` as `rahul-hermes` | Telegram | `rahul-envoy-om`: Codex, managed, on the VM's controller | `rahul-gate` | Om: close |
+| **Rahul** | Azure VM | Hermes (Telegram), joined through `tn mcp` as `rahul-hermes` | Telegram | `rahul-envoy-om`: Codex via the phase 13b runner, laptop until phase 16 confinement is available | `rahul-gate` | Om: close |
 | **Priya** | laptop | none in the demo (optional: OpenCode) | — | — | `priya-gate` | Om: friend |
 
 Rahul and Priya are separate Switch users with their own registration keys. Rahul's machine is enrolled under his own account (Gateway → Machines), so his envoy is his, on his machine, and nothing of his runs under Om's account. **Rahul's side doesn't need Switch Console:** the VM runs Switch's headless agent controller.
