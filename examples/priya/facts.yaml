@@ -1,0 +1,11 @@
+# examples/priya/facts.yaml — Priya, or her gate through `tn fact set`, keeps this current.
+calendar: ./calendar.ics
+facts:
+  diet:          {value: vegetarian,                       level: acquaintance}
+  city:          {value: Bangalore,                        level: acquaintance}
+  interests:     {value: [reading, hiking, board games],   level: friend}
+  has:           {value: [2-person tent, trekking poles],  level: friend}   # Scene 3
+  recommends:    {value: {dentist: "Dr. Menon, 100 Ft Road"}, level: friend}
+  neighbourhood: {value: Koramangala,                      level: close}
+  sizes:         {value: {tshirt: S},                      level: close}
+  address:       {value: "7, 80 Feet Road, Koramangala, Bangalore 560034", level: private}

@@ -1,0 +1,8 @@
+# examples/priya/trust.yaml — only Priya edits this.
+people:
+  om: friend
+consent:
+  default: direct            # Priya answers for herself
+envoy:
+  provider: opencode         # optional in the demo; her gate answers from facts
+  machine: "<laptop machine name in Switch>"   # filled in by scripts/demo_up.py

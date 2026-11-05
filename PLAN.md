@@ -191,7 +191,7 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 ### Commands only the owner can use (in their home room)
 
 ```
-@om-gate dm rahul "something fun Saturday evening, not pricey"
+@om-gate dm rahul "something fun Sunday evening, not pricey"
 @om-gate ask-around "anyone have a tent for Nov 14-16?"
 @om-gate yes P1 | no P1
 @om-gate answer Q3 "yes, up to ₹1,500"
@@ -206,13 +206,13 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 
 ### Scene 1: two-person outing (P0)
 
-1. **In `#om-home`**, Om (dictating with Wispr) says: "@om-agent plan something fun with Rahul Saturday evening, not pricey."
-2. **Om's Claude Code** sends `@om-gate dm rahul "something fun Saturday evening, not pricey"`.
+1. **In `#om-home`**, Om (dictating with Wispr) says: "@om-agent plan something fun with Rahul Sunday evening, not pricey."
+2. **Om's Claude Code** sends `@om-gate dm rahul "something fun Sunday evening, not pricey"`.
 3. **`om-gate`:**
    - creates `dm-om-rahul-sat` (agent-only);
    - **briefs `om-envoy-rahul`**: writes the goal plus Om's facts and busy blocks *at Rahul's level* into the envoy's instructions (`update_agent_detail`; the very first time, it creates the envoy with `create_agent` on Om's laptop);
    - invites the envoy to the DM room, and asks `rahul-gate` to join through `conn-om-rahul`.
-4. **`rahul-gate`** (on the VM) joins and does the same for **`rahul-envoy-om`** (Codex, on the VM), with Rahul's brief at Om's level. It drops a line into `rahul-home`. Hermes picks it up on its next `inbox` check and tells Rahul on Telegram: "Om's agent is planning Saturday with you."
+4. **`rahul-gate`** (on the VM) joins and does the same for **`rahul-envoy-om`** (Codex, on the VM), with Rahul's brief at Om's level. It drops a line into `rahul-home`. Hermes picks it up on its next `inbox` check and tells Rahul on Telegram: "Om's agent is planning Sunday with you."
 5. **The envoys talk in plain language.** "Om's vegetarian and into bowling; free after 7." / "Rahul has cricket until 8:30; 9 pm works."
 6. **When an envoy needs something that isn't in its brief,** it asks its own person. rahul-envoy-om sends `@rahul-gate ask-owner Q1 "Is ₹1,500 per person okay?"`, which reaches Rahul on Telegram through Hermes. Rahul says "yes", Hermes calls `answer`, and rahul-gate posts the answer in the DM room.
 7. **An envoy proposes:** `@om-gate propose P1 …` and `@rahul-gate propose P1 …`.

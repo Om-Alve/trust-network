@@ -1,0 +1,18 @@
+# examples/om/facts.yaml — Om, or Om's agent through `tn fact set`, keeps this current.
+calendar: ./calendar.ics
+facts:
+  diet:          {value: vegetarian,                        level: acquaintance}
+  city:          {value: Bangalore,                         level: acquaintance}
+  drinks:        {value: no alcohol,                        level: friend}
+  interests:     {value: [bowling, board games, sci-fi],    level: friend}
+  has:           {value: [projector, camping stove],        level: friend}   # for ask-around
+  recommends:    {value: {dentist: "Dr. Rao, 12th Main"},   level: friend}
+  neighbourhood: {value: Indiranagar,                       level: close}
+  sizes:         {value: {tshirt: M},                       level: close}
+  wishlist:
+    value:
+      - {item: Catan Seafarers, price: 2500}
+      - {item: Hario V60, price: 2000}
+      - {item: Kindle Paperwhite, price: 14000}
+    level: close
+  address:       {value: "42, 12th Main, Indiranagar, Bangalore 560038", level: private}   # never shared

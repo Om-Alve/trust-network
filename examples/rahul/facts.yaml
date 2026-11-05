@@ -1,0 +1,12 @@
+# examples/rahul/facts.yaml — Rahul, or Hermes through `tn fact set`, keeps this current.
+calendar: ./calendar.ics
+facts:
+  diet:          {value: non-vegetarian,                       level: acquaintance}
+  city:          {value: Bangalore,                            level: acquaintance}
+  drinks:        {value: occasional beer,                      level: friend}
+  interests:     {value: [cricket, sci-fi, board games],       level: friend}
+  has:           {value: [badminton racket, bluetooth speaker], level: friend}   # no tent: Scene 3
+  recommends:    {value: {gym: "Cult Fit, Koramangala"},       level: friend}
+  neighbourhood: {value: Koramangala,                          level: close}
+  sizes:         {value: {tshirt: L},                          level: close}
+  address:       {value: "18, 5th Block, Koramangala, Bangalore 560095", level: private}
