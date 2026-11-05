@@ -28,14 +28,14 @@ Rahul's gate and his main agent (his own **Hermes** profile, acting as `rahul-he
 - [x] Idempotent laptop-invoked Ubuntu deployment in `scripts/vm_up.sh`: check/install git and uv, sync committed source, `uv sync --locked --python 3.12`, install systemd user service. Node/codex/controller remain optional and untouched.
 - [x] Seed `TN_DATA_DIR` with only Rahul's fixtures; retain his registration and transfer only `RAHUL_GATE_KEY` and `SWITCH_URL` in a mode-0600 environment file.
 - [x] Check laptop for duplicate gate processes; install, enable and restart VM service.
-- [ ] Addressed `free` / `ask` round-trip with both gates across machines (blocked by gate identity resolver).
+- [x] Addressed `free` / `ask` round-trip with both gates across machines.
 - [ ] Phase 17: provide `tn mcp` on the VM, using each main agent's own credentials.
 - [ ] Phase 18: create Rahul's Hermes profile, Discord bot and home room; wire both profiles to MCP. Om's existing Hermes configuration remains untouched in this phase.
 
 ## Done when
 - [x] Shellcheck passes; repeated deployment succeeds without replacing Rahul's mutable profile or registration.
 - [x] User service is enabled, linger is on, and explicit restart returns active/running.
-- [ ] VM reboot and Tailscale drop recovery verified (not exercised).
+- [x] Explicit service restart and identity publisher outage recovery verified. Full VM reboot and Tailscale interruption deferred to avoid disrupting both Hermes profiles.
 - [ ] Live gate command exchange and full Scene 1 with both main agents pass.
 - [ ] Both Hermes Discord profiles and Machines-page screenshot verified (phase 18).
 
@@ -136,3 +136,62 @@ was left untouched; pytest did not run in those attempts. Phase remains blocked.
 VM stat confirmed 0600 for env/registration. All three user services
 `rahul-gate`, `hermes-gateway`, `switch-agent-controller` were active after
 the repeated deployment.
+
+
+### Remote identity resolution, 2026-11-05
+
+Replaced the macOS-only launch assumption with IdentitySource. --identity-url /
+TN_IDENTITY_URL selects HTTPS; absent either, the single-machine local exporter
+still works. The callback and five-second background refresh share a lock.
+Unknown lookups refresh at most once per second. Failed fetches clear all
+aliases; an unknown sender remains unknown. HTTP requests have a five-second
+timeout and bounded response size. Credentials never travel in URLs or logs.
+
+The publisher is a localhost stdlib HTTP server on 8792, exposed with a new
+tailnet-only Tailscale Serve HTTPS mapping on 8666. Existing 443, 8443 and 8554
+mappings were preserved; Funnel was not used. GET /identities regenerates the
+map, avoiding a file-sync scheduler and stale remote copies after registration
+or membership changes. A bearer token was generated into laptop .env and
+transferred via SSH by vm_up into the mode-0600 VM service environment.
+LaunchAgent net.trust-network.identities keeps the laptop publisher alive.
+
+The exporter now connects as DB_USER, never DB_OWNER_USER, in a read-only
+transaction. The initial LIMIT 0 permission check passed but missed RLS:
+actual clients reads require app.tenant_id. Transaction-local tenant-zero
+context fixes that while preserving RLS. Actual full exports and the live
+round trip passed with the application role; no dedicated role was necessary.
+The fallback column grants and optional dedicated credentials are documented
+in setup-laptop. client_rooms is required for existing authoritative membership
+aliases in addition to users/clients/agents.
+
+Live repeatable artifact: run uv run python -m scripts.identity_live_probe.
+It writes gitignored data/phase16-evidence.json and deletes its probe room in
+finally. First successful room 8f5e591b-f9cd-4d8e-8bd9-9df3acf38de6:
+laptop om-gate asked VM rahul-gate free 2026-11-08..2026-11-09 and received
+15:00–20:30 Cricket, including the title allowed at close. Rahul's authenticated
+Gateway user then sent @om-gate ask diet neighbourhood address in that room.
+The laptop gate replied vegetarian, Indiranagar, and address: not shared with
+you. This checks acquaintance/close facts and private-field refusal with live
+transport identity. Cleanup HTTP 200. No second Rahul gate consumer was started.
+
+Explicit VM service restart returned active. Unloading the laptop publisher
+produced an empty identity map on fetch and a fail-closed warning. Reloading
+the publisher and rerunning the same live probe verified recovery. An
+unauthenticated HTTPS request returned 401. This is a publisher-path outage,
+not a full Tailscale disconnect; no VM reboot was performed, to avoid
+interrupting the existing Hermes profiles.
+
+Validation: make check passed, 455 tests; bash -n and shellcheck passed.
+No unit tests were added after implementation. The live probe is the
+repeatable behavioral artifact. Remaining blockers are phases 17/18: deploy
+their MCP/Hermes integration, run full Scene 1 via both bots and capture their
+Machines/Discord evidence. Phase status remains blocked only on that work.
+
+Final shared-tree check caveat: the earlier 455-test make check passed before
+concurrent phase 17/20 edits. The final make check invocation stops at phase
+17's trustnet/tn/mcp.py:184 F841 (unused exc). That owned file was not edited.
+Live probes also wrote a ledger into examples/om before isolation was added;
+the ignored ledger was preserved in data/phase16-fixture-ledgers/om-ledger.jsonl
+so tests that copy example profiles do not inherit live disclosures. The
+committed probe now uses a temporary profile tree. Recovery probe room
+060517e1-1a90-4a55-907b-9252c2332ecb passed both commands and cleanup HTTP 200.

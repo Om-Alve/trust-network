@@ -363,3 +363,18 @@ too, or phase 16 is cut (PLAN.md §9 cut lines). Record which you chose in
 - `--separate-users` hardening (P2, PLAN.md §6).
 - `scripts/vm_up.sh`, which later automates Node, `codex`, `uv`, enrolment and the
   gate service (PLAN.md §5).
+
+## Remote gate identities
+
+Set `TN_IDENTITY_URL=https://<laptop-tailnet-name>:8666/identities` and
+`TN_IDENTITY_TOKEN` in the laptop's gitignored mode-0600 .env. The token must
+match the laptop publisher. `scripts/vm_up.sh` transfers both over SSH without
+printing them, into the mode-0600 rahul.env service environment.
+No database credentials or macOS executable are needed on the VM.
+
+The gate accepts `--identity-url` or TN_IDENTITY_URL; without either it uses the
+local exporter for a single-machine installation. It refreshes every five
+seconds and on unknown lookup, at most once per second. Fetch failures clear
+the map, so commands receive no disclosure until a successful refresh.
+Restart with `systemctl --user restart rahul-gate`; inspect state with
+`systemctl --user is-active rahul-gate`. Re-deploy after committing changes.

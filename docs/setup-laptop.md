@@ -293,3 +293,41 @@ Then follow [setup-vm.md](setup-vm.md) from the VM.
   turns on for `om-gate` and `rahul-gate`.
 - `#om-home` and `templates/home.template.yaml` (phase 11).
 - `scripts/demo_up.py` (phase 22), which automates the repeatable parts of this.
+
+## Gate identity publisher
+
+The exporter uses Console's application `DB_USER` and `DB_PASSWORD`, in a
+read-only transaction. On Switch 0.31.0 this role can SELECT the required
+columns in users, clients, agents and client_rooms. No owner credentials are
+used. If a future installation restricts this role, provision a dedicated
+login with a separately generated password. Set TN_IDENTITY_DB_USER and
+TN_IDENTITY_DB_PASSWORD in the publisher environment for that role.
+The minimum grants are:
+
+```sql
+CREATE ROLE trustnet_identity LOGIN;
+GRANT CONNECT ON DATABASE switch TO trustnet_identity;
+GRANT USAGE ON SCHEMA public TO trustnet_identity;
+GRANT SELECT (id,email) ON users TO trustnet_identity;
+GRANT SELECT (id,matrix_user_id,user_id,type) ON clients TO trustnet_identity;
+GRANT SELECT (id,name,owner_id,client_id) ON agents TO trustnet_identity;
+GRANT SELECT (room_id,client_id) ON client_rooms TO trustnet_identity;
+ALTER ROLE trustnet_identity SET default_transaction_read_only = on;
+```
+
+Set its password interactively with psql's `\password trustnet_identity`.
+The database name must match the installation. Keep credentials on the laptop.
+
+For this deployment, LaunchAgent `net.trust-network.identities` runs
+`.venv/bin/python -m scripts.identity_serve` in this checkout. Its mode-0600
+plist contains only the publisher bearer token, copied from gitignored `.env`
+(`TN_IDENTITY_TOKEN`). The server binds 127.0.0.1:8792.
+`tailscale serve --bg --https=8666 http://127.0.0.1:8792` adds a tailnet-only
+mapping; never use Funnel. Existing ports 443, 8443 and 8554 stay intact.
+GET /identities requires the bearer token and regenerates the non-secret map.
+No request headers are logged. Only the three explicit demo emails map to people.
+
+The exporter sets transaction-local app.tenant_id to Switch's tenant-zero UUID.
+Set TN_SWITCH_TENANT in the publisher environment for another tenant. The
+application role enforces row-level security; a column-only LIMIT 0 query does
+not exercise that policy.

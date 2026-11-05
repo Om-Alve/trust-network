@@ -23,12 +23,12 @@ if host.startswith('-'):
 # Refuse a simultaneous local registration consumer; bounded probes must finish first.
 processes = subprocess.check_output(['ps', '-axo', 'command='], text=True)
 for line in processes.splitlines():
-    if ('python' in line and any(name in line for name in
-            ('trustnet.gate', 'scripts.dm_live_probe', 'scripts.gate_live_probe',
+    if ('trustnet.gate' in line and '--person rahul' in line) or ('python' in line and any(name in line for name in
+            ('scripts.dm_live_probe', 'scripts.gate_live_probe',
              'scripts.e2e_scene1'))):
         raise SystemExit('Stop the local gate/probe before deploying Rahul')
 env = read_env(Path('.env'))
-for key in ('SWITCH_URL', 'RAHUL_GATE_KEY'):
+for key in ('SWITCH_URL', 'RAHUL_GATE_KEY', 'TN_IDENTITY_URL', 'TN_IDENTITY_TOKEN'):
     if not env.get(key) or any(c in env[key] for c in '\n\r\x00'):
         raise SystemExit('Missing or invalid required VM environment value')
 state = json.loads(Path('data/day0-state.json').read_text())
@@ -46,9 +46,8 @@ with tempfile.TemporaryDirectory(prefix='tn-vm-') as temporary:
         # Fixed destinations, not arbitrary .env contents. Never copy other credentials.
         files = {
             '.vm/rahul.env': ''.join(k + '=' + '"' + env[k].replace('\\', '\\\\').replace('"', '\\"') + '"\n'
-                                   for k in ('SWITCH_URL', 'RAHUL_GATE_KEY')),
+                                   for k in ('SWITCH_URL', 'RAHUL_GATE_KEY', 'TN_IDENTITY_URL', 'TN_IDENTITY_TOKEN')),
             '.vm/state.json': json.dumps({'rahul': state['rahul']}),
-            '.vm/identities.json': Path('data/gate-identities.json').read_text(),
         }
         for name, value in files.items():
             raw = value.encode()
@@ -72,7 +71,6 @@ tar xf -
 install -m 600 .vm/rahul.env "$HOME/.config/trust-network/rahul.env"
 mkdir -p data/profiles/rahul
 if [ ! -f data/rahul-state.json ]; then install -m 600 .vm/state.json data/rahul-state.json; fi
-install -m 600 .vm/identities.json data/gate-identities.json
 rm -rf .vm
 for file in facts.yaml calendar.ics trust.yaml; do
     if [ ! -f "data/profiles/rahul/$file" ]; then

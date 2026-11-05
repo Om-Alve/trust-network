@@ -5,19 +5,13 @@ import asyncio
 import json
 import logging
 import os
-import subprocess
 from pathlib import Path
 
-from trustnet.gate.policy import Identity, SenderKind
+from trustnet.gate.identity import IdentitySource, read_identities
 from trustnet.gate.runtime import Gate
 from trustnet.switch_client import SwitchClient
 
-
-def read_identities(path):
-    return {
-        key: Identity(SenderKind(value["kind"]), value["id"], value.get("owner_id"))
-        for key, value in json.loads(path.read_text()).items()
-    }
+__all__ = ["read_identities"]
 
 
 async def run(args):
@@ -36,20 +30,14 @@ async def run(args):
     else:
         client = SwitchClient(os.environ["SWITCH_URL"], credentials["id"], credentials["api_key"])
     try:
+        identities = IdentitySource(args.identity_map, args.identity_url)
 
-        def identities():
-            core = (
-                Path.home()
-                / "Library/Application Support/switchdash/local-switch-server/native/switch-core/0.31.0"
-            )
-            exporter = Path(__file__).resolve().parents[2] / "scripts/gate_identity_export.py"
-            subprocess.run(
-                [str(core / "venv/bin/python"), str(exporter)],
-                check=True,
-                env={**os.environ, "TN_IDENTITY_MAP": str(args.identity_map)},
-            )
-            return read_identities(args.identity_map)
+        async def refresh():
+            while True:
+                await asyncio.to_thread(identities.refresh)
+                await asyncio.sleep(5)
 
+        refresh_task = asyncio.create_task(refresh())
         gate_task = asyncio.create_task(Gate(args.person, client, identities).run())
         try:
             await client.ready.wait()
@@ -59,6 +47,8 @@ async def run(args):
                     await client.connect_to_room(room["room_id"])
             await gate_task
         finally:
+            refresh_task.cancel()
+            await asyncio.gather(refresh_task, return_exceptions=True)
             gate_task.cancel()
             await asyncio.gather(gate_task, return_exceptions=True)
     finally:
@@ -71,6 +61,7 @@ def main():
     parser.add_argument("--key-env", required=True)
     parser.add_argument("--state", type=Path, default=Path("data/day0-state.json"))
     parser.add_argument("--identity-map", type=Path, default=Path("data/gate-identities.json"))
+    parser.add_argument("--identity-url", default=os.environ.get("TN_IDENTITY_URL"))
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     asyncio.run(run(args))

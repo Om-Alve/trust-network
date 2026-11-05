@@ -25,13 +25,17 @@ async def main():
     db = await asyncpg.connect(
         host=env["DB_HOST"],
         port=int(env["DB_PORT"]),
-        user=env["DB_OWNER_USER"],
-        password=env["DB_OWNER_PASSWORD"],
+        user=os.environ.get("TN_IDENTITY_DB_USER", env["DB_USER"]),
+        password=os.environ.get("TN_IDENTITY_DB_PASSWORD", env["DB_PASSWORD"]),
         database=env["DB_NAME"],
     )
     result = {}
     try:
         async with db.transaction(readonly=True):
+            await db.execute(
+                "SELECT set_config('app.tenant_id', $1, true)",
+                os.environ.get("TN_SWITCH_TENANT", "00000000-0000-0000-0000-000000000000"),
+            )
             users = await db.fetch("SELECT id,email FROM users")
             people = {
                 r["id"]: {
@@ -67,7 +71,10 @@ async def main():
                     result["room:" + row["room_id"] + ":" + row["client_id"]] = identity
         path = Path(os.environ.get("TN_IDENTITY_MAP", "data/gate-identities.json"))
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(result))
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(result))
+        temporary.chmod(0o600)
+        temporary.replace(path)
         path.chmod(0o600)
     finally:
         await db.close()
