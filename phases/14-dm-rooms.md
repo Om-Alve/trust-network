@@ -36,3 +36,7 @@ Om says `@om-gate dm rahul "…"`; both gates set up a DM room, brief and invite
 
 ## Log
 <!-- evidence, deviations, notes -->
+
+### Day-0 decision, 2026-11-05
+
+Phase 04 room strategy: internal_only=True rooms with explicit cross-owner invitations work. Internal rooms remain visible in Console. Om/admin can also read Rahul private gifts, so gifts use courtesy seals. Phase 13b supplies the envoys. Do not depend on archive to reject writes. See docs/day0.md for evidence.

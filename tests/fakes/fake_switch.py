@@ -1,4 +1,4 @@
-"""Deliberately strict fake: internal rooms hide from humans; archives reject writes."""
+"""In-memory protocol model with core 0.31.0 room and archive semantics."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from trustnet.switch_client import Event, Operations
 class FakeSwitch:
     def __init__(self):
         self.users: set[str] = set()
+        self.admins: set[str] = set()
         self.agents: dict[str, dict] = {}
         self.rooms: dict[str, dict] = {}
         self.clients: list[FakeSwitchClient] = []
@@ -37,13 +38,11 @@ class FakeSwitchClient(Operations):
 
     def _room(self, room_id: str | None = None, *, write: bool = False) -> dict:
         room = self.server.rooms[room_id or self.room_id]
-        if self.kind == "user" and room["internal_only"]:
-            raise PermissionError("Internal room is invisible to humans")
         if room["read_visibility"] == "private" or write:
-            if self.name not in room["members"]:
+            if self.name not in room["members"] and not (
+                self.kind == "user" and self.owner_id in self.server.admins and not write
+            ):
                 raise PermissionError("Room membership required")
-        if write and room["archived"]:
-            raise PermissionError("Archived room is read-only in fake")
         return room
 
     async def _op(self, name: str, arguments: dict[str, Any]) -> Any:
@@ -58,7 +57,7 @@ class FakeSwitchClient(Operations):
                 a,
                 id=rid,
                 room_id=rid,
-                members=set(a["agent_names"]) | set(a.get("user_names") or []),
+                members=set(a["agent_names"]) | set(a.get("user_names") or []) | {self.owner_id},
                 archived=False,
                 messages=[],
                 documents={},

@@ -1,7 +1,7 @@
 ---
 id: "13"
 title: Envoy lifecycle (managed agents)
-status: todo
+status: skipped
 priority: P0
 owner: agent
 depends_on: ["04", "11", "12"]
@@ -35,3 +35,7 @@ target: Nov 6 afternoon
 
 ## Log
 <!-- evidence, deviations, notes -->
+
+### Day-0 decision, 2026-11-05
+
+Phase 04 selects 13b: OpenCode managed execution/rebriefing was not proved and its disallowedTools setting is rejected. Managed creation works but is insufficient. This phase is skipped. See docs/day0.md for evidence.

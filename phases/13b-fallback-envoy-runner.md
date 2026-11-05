@@ -38,3 +38,7 @@ target: Nov 6 afternoon
 
 ## Log
 <!-- evidence, deviations, notes -->
+
+### Day-0 decision, 2026-11-05
+
+Phase 04 selects this branch. Core 0.31.0 rejects OpenCode disallowedTools and the short live managed probe did not prove OpenCode replies or rebrief delivery. Keep OpenCode DeepSeek for Om and Codex for Rahul; enforce native tool restrictions and per-conversation isolation in the runner. See docs/day0.md for evidence.

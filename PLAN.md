@@ -359,6 +359,14 @@ Protocol findings from phase 03 (source at `sandbox-quantum/switch@1c9725a`) are
 
 ---
 
+Day-0 outcome (2026-11-05, core 0.31.0): select fallback phase 13b. Managed
+creation succeeds, but OpenCode tool-denial configuration is rejected and
+managed OpenCode replies/rebriefing were not established. Internal cross-owner
+rooms work; admin can read private gift rooms, so gifts use courtesy seals.
+Gate self-addressing updates are forbidden; both gates were configured through
+the owner Gateway API. Events carry transport mxids and null sender_kind;
+resolve server identities before authorizing commands. See docs/day0.md.
+
 ## 9. Schedule (solo; Claude Code does most of the typing, prompts dictated with Wispr)
 
 | When | Work | Done when |
@@ -426,6 +434,10 @@ Protocol findings from phase 03 (source at `sandbox-quantum/switch@1c9725a`) are
 | Judges must reproduce it | `scripts/demo_up.py`, example data, the one-machine layout (no VM, no Tailscale), Mattermost fallback, no OAuth anywhere |
 
 ---
+
+Day-0 risk update: auto_mode=False is provider approval behavior, not a tool
+denylist. Use native provider restrictions in the fallback runner. Private room
+visibility does not protect gifts against the workspace administrator.
 
 ## 12. Code with Wispr
 

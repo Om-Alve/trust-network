@@ -1,0 +1,9 @@
+delete agents day0-om-envoy: HTTP 200
+delete agents day0-rahul-envoy: HTTP 200
+delete agents day0-smoke: HTTP 200
+delete agents day0-smoke2: HTTP 200
+delete rooms day0-fresh-session: HTTP 200
+delete rooms day0-protocol: HTTP 200
+delete rooms day0-private-gift: HTTP 200
+delete rooms day0-fresh-session: HTTP 200
+delete rooms day0-post-smoke: HTTP 200

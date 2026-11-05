@@ -16,9 +16,9 @@ async def test_visibility_addressing_archive():
             "gift", "", ["gate", "friend"], internal_only=True, read_visibility="private"
         )
     )["room_id"]
-    for client in [human, outsider]:
-        with pytest.raises(PermissionError):
-            await client.get_room_detail(rid)
+    assert (await human.get_room_detail(rid))["internal_only"]
+    with pytest.raises(PermissionError):
+        await outsider.get_room_detail(rid)
     await gate.connect_to_room(rid)
     await friend.connect_to_room(rid)
     await gate.post_message("@friend hello @friend-extra")
@@ -27,8 +27,7 @@ async def test_visibility_addressing_archive():
     assert event.addressed and event.sender_id == "gate" and event.sender_kind == "agent"
     await stream.aclose()
     await gate.archive_room(rid)
-    with pytest.raises(PermissionError, match="read-only"):
-        await friend.post_message("no")
+    await friend.post_message("archive is metadata")
     assert (await friend.read_context())["threads"][0]["root"][
         "body"
     ] == "@friend hello @friend-extra"
@@ -49,4 +48,15 @@ async def test_documents_invites_and_ownership():
     agent = await gate.create_agent("envoy", "", "laptop", "claude", instructions="private")
     await gate.update_agent_detail(agent["id"], instructions="revised")
     assert "instructions" not in await friend.get_agent_detail(agent["id"])
-    assert {p["id"] for p in await gate.list_participants()} == {"gate", "friend"}
+    assert {p["id"] for p in await gate.list_participants()} == {"gate", "friend", "om"}
+
+
+async def test_admin_reads_other_owners_private_internal_room():
+    server = FakeSwitch()
+    server.admins.add("om")
+    rahul = server.client("rahul-gate", "rahul")
+    admin = server.client("om", "om", kind="user")
+    room = await rahul.create_room(
+        "gift", "", ["rahul-gate"], internal_only=True, read_visibility="private"
+    )
+    assert (await admin.get_room_detail(room["room_id"]))["name"] == "gift"

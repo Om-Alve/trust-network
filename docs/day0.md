@@ -256,3 +256,44 @@ Switch's Discord connection, never in this repo.
 
 Notes: phase 11 runs `templates/home.template.yaml`. Record the channel ID or a
 screenshot path, and confirm it is private and lists Om, `om-agent` and `om-gate`.
+
+## Phase 04 live results, 2026-11-05
+
+Evidence files under `docs/day0-evidence/` contain redacted raw responses from
+`uv run python scripts/day0_probe.py --state <private-state-file> checkN`.
+The private state file contains one-time gate credentials and is not in git.
+Installed core 0.31.0 source, rather than GitHub main, was used throughout.
+
+| Check | Result | Evidence | Decision taken |
+|---|---|---|---|
+| 4 | fail | Both create_agent calls succeeded and controllers reported running. Codex replied DAY0_BETA. Subsequent rebrief to DAY0_GAMMA did not produce that reply within 20 seconds; OpenCode produced only a session-start notice. `check4.txt`. | Choose fallback phase 13b. Managed creation alone does not establish reliable rebriefing or OpenCode execution. |
+| 5 | partial | Cross-owner get_agent_detail omits instructions. `anyone` addressing is accepted; a raw peer name is rejected with 400. Fresh room created and prompted, peer DAY0_PEER delivery was observed, but session isolation was not established in the bounded probe. `check5.txt`. | Do not claim managed peer/session guarantees. Fallback runner must isolate conversations itself. Briefs remain disclosure-filtered. |
+| 6 | fail | OpenCode advanced_config disallowedTools rejected with 400. Installed provider schema has no such field. Codex auto_mode=False accepted, but a prompt alone did not prove permission enforcement. `check6.txt`. | Fallback runner must configure provider-native tool restrictions in empty working directories; no claim that auto_mode=False disables tools. |
+| 7 | pass | Internal room creation and cross-owner invite returned {"ok": true}. `check7.txt`. | Use internal rooms with explicit gate/envoy invitations. Internal means no external bridge, not hidden from humans. |
+| 8 | partial | list_participants has UUID/type/name, get_agent_detail has owner_id. Recorded WebSocket frame uses a transport mxid and null sender_kind, with boolean addressed. `check8.txt`, live-message.json. | Never compare the transport sender directly to participant UUIDs or infer identity from a display name. Phase 11 must resolve the server identity mapping and fail closed for unknown senders. |
+| 9 | fail, fallback pass | Self update_agent_detail returns 403. Owner Gateway PUT /agents/{id}/addressing-policy with {"policy":null} returned 200 for both gates. `check9.txt`. | Both retained gates already allow anyone. Enforce owner commands in gate code. No Console click required. |
+| 10 | fail | Om/admin GET /gateway/rooms/{id} returned 200 for both internal DM and Rahul-created private gift room. `check10.txt`. | Console can show DMs; gifts use the courtesy seal, not a promise of privacy from workspace admins. |
+
+All rows above were measured on **2026-11-05**. PASS/FAIL in the probe is
+conservative: check 8 fails the full identity contract even though ownership
+lookup passes; check 5 remains partial until peer and fresh-session evidence exists.
+
+### Protocol and lifecycle consequences
+
+- Start the WebSocket, wait for connection_state, then issue operations. Room
+  operations require connect_to_room first and share its connection_id.
+- Core 0.31.0 only supports owner_only, owner_and_owner_agents, or anyone in
+  update_agent_detail.addressing. Fine-grained peers need the owner Gateway policy.
+- FakeSwitch now permits human room owners to read internal rooms and allows
+  writes after archive. It remains a simplified offline model, models admin read bypass explicitly.
+- Phase 13 is skipped; phase 13b remains todo. Tool-denial rejection and incomplete
+  OpenCode/rebrief proof are sufficient to select the fallback without extending LLM chats.
+- Keep om-gate and rahul-gate for phases 11 onward. Both have can_manage_agents
+  enabled and addressing open through the owner Gateway API. Credentials stay
+  only in mode-0600 `data/day0-state.json` (gitignored); bootstrap must explicitly reuse or rotate them.
+- No human step is blocked and no click is needed. Provider execution and identity
+  mapping are engineering follow-ups, not requests for Om to change infrastructure.
+
+Cleanup completed through Gateway DELETE. All disposable day0 agents and rooms
+returned HTTP 200; see docs/day0-evidence/cleanup.txt. Only om-gate and
+rahul-gate are retained from this run. Existing unrelated agents were left alone.
