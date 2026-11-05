@@ -329,3 +329,14 @@ The phase 04 probe was deliberately short, so two of its failures were weak on t
 So phase 13b (our own envoy runner: `opencode run -m opencode-go/deepseek-v4.1-flash` for Om,
 `codex exec` for Rahul, each in an empty folder with tools denied through the CLI's own
 permission config) is the right branch for both envoys.
+
+### No-envoy decision, 2026-11-05
+
+PLAN.md dropped envoys the same evening (and swapped main agents: Om's main agent is now
+Hermes, Rahul's is a managed Codex agent, `rahul-agent`). **Checks 4, 5 and 6 no longer drive
+the design** — they tested managed/fallback envoys, cross-envoy addressing and tool denial for
+envoys specifically, and none of that governs how the two main agents talk to each other now.
+Nothing above is retracted: the evidence stands, phase 13b stays built (code kept, unused,
+`status: skipped`), and the findings would matter again if envoys were ever reintroduced.
+Checks 1–3, 7–10 and 12 are unaffected by either decision; check 11 (Hermes on the VM) now
+tests Om's Hermes rather than Rahul's.

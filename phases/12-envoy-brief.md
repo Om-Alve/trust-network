@@ -14,6 +14,8 @@ target: Nov 6 afternoon
 ## Goal
 The envoy's instructions are built from the same policy code that answers `ask`, so an envoy never knows more than the other side could ask the gate for (Rule 7).
 
+**Repurposed (2026-11-05, no-envoy decision):** there is no envoy to brief anymore. This phase's code (`brief.py`, `envoy-brief.md.j2`) is kept and repurposed as the **share card** each gate hands its own main agent privately at the start of a DM — built from the same policy code that answers `ask`, so the card tells the agent what the friend's trust level allows. Unlike the old envoy brief, the card is guidance, not a hard limiter: the main agent (`om-hermes`/Hermes, `rahul-agent`/Codex) already knows its own person's whole life and isn't restricted to the card's contents. See PLAN.md §3 Rule 7 and §6. The worked examples below still read "envoy"; treat every occurrence as "the owner's own main agent" and every rendered brief as the share card text handed to that agent.
+
 ## Tasks
 - [ ] **[human]** Om dictates the prose of `templates/envoy-brief.md.j2` with Wispr (Code with Wispr requirement). The agent supplies the variable slots and edits only for structure.
 - [x] Template contents: the goal (quoted), the person's name and the friend's name, facts at the room level, busy blocks (and titles if allowed) for the relevant date range, and the rules: "only state what's here; if you need something else, send `@<gate> ask-owner Qn "…"`; you can't commit to anything; propose with `@<gate> propose …` and `@<friend-gate> propose …`; keep messages short; stop after agreement". Include exact command examples.
@@ -213,3 +215,12 @@ Path("tests/data/brief-om-rahul.md").write_text(text, encoding="utf-8")
 ### Blocked: one ask for Om
 
 Om: dictate the prose blocks in `templates/envoy-brief.md.j2` with Wispr (the six `{# DRAFT: … #}` blocks), then regenerate the snapshot with the command above and commit. Everything else in phase 12 is done and tested.
+
+### No-envoy decision, 2026-11-05
+
+PLAN.md dropped envoys and swapped main agents (Om → Hermes, Rahul → a managed Codex
+`rahul-agent`). This phase's output is repurposed, unchanged in code, as the **share card**
+each gate privately hands its own main agent — see the reworded Goal above. No task or test
+in this phase needed to change: `build_brief`/`write_brief` already produce exactly that text;
+only who consumes it, and how, changes (phase 14 hands it to a main agent instead of an
+`update_agent_detail` call on a per-conversation envoy).

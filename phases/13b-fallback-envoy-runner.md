@@ -1,7 +1,7 @@
 ---
 id: "13b"
 title: Fallback envoy runner (only if checks 4–6 fail)
-status: done
+status: skipped
 priority: P0 if needed
 owner: agent
 depends_on: ["04", "11", "12"]
@@ -129,3 +129,10 @@ check 5 did not establish managed rebrief/session guarantees. See docs/day0.md.
 Final verification rerun after phase 21 edits settled: `make check` passed:
 `80 files already formatted`, `All checks passed!`, `452 passed in 1.28s`.
 The earlier concurrent failures above were transient. Own paths also pass separately.
+
+### No-envoy decision, 2026-11-05
+
+Built, unused after the no-envoy decision (2026-11-05). PLAN.md now has main agents
+(`om-hermes`/Hermes and `rahul-agent`, a managed Codex agent) talk directly in DM rooms;
+nothing calls `trustnet/envoy_runner.py` or `trustnet/gate/envoy.py` anymore. The code,
+tests and live evidence above are left in the repo and unmodified — do not delete them.

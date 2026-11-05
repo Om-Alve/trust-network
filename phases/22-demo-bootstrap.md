@@ -16,11 +16,11 @@ One script brings the demo up from keys, another resets it between takes, and a 
 
 ## Tasks
 - [ ] `scripts/demo_up.py`:
-  - reads keys from `.env`; registers `om-gate`, `rahul-gate`, `priya-gate`, `rahul-hermes`;
-  - copies `examples/*` into `TN_DATA_DIR` (never mutating fixtures) and fills `envoy.machine` from `list_machines`;
+  - reads keys from `.env`; registers `om-gate`, `rahul-gate`, `priya-gate`, `om-hermes` (swapped from `rahul-hermes`, 2026-11-05);
+  - copies `examples/*` into `TN_DATA_DIR` (never mutating fixtures);
   - sets each gate's addressing (check 9);
   - starts the gates (or prints the commands to start them in separate terminals);
-  - prints the remaining manual clicks: turn on "can manage agents" for each gate, enroll the VM or start the second controller, run the home template.
+  - prints the remaining manual clicks: enroll the VM or start the second controller, run the home template for Om's optional `om-agent`, create `rahul-agent` as a managed Codex agent in `rahul-home`. "Can manage agents" is no longer required just to run gates, now that gates don't create envoys — it's only needed for whichever account places `rahul-agent`/`om-agent`.
 - [ ] `scripts/demo_reset.py`: archives `dm-*` / `gift-*` rooms, clears ledgers, claims, inbox cursors and added calendar events in `TN_DATA_DIR`, so each scene can be re-recorded from scratch.
 - [ ] One-machine layout: document and script a second `switch-agent-controller` with its own `--data-dir` against `http://localhost:<switch-core port>` acting as Rahul's machine.
 - [ ] `--dry-run` for both scripts (prints what it would do).
@@ -35,3 +35,10 @@ One script brings the demo up from keys, another resets it between takes, and a 
 
 ## Log
 <!-- evidence, deviations, notes -->
+
+### No-envoy decision and main-agent swap, 2026-11-05
+
+Dropped the `envoy.machine` fill-in (no envoys to place at runtime). Swapped the registered
+Hermes identity from `rahul-hermes` to `om-hermes`. Added `rahul-agent` (managed Codex) to the
+remaining-manual-clicks list, since it now needs the same kind of managed-agent placement
+`om-agent` used to need exclusively.

@@ -14,8 +14,14 @@ target: Nov 7 morning
 ## Goal
 Om asks all his friends at once ("anyone have a tent for Nov 14–16?"). Each friend's gate answers from facts if it can, otherwise asks its person, and Om gets one summary.
 
+> Note, 2026-11-05: ask-around was always gate-to-gate, never routed through an envoy or a main
+> agent. After the main-agent swap, Om triggers this through Hermes (`ask_around` over `tn mcp`)
+> instead of typing directly in Discord, and Rahul's gate relays its "I don't know" case to
+> `rahul-home` (his Codex agent / Rahul directly) instead of to Hermes, since Hermes is Om's
+> agent now.
+
 ## Tasks
-- [ ] Owner command `ask-around "<question>"` (≤140 chars): post `@<friend>-gate ask-around Ak "<question>"` into every connection room the owner has (creating conn rooms for listed friends if missing). Gate-to-gate only; no envoys involved.
+- [ ] Owner command `ask-around "<question>"` (≤140 chars): post `@<friend>-gate ask-around Ak "<question>"` into every connection room the owner has (creating conn rooms for listed friends if missing). Gate-to-gate only; main agents aren't involved.
 - [ ] Receiving gate:
   - match the question against `has` and `recommends` facts **visible at the room level** (simple keyword/singular-plural match; no LLM);
   - a match → answer at once ("Priya: 2-person tent");
@@ -27,10 +33,16 @@ Om asks all his friends at once ("anyone have a tent for Nov 14–16?"). Each fr
 
 ## Done when
 - [ ] `make check` passes.
-- [ ] **Scene 3 live:** Om's tent request in `#om-home` → Priya's gate answers instantly → Rahul is asked on Telegram (or `tn --as rahul inbox`) and says "no, sorry" → `#om-home` shows the combined summary. Evidence in *Log*.
+- [ ] **Scene 3 live:** Om's tent request, via Hermes on Telegram (or directly in `#om-home`) → Priya's gate answers instantly → Rahul is asked directly in `rahul-home` (or `tn --as rahul inbox`) and says "no, sorry" → Hermes tells Om the combined summary (or it shows in `#om-home`). Evidence in *Log*.
 
 ## Commit
 `phase 20: ask-around across connection rooms (scene 3)`
 
 ## Log
 <!-- evidence, deviations, notes -->
+
+### No-envoy decision and main-agent swap, 2026-11-05
+
+No mechanics changed — ask-around was always gate-to-gate. Updated the demo narrative: Om now
+asks through Hermes, and Rahul now answers directly in `rahul-home` rather than via Hermes on
+Telegram, following the Nov 5 main-agent swap.

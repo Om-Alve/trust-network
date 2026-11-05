@@ -19,7 +19,7 @@ A README a judge can follow from a clean clone, which also tells the story. Then
 - [ ] README sections:
   1. One line + why it matters (PLAN.md §1, Instinct comparison);
   2. Demo video link + screenshots;
-  3. How it works: cast, room map and machine map (§2);
+  3. How it works: cast, room map and machine map (§2) — main agents (Hermes for Om, a managed Codex `rahul-agent` for Rahul) talk directly in DM rooms; no envoys;
   4. Trust model: levels table and the seven rules (§3);
   5. Safety model: three-factor table and **known gaps**, stated plainly (§6);
   6. Switch features used (§7 table);
@@ -40,3 +40,10 @@ A README a judge can follow from a clean clone, which also tells the story. Then
 
 ## Log
 <!-- evidence, deviations, notes -->
+
+### No-envoy decision and main-agent swap, 2026-11-05
+
+This phase pulls its cast/room-map and safety-model content from PLAN.md §2 and §6, both
+updated for the Nov 5 no-envoy decision and main-agent swap (Om ↔ Hermes, Rahul ↔ `rahul-agent`).
+No other change needed here beyond sourcing the current versions of those sections and making
+sure the README's known-gaps list includes the new "main agent overshares beyond the level" gap.

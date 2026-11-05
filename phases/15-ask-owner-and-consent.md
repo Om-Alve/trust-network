@@ -12,25 +12,40 @@ target: Nov 6 afternoon
 # 15 · Ask-your-person and consent → Scene 1 via CLI
 
 ## Goal
-Envoys can ask their own person a question, propose a plan, and nothing is committed until both people say yes. **Scene 1 runs end to end, with Rahul driven from the terminal** (`tn --as rahul`), before Hermes is involved.
+A main agent can ask its own person a question, propose a plan, and nothing is committed until both people say yes. **Scene 1 runs end to end, with both Om and Rahul driven from the terminal** (`tn --as om`, `tn --as rahul`), before Hermes and `rahul-agent` exist.
+
+> Repurposed, 2026-11-05 (no-envoy decision + main-agent swap): `ask-owner` is still here as a
+> generic mechanism, but in the new design a main agent that needs something from its own
+> person usually just asks it directly on its own channel (Hermes on Telegram for Om,
+> `rahul-agent` right there in `rahul-home` for Rahul) rather than relaying through the gate —
+> the gate relay matters most when the agent has no other path to its person. `propose`/`yes`/
+> `no` are unchanged: proposals and consent always go through the gates.
 
 ## Tasks
-- [ ] `ask-owner Qn "…"` (from the gate's own envoy, in a DM room only): relay to the home room as a quoted question with "reply `@om-gate answer Qn …`"; track open questions per room.
-- [ ] `answer Qn "…"` (authorized per Rule 2, `direct` or `via-agent`): post the answer into the DM room for the envoy; ledger entry.
+- [ ] `ask-owner Qn "…"` (from the gate's own main agent, in a DM room or elsewhere it's a member): relay to the home room/inbox as a quoted question with "reply `@<gate> answer Qn …`"; track open questions per room. Kept as a generic fallback; Scene 1's budget question in the new design is answered directly by Rahul in `rahul-home`, without going through this relay.
+- [ ] `answer Qn "…"` (authorized per Rule 2, `direct` or `via-agent`): post the answer into the DM room for the main agent; ledger entry.
 - [ ] `propose Pn …` (validated fixed form): store as pending per room; post the card in the home room ("P1: Sun 21:00, 2h, Bowling + dinner @ Smaaash, Indiranagar · reply `yes P1` / `no P1`").
-- [ ] `yes Pn` / `no Pn` → gate sends `@<friend-gate> consent Pn yes direct|via-agent` in the DM room; when both sides have said yes, both gates post the confirmation in their home rooms: "✅ P1: Sun 21:00, Bowling + dinner @ Smaaash · Om ✅ · Rahul ✅ via Hermes". A `no` from either side posts "❌ P1 declined" and lets envoys continue.
+- [ ] `yes Pn` / `no Pn` → gate sends `@<friend-gate> consent Pn yes direct|via-agent` in the DM room; when both sides have said yes, both gates post the confirmation in their home rooms: "✅ P1: Sun 21:00, Bowling + dinner @ Smaaash · Om ✅ via Hermes · Rahul ✅". A `no` from either side posts "❌ P1 declined" and lets the agents continue.
 - [ ] After confirmation: write the plan as a room document (`plan` record) if available, archive the DM room, ledger entries on both sides.
-- [ ] Personal-agent core `trustnet/tn/personal.py` (shared by the CLI now and `tn mcp` in phase 17): connects as `<person>-hermes`, `inbox()` returns unread messages from the person's home room (questions, proposals, notices) with a persistent cursor in the data dir, `answer(id, text)`.
-- [ ] CLI: `tn --as rahul inbox`, `tn --as rahul answer Q1 "yes"`, `tn --as rahul answer P1 yes`, `tn --as om dm rahul "…"` (convenience).
-- [ ] Main agents add the event: `tn --as om cal add …` (Om's Codex agent is told this by `SKILL.md`).
+- [ ] Personal-agent core `trustnet/tn/personal.py` (shared by the CLI now and `tn mcp` in phase 17, generic over which person it runs `--as`): connects as `<person>-hermes`, `inbox()` returns unread messages from the person's home room (questions, proposals, notices) with a persistent cursor in the data dir, `answer(id, text)`.
+- [ ] CLI: `tn --as om inbox`, `tn --as om answer Q1 "yes"`, `tn --as om answer P1 yes`, `tn --as rahul dm om "…"` (convenience). Also needs a way to post plain-language text directly into a DM room (standing in for a main agent before phase 14's real agents exist) — see phase 14's Log for this gap.
+- [ ] Main agents add the event: `tn --as rahul cal add …` (`rahul-agent` is told this by `SKILL.md`; Hermes uses the `tn mcp` tool instead, since it has no shell).
 - [ ] Offline tests: forged consent (text says "Om says yes") denied; proposal never confirmed with one yes; `via-agent` label shown only when it was via the agent; questions over 140 chars rejected.
 
 ## Done when
 - [ ] `make check` passes.
-- [ ] **Scene 1 live without Hermes:** Om's request in `#om-home` → envoys plan → Rahul's envoy asks Q1 about budget → `tn --as rahul inbox` shows it → `tn --as rahul answer Q1 "yes"` → P1 proposed → Om types `@om-gate yes P1` → `tn --as rahul answer P1 yes` → both home rooms show the ✅ line → both calendars contain P1 → DM room archived → both ledgers list what was shared. Step-by-step evidence in *Log*.
+- [ ] **Scene 1 live without Hermes or `rahul-agent`:** Om's request (via `tn --as om dm rahul "…"`) → main-agent stand-ins plan in the DM room → when Rahul's side needs Om's budget confirmation, `tn --as rahul` answers directly in the room (standing in for `rahul-agent` asking Rahul in `rahul-home`) → an agent proposes P1 through both gates → `tn --as om answer P1 yes` (standing in for Om telling Hermes "yes") → `tn --as rahul answer P1 yes` (standing in for Rahul saying yes directly) → both home rooms show the ✅ line → both calendars contain P1 → DM room archived → both ledgers list what was shared. Step-by-step evidence in *Log*.
 
 ## Commit
 `phase 15: ask-owner, proposals and two-sided consent (scene 1 via CLI)`
 
 ## Log
 <!-- evidence, deviations, notes -->
+
+### No-envoy decision and main-agent swap, 2026-11-05
+
+Reworded for the no-envoy design (main agents ask their own person directly where they can;
+`ask-owner` stays as a generic relay) and the main-agent swap (Om ↔ Hermes, Rahul ↔
+`rahul-agent`). No task here was actually built yet (`status: todo`), so this is a planning-only
+change; the CLI task gained a note that it will also need a way to post plain text into a DM
+room once phase 14 needs a stand-in for a main agent.

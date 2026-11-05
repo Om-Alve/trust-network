@@ -41,12 +41,12 @@ Front matter is the single source of truth for status. The index table below has
 | 09 | [Command parser](09-command-parser.md) | P0 | agent | 05 | Nov 6 morning |
 | 10 | [`tn` CLI (offline commands)](10-tn-cli.md) | P0 | agent | 06, 07, 08 | Nov 6 morning |
 | 11 | [Gate runtime: `free` / `ask` live](11-gate-runtime.md) | P0 | agent + human | 03, 04, 07, 08, 09 | Nov 6 morning |
-| 12 | [Envoy brief](12-envoy-brief.md) | P0 | agent + human | 07, 08 | Nov 6 afternoon |
-| 13 | [Envoy lifecycle (managed agents)](13-envoy-lifecycle.md) | P0 | agent | 04, 11, 12 | Nov 6 afternoon |
-| 13b | [Fallback envoy runner (only if checks 4–6 fail)](13b-fallback-envoy-runner.md) | P0 if needed | agent | 04, 11, 12 | Nov 6 afternoon |
-| 14 | [DM rooms and envoy conversations](14-dm-rooms.md) | P0 | agent | 13 or 13b | Nov 6 afternoon |
+| 12 | [Share card (was: envoy brief, repurposed Nov 5)](12-envoy-brief.md) | P0 | agent + human | 07, 08 | Nov 6 afternoon |
+| 13 | [Envoy lifecycle (managed agents) — skipped, superseded by the no-envoy decision](13-envoy-lifecycle.md) | P0 | agent | 04, 11, 12 | Nov 6 afternoon |
+| 13b | [Fallback envoy runner — built, unused after the no-envoy decision](13b-fallback-envoy-runner.md) | P0 if needed | agent | 04, 11, 12 | Nov 6 afternoon |
+| 14 | [DM rooms between main agents](14-dm-rooms.md) | P0 | agent | 11, 12 | Nov 6 afternoon |
 | 15 | [Ask-your-person and consent → Scene 1 via CLI](15-ask-owner-and-consent.md) | P0 | agent | 14, 10 | Nov 6 afternoon |
-| 16 | [Rahul's side on the Azure VM](16-rahul-on-vm.md) | P1 | human + agent | 15 | Nov 6 night |
+| 16 | [Azure VM: om-hermes, rahul-gate, rahul-agent](16-rahul-on-vm.md) | P1 | human + agent | 15 | Nov 6 night |
 | 17 | [`tn mcp` server](17-tn-mcp.md) | P0 | agent | 15 | Nov 6 night |
 | 18 | [Hermes, Telegram and `SKILL.md` → Scene 1 on Telegram](18-hermes-and-skill.md) | P0 (P1 if it slips) | human + agent | 17 | Nov 6 night |
 | 19 | [Gift rooms and surprise mode → Scene 2](19-gifts-surprise-mode.md) | P1 | agent | 15, 17 | Nov 7 morning |
@@ -67,16 +67,17 @@ Layer 1  03 switch client  ← 01         05 fixtures      ← 01
 Layer 2  04 protocol checks ← 02,03     06 calendar      ← 05     09 commands ← 05
 Layer 3  07 policy         ← 05,06
 Layer 4  08 ledger/view-as ← 07
-Layer 5  10 tn CLI         ← 06,07,08   11 gate runtime  ← 03,04,07,08,09   12 brief ← 07,08
-Layer 6  13 envoys (or 13b fallback) ← 04,11,12          21 overreach ← 11
-Layer 7  14 DM rooms       ← 13|13b
+Layer 5  10 tn CLI         ← 06,07,08   11 gate runtime  ← 03,04,07,08,09   12 share card ← 07,08
+Layer 6  13 envoy lifecycle — skipped (unused)           21 overreach ← 11
+         13b fallback envoy runner — built, unused after the no-envoy decision (2026-11-05)
+Layer 7  14 DM rooms (main agents) ← 11,12
 Layer 8  15 consent, Scene 1 via CLI ← 14,10
 Layer 9  16 VM ← 15   17 tn mcp ← 15   20 ask-around ← 15   22 demo bootstrap ← 15
 Layer 10 18 Hermes ← 17   19 gifts ← 15,17   23 README ← 22
 Layer 11 24 video + submit ← 23   25 P2 ← 18
 ```
 
-**Critical path to P0 (Scene 1):** 01 → 03 → 04 → 11 → 13 → 14 → 15 → 17 → 18 → 22 → 23 → 24.
+**Critical path to P0 (Scene 1):** 01 → 03 → 04 → 11 → 12 → 14 → 15 → 17 → 18 → 22 → 23 → 24.
 **Parallel work:** 02 runs beside 01/03 (it's mostly Om's clicks). 05–10 are offline modules with no Switch dependency, so they can run beside 03/04.
 
 ## Cut lines (from PLAN.md §9)

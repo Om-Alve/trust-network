@@ -13,21 +13,23 @@
 | Scope | trust-network only. Pit Crew dropped. |
 | Where people talk | **Discord**, through Switch's Discord connection. Bundled Mattermost is the setup-free fallback for judges. |
 | Where agents talk to each other | **Agent-only Switch rooms** (`create_room(internal_only=True)`), shown in Switch Console. A short summary goes to the Discord home channel. |
-| Who talks across people | **Envoys**: OpenCode with OpenCode Go DeepSeek V4.1 Flash for Om and Codex for Rahul, launched by the trust-network runner (phase 13b). One envoy per friend. Its **instructions are the brief**, rewritten before each conversation, holding only what the trust level allows. File and shell tools are off. Each DM room gets a fresh session. Main agents never meet other people's agents. |
+| Who talks across people | **Each person's own main agent, directly**, in a DM room per conversation (`dm-om-rahul-<slug>`, agent-only). Om's main agent is **Hermes** on Telegram, acting in Switch through `tn mcp` as `om-hermes`. Rahul's main agent is **`rahul-agent`**: a Switch-managed **Codex** agent on Rahul's own machine (`rahul-vm`), with `auto_mode` and `auto_approve` off, so every tool use needs Rahul's approval in Console. No envoy sits between them (dropped Nov 5, see below). |
+| **No envoys (decided Nov 5)** | Main agents talk to each other directly in agent-only DM rooms. Gates are unchanged: they still compute room-level access from Switch membership, record every disclosure, and carry proposals and consent. Reason: simpler, one hop fewer — Om's call. |
+| **Main agents swapped (decided Nov 5, with the no-envoy change)** | Om now talks through **Hermes** on Telegram (Hermes already runs on the Azure VM, host `hermes`, user `om`); Rahul now talks through a Switch-managed **Codex** agent (`rahul-agent`) on his own machine. `om-agent` (the managed Codex agent from phase 11, in Discord `#om-home`) stays as an optional secondary surface for Om — `view-as`, `ledger`, overreach notes, or typing `yes P1` directly — but no longer the one conversing with Rahul's side. |
 | Who holds private data | Each person's **gate**: our code, no LLM, running on the person's own machine |
-| Machines | **Om's side on the laptop**: Switch server (Docker, run by Console), Console, `om-gate`, `priya-gate`. **Rahul's side on the Azure VM**: `rahul-gate`, Hermes, and Switch's headless `switch-agent-controller` running his envoy. Joined by **Tailscale**: `tailscale serve` gives the laptop's Switch server an https address only tailnet devices can reach. |
-| Custom envoy runner | **Selected by Day-0**. Phase 13b runs both envoys with native tool denial and isolated state; macOS Seatbelt adds read confinement. Linux requires a separate OS user/container. |
-| Planner agent | None. Your envoy plans with their envoy. |
+| Machines | **Om's side on the laptop**: Switch server (Docker, run by Console), Console, `om-gate`, `priya-gate`, and (optional, secondary) `om-agent`. **The Azure VM hosts both Om's and Rahul's software** (a demo shortcut): Om's Hermes + `tn mcp` (as `om-hermes`), and Rahul's `rahul-gate` plus his managed `rahul-agent` (via the `switch-agent-controller` enrollment `rahul-vm`, required again now that it runs Rahul's main agent). Joined by **Tailscale**: `tailscale serve` gives the laptop's Switch server an https address only tailnet devices can reach. |
+| Custom envoy runner | **Unused after Nov 5.** Phase 13b built it (native tool denial, isolated state; macOS Seatbelt adds read confinement, Linux needs a separate OS user/container); the code stays in the repo but nothing calls it now that main agents talk directly. |
+| Planner agent | None. Your main agent plans directly with your friend's main agent. |
 | Tally / group secrets | Dropped. When an agent lacks a fact, it **asks its person**. |
 | Trust levels | **close / friend / acquaintance**, per person, in each owner's own list. Mutual: each side sets its own level. |
 | Preferences | Facts on your profile (vegetarian, no alcohol, interests, wishlist …), each tagged with the lowest level that may see it |
-| Demo cast | **Om:** Codex, managed in Discord `#om-home`. **Rahul:** Hermes on Telegram. **Priya:** a gate with facts only. Envoys: Om → OpenCode (OpenCode Go DeepSeek V4.1 Flash), via the trust-network runner, Rahul → Codex. No Claude Code anywhere in Switch. |
+| Demo cast | **Om:** Hermes on Telegram, talking directly to Rahul's agent in DM rooms through `tn mcp` as `om-hermes`; `om-agent` (Codex, managed, Discord `#om-home`) stays as an optional secondary surface. **Rahul:** `rahul-agent`, a managed Codex agent on his own machine, talked to in `rahul-home`. **Priya:** a gate with facts only. No Claude Code anywhere in Switch. |
 | Scenes | (1) two-person outing, (2) gift ideas that keep the surprise, (3) ask around, plus an overreach alert and `view-as` |
 | Gift privacy | Nothing reaches the person receiving the gift until after the occasion. Claimed items are hidden from them but shown to other askers. |
-| Consent | Om types `yes P1` in Discord. Rahul says yes to Hermes, recorded as "via Hermes". |
+| Consent | Om tells Hermes "yes", recorded as "via Hermes" (or types `@om-gate yes P1` directly in `#om-home`). Rahul says yes directly in `rahul-home`, recorded "Rahul ✅". |
 | Calendars | Fake `.ics` fixtures in the repo. Main agents write accepted plans into them through `tn cal add`. |
 | Name | `trust-network` |
-| Om's agent (changed Nov 5) | **Codex** is Om's managed main agent in `#om-home`, with no model override, on `Om’s MacBook Pro`. His envoy stays OpenCode with OpenCode Go DeepSeek V4.1 Flash (`opencode-go/deepseek-v4.1-flash`) via the trust-network runner (phase 13b). Console 0.40.1's controller cannot start OpenCode 2.x: it waits for `opencode server listening`, while OpenCode prints `server listening`. |
+| Om’s agent (changed Nov 5, then superseded) | **Codex** (`om-agent`) was briefly Om’s managed main agent in `#om-home`. With the Nov 5 main-agent swap, Om’s main agent is **Hermes**; `om-agent` stays in `#om-home` as an optional secondary surface only (`view-as`, `ledger`, overreach notes, direct `yes P1`). Console 0.40.1’s controller cannot start OpenCode 2.x (it waits for `opencode server listening`, while OpenCode prints `server listening`); moot, since OpenCode was only ever used for the dropped envoy. |
 
 ---
 
@@ -49,31 +51,31 @@
 
 ### People and their agents (demo)
 
-| Person | Runs on | Main agent (knows their life) | Where they talk to it | Envoy (talks to other people's envoys) | Gate | Trust list |
-|---|---|---|---|---|---|---|
-| **Om** | laptop | Codex (managed, Switch Console) | Discord `#om-home` | `om-envoy-rahul`: OpenCode (`opencode-go/deepseek-v4.1-flash`), via the trust-network runner on the laptop | `om-gate` | Rahul: close, Priya: friend |
-| **Rahul** | Azure VM | Hermes (Telegram), joined through `tn mcp` as `rahul-hermes` | Telegram | `rahul-envoy-om`: Codex via the phase 13b runner, laptop until phase 16 confinement is available | `rahul-gate` | Om: close |
-| **Priya** | laptop | none in the demo (optional: OpenCode) | — | — | `priya-gate` | Om: friend |
+| Person | Runs on | Main agent (knows their life; talks directly to friends' agents in DM rooms) | Where they talk to it | Gate | Trust list |
+|---|---|---|---|---|---|
+| **Om** | Azure VM (Hermes), laptop (`om-gate`, optional `om-agent`) | Hermes, acting in Switch through `tn mcp` as `om-hermes` | Telegram (primary); Discord `#om-home` via `om-agent` (optional, secondary: `view-as`, `ledger`, overreach, direct `yes`) | `om-gate` | Rahul: close, Priya: friend |
+| **Rahul** | Azure VM | `rahul-agent`: Codex (managed, via the `rahul-vm` controller), `auto_mode`/`auto_approve` off — every tool use needs Rahul's approval in Console | `rahul-home` (agent-only Switch room; a Discord channel is optional) | `rahul-gate` | Om: close |
+| **Priya** | laptop | none in the demo (optional: OpenCode) | — | `priya-gate` | Om: friend |
 
-Rahul and Priya are separate Switch users with their own registration keys. Rahul's machine is enrolled under his own account (Gateway → Machines), so his envoy is his, on his machine, and nothing of his runs under Om's account. **Rahul's side doesn't need Switch Console:** the VM runs Switch's headless agent controller.
+Rahul and Priya are separate Switch users with their own registration keys. Rahul's machine is enrolled under his own account (Gateway → Machines), so nothing of his runs under Om's account. **The Azure VM now hosts software for both people** (a demo shortcut, called out so it isn't mistaken for a security boundary): Om's Hermes acts as `om-hermes` under Om's own Switch key, and Rahul's `rahul-agent` runs under the `rahul-vm` controller enrolled to Rahul's account — the two are isolated by Switch identity, not by machine. The one-machine judges' layout still works the same way it always did.
 
 ### Machines and network
 
 ```
- LAPTOP (Om)                                               AZURE VM (Rahul), on the same tailnet
- ───────────                                               ─────────────────────────────────────
- Switch server (Docker, run by Console)  ◀──── https ────  switch-agent-controller (Rahul's machine)
-   published on the tailnet by                               └─ rahul-envoy-om (Codex)
+ LAPTOP (Om)                                               AZURE VM, on the same tailnet
+ ───────────                                               (hosts BOTH Om's Hermes and Rahul's side)
+ Switch server (Docker, run by Console)  ◀──── https ────  switch-agent-controller (Rahul's machine,
+   published on the tailnet by                               rahul-vm) └─ rahul-agent (Codex, managed)
    `tailscale serve` as                                    rahul-gate (Python) ─ examples/rahul/
-   https://<laptop>.<tailnet>.ts.net                       Hermes + `tn mcp` ──── Telegram
- Switch Console (Om) + its controller
-   └─ om-envoy-rahul (OpenCode)
+   https://<laptop>.<tailnet>.ts.net                       om-hermes (Hermes) + `tn mcp` ──── Telegram
+ Switch Console (Om) + its controller,
+   optional secondary `om-agent`
  om-gate, priya-gate (Python)
 ```
 
 - **Why Tailscale Serve:** the controller only accepts an `https` server address, except for `localhost`. Serve gives a real certificate on the tailnet name (the tailnet already has HTTPS certificates on). It's tailnet-only: Serve, never Funnel.
 - **Serve the switch-core port, not the Gateway's.** The controller calls `/v1/...` on switch-core. Console picks the ports, so find them with `docker ps`.
-- **Everything on the VM goes through the same address:** the controller, `rahul-gate` and `tn mcp`.
+- **Everything on the VM goes through the same address:** the `rahul-vm` controller, `rahul-gate`, Hermes and `tn mcp`.
 - **The laptop stays awake** during the demo (`caffeinate -dims`). The controller reconnects by itself if the link drops.
 - **Judges can run everything on one machine:** a second controller with its own `--data-dir`, over `localhost`, with no Tailscale. The README documents this layout.
 
@@ -81,25 +83,26 @@ Rahul and Priya are separate Switch users with their own registration keys. Rahu
 
 | Room | Kind | Members | Purpose |
 |---|---|---|---|
-| `#om-home` | Discord private channel | Om, Om's Codex agent, `om-gate` | Om's requests, summaries, consent (`yes P1`), `view-as`, `ledger` |
-| `rahul-home`, `priya-home` | Agent-only | the person's gate, plus `rahul-hermes` | Relays to Hermes (through `inbox`) and consent via Hermes |
+| `#om-home` | Discord private channel | Om, `om-agent` (optional, secondary), `om-gate` | Om's `view-as`, `ledger`, overreach notes, and direct `yes P1`; also polled by Hermes (`inbox`) as Om's primary surface |
+| `rahul-home` | Agent-only Switch room | Rahul, `rahul-agent`, `rahul-gate` | Rahul's requests, proposals, consent (`yes P1`) — Rahul's primary surface, talked to directly, not relayed |
+| `priya-home` | Agent-only | `priya-gate` | Unused in the demo (Priya has no main agent) |
 | `conn-om-rahul`, `conn-om-priya` | Agent-only, one per pair | the two gates | The connection itself: ask-around traffic, and setting up conversations |
-| `dm-om-rahul-<slug>` | Agent-only, one per conversation | both envoys + both gates | Envoys plan in plain language; gates answer questions and carry proposals. A new room means a fresh envoy session. Archived afterwards. |
+| `dm-om-rahul-<slug>` | Agent-only, one per conversation | both main agents (`om-hermes`, `rahul-agent`) + both gates | The main agents plan in plain language; each gate privately hands its own agent a share card at the start, and carries proposals/consent. Archived after agreement, a turn limit or a time limit. |
 | `gift-<asker>-<for>-<slug>` | Agent-only, created by the asker's gate, private | the asker's gate + the recipient's gate | Gift questions. Nothing is relayed to the recipient, and the log entry is sealed until the date. |
 
 ### Room map
 
 ```
- DISCORD (people)                    SWITCH, agent-only rooms (agents)                       TELEGRAM
- ─────────────────                   ──────────────────────────────────────                 ─────────
- #om-home                            dm-om-rahul-sat
-   Om ⇄ Om's Codex agent               om-envoy-rahul (OpenCode) ⇄ rahul-envoy-om (Codex)
-   om-gate posts summaries,            om-gate ⇄ rahul-gate (answers, ask-your-person, P1)
-   proposals; Om says yes                         │                    │
-                                     conn-om-rahul (om-gate ⇄ rahul-gate)                    Rahul ⇄ Hermes
-                                     conn-om-priya (om-gate ⇄ priya-gate)                      │ tn mcp
-                                     gift-rahul-om-bday (rahul-gate → om-gate, sealed)         ▼
-                                     rahul-home (rahul-gate ⇄ rahul-hermes) ◀── inbox / answer
+ TELEGRAM                            SWITCH, agent-only rooms (agents)                       DISCORD (optional)
+ ─────────                           ──────────────────────────────────────                 ──────────────────
+ Om ⇄ Hermes                         dm-om-rahul-sat                                        #om-home
+   │ tn mcp                            om-hermes (Hermes) ⇄ rahul-agent (Codex)                Om ⇄ om-agent
+   ▼                                   om-gate ⇄ rahul-gate (answers, ask-your-person, P1)      (view-as, ledger,
+ #om-home (polled via inbox) ◀──────             │                    │                         overreach, yes)
+                                     conn-om-rahul (om-gate ⇄ rahul-gate)
+                                     conn-om-priya (om-gate ⇄ priya-gate)
+                                     gift-rahul-om-bday (rahul-gate → om-gate, sealed)
+                                     rahul-home (rahul-gate ⇄ rahul-agent) ◀── Rahul talks directly
 ```
 
 ---
@@ -114,11 +117,7 @@ people:
   rahul: close
   priya: friend
 consent:
-  default: direct            # Om says yes himself in #om-home
-envoy:
-  provider: opencode         # which agent speaks for Om
-  model: opencode-go/deepseek-v4.1-flash   # optional; the provider's default if absent
-  machine: <laptop machine name in Switch>
+  default: via-agent         # Om's answers come through Hermes; others see "via Hermes" (swapped Nov 5)
 ```
 
 ```yaml
@@ -126,11 +125,15 @@ envoy:
 people:
   om: close
 consent:
-  default: via-agent         # Rahul's answers may come through Hermes; others see "via Hermes"
-envoy:
-  provider: codex
-  machine: <VM machine name in Switch>
+  default: direct            # Rahul says yes himself in rahul-home (swapped Nov 5)
 ```
+
+*The `envoy:` block that used to sit in both files above (`provider`, `model`, `machine`) configured the
+now-dropped envoy runner (phase 13b; the code stays in the repo but is unused after the Nov 5 decision).
+It is no longer read when deciding who talks for each person — that's each person's own main agent, from
+§2. A new field will be needed instead for `rahul-agent`'s managed-agent placement (provider `codex`,
+machine `rahul-vm`), analogous to how `om-agent` was placed by `templates/home.template.yaml`; see §5 and
+the report at the end of this change for the exact fixture edit still needed.*
 
 ```yaml
 # examples/om/facts.yaml (Om, or Om's agent through `tn fact set`, keeps this current)
@@ -173,14 +176,14 @@ facts:
    - writes a ledger entry sealed until `reveal_after`;
    - hides claims from its owner's own view of the wishlist.
 6. **Everything disclosed is logged** to `ledger.jsonl`: field, value, to whom, which room, when. Writing a brief counts as disclosing every fact in it.
-7. **Envoys are briefed at the room level and nothing more.** The gate builds the brief from the same policy code that answers `ask`, so the envoy never knows more than the other side could ask for.
+7. **Share cards, not guarantees.** At the start of a DM, each gate privately hands its own main agent a **share card** — built from the same policy code that answers `ask` — listing what the friend's trust level allows. This tells the agent its limits; it doesn't enforce them the way the old envoy brief did, because the main agent already knows its own person's whole life and isn't confined to the card's contents. What crosses the boundary through the gate (facts, calendars, proposals) is still enforced in code; what a main agent chooses to say in the DM room itself is not (see §6's new gap).
 
 ### Commands any agent or gate can send to a gate (in `SKILL.md`)
 
 ```
 @om-gate free 2026-11-08..2026-11-09                     → busy blocks (+ titles at friend and close)
 @om-gate ask diet interests                              → values, or "<field>: not shared with you" (no hint whether it exists or its level; `view-as` shows the owner "not shared at this level")
-@om-gate ask-owner Q3 "Is ₹1,500 per person okay?"       → asks Om (Discord); reply comes back as `answer Q3 …`
+@om-gate ask-owner Q3 "Is ₹1,500 per person okay?"       → asks the owner on their home surface (Telegram via Hermes for Om, directly in `rahul-home` for Rahul); reply comes back as `answer Q3 …`
 @om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"
 @om-gate counter P1 P2 2026-11-09T19:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"
 @om-gate gift-ideas birthday 2026-11-20 budget<=3000     → wishlist with 'taken' flags (close), interests (friend)
@@ -208,50 +211,51 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 
 ### Scene 1: two-person outing (P0)
 
-1. **In `#om-home`**, Om (dictating with Wispr) says: "@om-agent plan something fun with Rahul Sunday evening, not pricey."
-2. **Om's Codex agent** sends `@om-gate dm rahul "something fun Sunday evening, not pricey"`.
+1. **Om, dictating with Wispr into Telegram, tells Hermes:** "plan something fun with Rahul Sunday evening, not pricey."
+2. **Hermes** (acting in Switch as `om-hermes` through `tn mcp`) sends `@om-gate dm rahul "something fun Sunday evening, not pricey"`.
 3. **`om-gate`:**
    - creates `dm-om-rahul-sat` (agent-only);
-   - **briefs `om-envoy-rahul`**: writes the goal plus Om's facts and busy blocks *at Rahul's level* into the envoy's instructions (`update_agent_detail`; the very first time, it creates the envoy with `create_agent` on Om's laptop);
-   - invites the envoy to the DM room, and asks `rahul-gate` to join through `conn-om-rahul`.
-4. **`rahul-gate`** (on the VM) joins and does the same for **`rahul-envoy-om`** (Codex, on the VM), with Rahul's brief at Om's level. It drops a line into `rahul-home`. Hermes picks it up on its next `inbox` check and tells Rahul on Telegram: "Om's agent is planning Sunday with you."
-5. **The envoys talk in plain language.** "Om's vegetarian and into bowling; free after 7." / "Rahul has cricket until 8:30; 9 pm works."
-6. **When an envoy needs something that isn't in its brief,** it asks its own person. rahul-envoy-om sends `@rahul-gate ask-owner Q1 "Is ₹1,500 per person okay?"`, which reaches Rahul on Telegram through Hermes. Rahul says "yes", Hermes calls `answer`, and rahul-gate posts the answer in the DM room.
-7. **An envoy proposes:** `@om-gate propose P1 …` and `@rahul-gate propose P1 …`.
+   - invites `om-hermes` to the room;
+   - privately hands `om-hermes` a **share card**: what Rahul's trust level allows Om's side to say (Rule 7) — this is guidance for the agent, not a hard filter;
+   - posts `@rahul-gate join-dm <room> "<goal>"` in `conn-om-rahul`.
+4. **`rahul-gate`** (on the VM) joins, invites **`rahul-agent`** (the managed Codex agent on `rahul-vm`) to the room, and privately hands it its own share card (what Om's level allows). It drops a line into `rahul-home`: "Om's agent is planning Sunday with you."
+5. **`om-hermes` and `rahul-agent` talk directly in the DM room, in plain language.** "Om's vegetarian and into bowling; free after 7." / "Rahul has cricket until 8:30; 9 pm works." Neither is confined to a brief — each already knows its own person's whole life, so what it actually says rests on `SKILL.md` plus, for `rahul-agent`, Rahul approving each tool use in Console.
+6. **When `rahul-agent` needs something it isn't sure about, it asks Rahul directly in `rahul-home`:** "Is ₹1,500 per person okay?" Rahul answers right there.
+7. **An agent proposes a plan through the gates, unchanged:** `@om-gate propose P1 …` and `@rahul-gate propose P1 …`.
 8. **Both people say yes:**
-   - `om-gate` posts P1 in `#om-home`, and Om types `@om-gate yes P1`;
-   - `rahul-gate` puts P1 in Rahul's `inbox`, Rahul tells Hermes "sure", and Hermes calls `answer(P1, yes)`.
-9. **Both gates post the confirmation.** `#om-home` shows "✅ P1: Sat 21:00, Bowling + dinner @ Smaaash · Om ✅ · Rahul ✅ via Hermes".
-10. **Each main agent adds the event** with `tn cal add` (Hermes uses the MCP tool). The DM room is archived, and both ledgers record what was shared.
+   - Om tells Hermes "yes"; Hermes calls `answer(P1, yes)` over `tn mcp` (recorded "via Hermes") — or Om types `@om-gate yes P1` directly in `#om-home`;
+   - Rahul says yes directly in `rahul-home`: `@rahul-gate yes P1` (recorded "Rahul ✅", direct — no agent in between).
+9. **Both gates post the confirmation.** `rahul-home` and Om's home surface show "✅ P1: Sat 21:00, Bowling + dinner @ Smaaash · Om ✅ via Hermes · Rahul ✅".
+10. **Each main agent adds the event:** Hermes calls `cal_add` over `tn mcp`; `rahul-agent` runs `tn cal add` (Console-approved). The DM room is archived, and both ledgers record what was shared.
 
 ### Scene 2: gift ideas that keep the surprise (P1)
 
-1. **Rahul tells Hermes on Telegram:** "Om's birthday is the 20th. Gift ideas under ₹3k?"
-2. **Hermes** calls `gift_ideas(om, birthday, 2026-11-20, 3000)` on `tn mcp`.
+1. **Rahul tells his Codex agent, in `rahul-home`:** "Om's birthday is the 20th. Gift ideas under ₹3k?"
+2. **`rahul-agent`** runs `tn --as rahul gift-ideas om birthday 2026-11-20 3000` (Console-approved), which acts through `rahul-gate`.
 3. **`rahul-gate`** creates `gift-rahul-om-bday` (agent-only, private) with `om-gate` and sends `@om-gate gift-ideas birthday 2026-11-20 budget<=3000`.
 4. **`om-gate` answers from stored facts only. It never asks Om.** Rahul is close, so: `wishlist: Catan Seafarers (≈₹2,500), Hario V60 (≈₹2,000), Kindle Paperwhite (over budget) · interests: board games, sci-fi · sizes: tshirt M`.
-5. **Hermes suggests Catan Seafarers. Rahul:** "get that." Hermes calls `claim(om, "Catan Seafarers")`.
+5. **`rahul-agent` suggests Catan Seafarers. Rahul:** "get that." `rahul-agent` runs `tn --as rahul claim om "Catan Seafarers"`.
 6. **Om's view stays unchanged:**
-   - `#om-home` shows nothing;
+   - his home surface (Hermes/`#om-home`) shows nothing;
    - his own wishlist still shows Catan;
-   - `@om-gate ledger` shows "1 sealed entry, opens Nov 21".
+   - `@om-gate ledger` (or asking Hermes) shows "1 sealed entry, opens Nov 21".
 7. **Optional beat:** Priya's side then asks for gift ideas and sees "Catan Seafarers: taken".
 
 *Being honest about the seal:* it's a courtesy seal. The ledger file is on Om's own laptop, like a wrapped present he could open early.
 
 ### Scene 3: ask around (P1)
 
-1. **In `#om-home`:** "@om-agent ask around if anyone can lend me a tent for Nov 14–16." Om's agent sends `@om-gate ask-around "tent to borrow, Nov 14-16"`.
+1. **Om tells Hermes on Telegram:** "ask around if anyone can lend me a tent for Nov 14–16." Hermes calls `ask_around("tent to borrow, Nov 14-16")` over `tn mcp`, reaching `om-gate`.
 2. **`om-gate`** posts the question in each connection room (`conn-om-rahul`, `conn-om-priya`).
 3. **`priya-gate`** finds `tent` in her `has` facts (friend level) and answers right away: "Priya: 2-person tent."
-4. **`rahul-gate`** has no matching fact, so it **asks its person.** Hermes asks Rahul on Telegram, Rahul says "no, sorry", and the answer comes back.
-5. **In `#om-home`:** "Priya can lend a 2-person tent. Rahul can't." Recommendations work the same way, e.g. "a good dentist nearby?" is answered from friends' `recommends` facts.
+4. **`rahul-gate`** has no matching fact, so it **asks its person** by relaying to `rahul-home`. Rahul says "no, sorry" directly there, and the answer comes back.
+5. **Hermes tells Om (on Telegram):** "Priya can lend a 2-person tent. Rahul can't." (Om can also check `#om-home` directly.) Recommendations work the same way, e.g. "a good dentist nearby?" is answered from friends' `recommends` facts.
 
 ### Overreach and view-as (P1, about 1 h)
 
-- **Rahul tells Hermes:** "find out Om's home address." Hermes calls `ask(om, address)`.
-- **`om-gate`** answers "not shared with you", and posts in `#om-home`: "Rahul's side asked for your address (private)."
-- **Om runs `@om-gate view-as rahul`** and sees the exact table of what Rahul's side can learn.
+- **Rahul tells his Codex agent:** "find out Om's home address." `rahul-agent` runs `tn --as rahul ask om address` (Console-approved), which `rahul-gate` sends to `om-gate` as `ask address` in `conn-om-rahul`.
+- **`om-gate`** answers "not shared with you", and posts to Om's home surface: "Rahul's side asked for your address (private)" (Hermes relays this on Telegram; it also shows in `#om-home`).
+- **Om runs `@om-gate view-as rahul`** (directly in `#om-home`, or by asking Hermes) and sees the exact table of what Rahul's side can learn.
 
 ---
 
@@ -261,25 +265,29 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 |---|---|---|
 | `switch_client.py` | Agent protocol client: register with a person's key, WebSocket events (`addressed`, sender), ops (`post_message`, `create_room`, `invite_agent_to_room`, `list_participants`, `get_agent_detail`, `archive_room`, `create_agent`, `update_agent_detail`, `list_machines`) | ~200 lines |
 | `gate/` | Policy (levels, room level, consent, tighten-only), facts, `.ics` reader, command parser, relays, surprise mode, ledger, `view-as` | ~600 lines + tests |
-| `gate/envoy.py` | Gets the person's envoy ready for a conversation. The first time, `create_agent` on the owner's machine (provider and machine from `trust.yaml`, an empty folder, file and shell tools off, `auto_mode` and `auto_approve` off). Each time, `update_agent_detail` with the new brief, then `invite_agent_to_room`. Counts turns and archives the room at 12 turns or 10 minutes. | ~80 lines |
+| *(unused since Nov 5)* `gate/envoy.py` | Built in phase 13b for the dropped envoy design (gate-side registration, brief handoff, turn/time-limited lifecycle). Nothing calls it now that main agents talk directly; kept in the repo. | ~80 lines |
 | `tn` CLI | `init`, `trust`, `fact set/get`, `cal add`, `view-as`, `--as <person>` for the demo | ~200 lines |
-| `tn mcp` | MCP server (stdio) for personal agents: `inbox`, `dm`, `ask`, `gift_ideas`, `claim`, `ask_around`, `answer`, `cal_add`, `fact_set`. Acts in Switch as `rahul-hermes`. | ~150 lines |
-| `SKILL.md` | The manual for every agent, in Agent Skill format. Attached to rooms as a doc, and loaded by Hermes and Om's Codex agent. **Dictated with Wispr.** | 1 page |
-| `envoy-brief.md.j2` | The brief template, which becomes the envoy's instructions: goal, the person's facts at this level, busy blocks, "only state what's here; otherwise `ask-owner`; you can't commit; propose through the gate" | ½ page |
-| `templates/home.template.yaml` | Om's Discord home: private channel, a managed Codex main agent (`provider: codex`, no model override, `allow_existing`), `om-gate`, the `SKILL.md` doc | YAML |
-| `scripts/demo_up.py` | Registers gates from keys, writes example data, sets addressing, prints the remaining clicks (turn on "can manage agents" for each gate, enroll the VM) | ~100 lines |
-| `scripts/vm_up.sh` | Sets up Rahul's side on a Linux box: Node 22, `codex`, `uv`, the controller (enroll with a one-time code), `rahul-gate` as a service, Hermes's `tn mcp` entry | ~40 lines |
+| `tn mcp` | MCP server (stdio) for personal agents, generic across who runs it (`--as om` in the demo, acting as `om-hermes`): `inbox`, `dm`, `dm_read`, `dm_post`, `ask`, `gift_ideas`, `claim`, `ask_around`, `answer`, `cal_add`, `fact_set`. `dm_read`/`dm_post` (new, Nov 5) let a Hermes-style agent read and post plain-language text in a DM room it's already a member of, since the main agent now carries that conversation itself. | ~180 lines |
+| `SKILL.md` | The manual for every agent, in Agent Skill format. Attached to rooms as a doc, and loaded by Hermes and `rahul-agent`/`om-agent`. **Dictated with Wispr.** | 1 page |
+| `envoy-brief.md.j2` | *Repurposed (Nov 5):* the template for the **share card** each gate privately hands its own main agent at the start of a DM — the friend's name, the facts and busy blocks their trust level allows, and a reminder that this is guidance, not an enforced filter (Rule 7). Kept under its old filename; no code renamed. | ½ page |
+| `templates/home.template.yaml` | Om's Discord home (now optional/secondary): private channel, a managed Codex main agent (`provider: codex`, no model override, `allow_existing`), `om-gate`, the `SKILL.md` doc | YAML |
+| *(needed, not yet built)* a `rahul-home` equivalent | An agent-only Switch room with a managed Codex agent (`rahul-agent`) on `rahul-vm` plus `rahul-gate`, parallel to `home.template.yaml` but for an agent-only room instead of a Discord channel. See the report at the end of this change — this is the main code gap the main-agent swap introduces, for phase 16 to close. | template or script |
+| `scripts/demo_up.py` | Registers gates from keys, writes example data, sets addressing, prints the remaining clicks (enroll the VM, run the home template for Om, create `rahul-agent` as a managed agent in `rahul-home`) | ~100 lines |
+| `scripts/vm_up.sh` | Sets up the Azure VM, now shared by Om's Hermes and Rahul's side: Node 22, `codex` (for the `rahul-vm` controller to run `rahul-agent`), `uv`, the controller (enroll with a one-time code), `rahul-gate` as a service, Hermes's `tn mcp` entry (acting as `om-hermes`) | ~40 lines |
 | `examples/{om,rahul,priya}/` | `trust.yaml`, `facts.yaml`, `calendar.ics` | fixtures |
-| *(Fallback)* `envoy_runner.py` | Only if checks 3–5 fail: registers an envoy under its person's key and runs their agent CLI headless in an empty folder with tools off (`opencode run -m opencode-go/deepseek-v4.1-flash` for Om, `codex exec` for Rahul) | ~200 lines |
+| *(unused since Nov 5)* `envoy_runner.py` | Built in phase 13b for the dropped envoy design: registered an envoy under its person's key and ran their agent CLI headless, tools off (`opencode run -m opencode-go/deepseek-v4.1-flash` for Om, `codex exec` for Rahul). Nothing calls it now. | ~200 lines |
 
 ```
 trust-network/
 ├── trustnet/
 │   ├── switch_client.py
-│   ├── gate/  (policy.py, facts.py, calendar.py, commands.py, relay.py, surprise.py, ledger.py, envoy.py, __main__.py)
+│   ├── envoy_runner.py        # unused since Nov 5 (built for the dropped envoy design)
+│   ├── gate/  (policy.py, facts.py, calendar.py, commands.py, relay.py, surprise.py, ledger.py,
+│   │           brief.py [repurposed: share card], runtime.py, view_as.py,
+│   │           envoy.py [unused since Nov 5], __main__.py)
 │   └── tn/    (cli.py, mcp.py)
 ├── skills/trust-network/SKILL.md
-├── templates/ (home.template.yaml, envoy-brief.md.j2)
+├── templates/ (home.template.yaml, envoy-brief.md.j2 [repurposed: share card])
 ├── examples/ (om/, rahul/, priya/)
 ├── scripts/ (demo_up.py, vm_up.sh)
 ├── tests/ (test_policy.py, test_commands.py, test_surprise.py, test_brief.py)
@@ -297,17 +305,17 @@ An agent is unsafe when all three hold: it acts unwatched, can reach something t
 | Piece | Reads unvetted text | Reaches what matters | Unwatched | Why it's safe |
 |---|---|---|---|---|
 | **gate** | yes | yes (your facts) | yes | **No LLM.** It only matches a fixed set of commands, and its rules are tested in code. |
-| **envoy** | yes (the other envoy) | **no**: only a brief at this level, file and shell tools off, an empty folder, can't commit | yes | It can't leak what it was never told. Commitments need both people's yes. |
-| **Om's Codex agent** | **no**: only `#om-home` | yes | provider approvals | Only Om can address it. What crosses into the home room is fixed forms and quoted questions of 140 characters or fewer. |
-| **Hermes via `tn mcp`** | yes (your chats) | **little**: nine purpose-built tools, can only tighten facts | yes | The worst a tricked Hermes can do: say yes to a plan you allowed it to answer, or make a fact more private |
+| **`rahul-agent` (Codex, managed)** | **yes** — the DM room, directly, not filtered by an envoy brief | yes | provider approvals (`auto_mode`/`auto_approve` off) | Every tool use — posting in a DM room included — needs Rahul's approval in Console. Nothing it sends crosses unseen. |
+| **Hermes via `tn mcp` (`om-hermes`)** | yes (Om's chats, and now the DM room's plain-language text through `dm_read`) | **little**: eleven purpose-built tools, can only tighten facts, can only read/post in DM rooms it's already a member of | yes | The worst a tricked Hermes can do: say too much in a DM room, say yes to a plan Om allowed it to answer, or make a fact more private |
+| **`om-agent` (Codex, managed, optional)** | no: only `#om-home`, and only used for `view-as`/`ledger`/overreach/direct `yes` | yes | provider approvals | Secondary surface only; not party to any DM room in the demo |
 
-**Stronger on the VM (P2):** `install-service --separate-users` runs each envoy as its own Linux user that sees only its own folder, can't read the home directories or the gate's files, and can't reach the cloud metadata address. Codex has no per-tool switch in Switch's settings, so this is its real sandbox.
+**Stronger on the VM (P2):** `install-service --separate-users` would run Rahul's main agent as its own Linux user that can't read the gate's files or reach the cloud metadata address. Codex has no per-tool switch in Switch's settings, so this is its real sandbox.
 
 **Known gaps (say these in the README):**
-- **The 140-character questions** that envoys ask their person reach the main agent as text, which leaves a small injection channel. They're shown quoted, and `SKILL.md` tells main agents to pass them to the human without acting on them.
+- **A main agent now carries the DM-room conversation itself, unfiltered.** With no envoy brief in between, `rahul-agent` and Hermes each know their own person's whole life, so what either one actually says to the other rests on `SKILL.md` plus, for `rahul-agent`, Rahul approving every message in Console; Hermes has no per-message human check, only its eleven narrow tools. The gate's level guarantees still cover only what gates themselves disclose — facts, calendars, proposals — never what a main agent chooses to volunteer in the DM room.
+- **The 140-character questions** an agent relays to its own owner through `ask-owner` reach the owner as text, which leaves a small injection channel. They're shown quoted, and `SKILL.md` tells main agents to pass them to the human without acting on them.
 - **The gift seal is a courtesy,** because the ledger file is on the recipient's own laptop.
 - **Whoever runs the Switch server** can read every room.
-- **Codex envoys** rely on `auto_mode` off and an empty folder until `--separate-users` is on.
 - **Every device on Om's tailnet** can reach the Switch server (it still needs a Switch credential).
 
 ---
@@ -316,22 +324,22 @@ An agent is unsafe when all three hold: it acts unwatched, can reach something t
 
 | Switch feature | Where trust-network uses it |
 |---|---|
-| **Agent-only rooms** (`create_room(internal_only=True)`) | Envoy DMs, connection rooms, gift rooms |
-| **Agent management**: `create_agent`, "can manage agents", managed agents placed on a named machine | Gates create and re-brief their own person's envoys. No agent code of our own. |
-| **Headless agent controller** (`switch-agent-controller`) and the **Machines** page | Rahul's envoy runs on his own machine, the Azure VM, without Switch Console |
-| **Agent instructions** | The level-filtered brief |
-| **Per-room sessions** | Each DM room is a fresh envoy session |
-| **Agent protocol** (register under a person's key, WebSocket events, ops) | Gates, `rahul-hermes` |
-| **Discord connection**: one bot, each agent under its own name, private channels Switch creates | `#om-home` |
-| **Templates** with `provider: "{param}"`, `allow_existing`, `docs:` | Home channel setup |
-| **Addressing**: `owner`, custom rules, visible refusals | Main agents answer only their owner; gates take owner commands only from their owner; each envoy answers only its gate and the friend's envoy |
+| **Agent-only rooms** (`create_room(internal_only=True)`) | DM rooms between main agents, connection rooms, gift rooms, `rahul-home` |
+| **Agent management**: `create_agent`, "can manage agents", managed agents placed on a named machine | `rahul-agent` is a managed Codex agent placed on `rahul-vm`; `om-agent` likewise on the laptop (now optional). `create_agent`-based envoy creation (phases 12/13/13b) is unused after the no-envoy decision. |
+| **Headless agent controller** (`switch-agent-controller`) and the **Machines** page | Runs `rahul-agent` on Rahul's own machine, the Azure VM, without Switch Console — now required again (it was optional between the no-envoy and main-agent-swap decisions) |
+| **Agent instructions** | None set at runtime for the main agents now; the level-filtered **share card** (repurposed phase 12 brief) is handed to each one privately instead |
+| **Per-room sessions** | DM rooms are archived after agreement or a turn/time limit; the main agents themselves persist across conversations, unlike the old per-room envoy session |
+| **Agent protocol** (register under a person's key, WebSocket events, ops) | Gates, `om-hermes` |
+| **Discord connection**: one bot, each agent under its own name, private channels Switch creates | `#om-home` (now Om's optional secondary surface) |
+| **Templates** with `provider: "{param}"`, `allow_existing`, `docs:` | Home channel setup for `om-agent`; a parallel setup is still needed for `rahul-agent` in `rahul-home` (see §5) |
+| **Addressing**: `owner`, custom rules, visible refusals | Main agents answer only their owner; gates take owner commands only from their owner; `rahul-agent` and `om-hermes` address each other directly once invited to a DM room |
 | **Membership as server truth** (`list_participants`, `get_agent_detail`) | Room level |
-| **Agents inherit their owner's permissions** | Why each gate and envoy belongs to its own person, on its own person's machine |
+| **Agents inherit their owner's permissions** | Why each gate and main agent belongs to its own person, on its own person's machine |
 | **Private rooms** (`read_visibility`) | Gift rooms |
 | **Room documents** | `SKILL.md` in rooms; the `plan` record in DM rooms |
 | **Archive room** | DM and gift rooms when done |
-| **Switch Console** | Om's main agent and Om's envoy; reading the envoys' DM transcript (a video shot) |
-| **Multiple providers** | Managed Codex for Om in `#om-home`, OpenCode with OpenCode Go DeepSeek V4.1 Flash for his envoy via the trust-network runner, and Hermes for Rahul |
+| **Switch Console** | Rahul's main agent (`rahul-agent`); reading the DM room transcript between it and Hermes (a video shot) |
+| **Multiple providers** | Managed Codex for Rahul (`rahul-agent`), Hermes for Om — no separate envoy provider |
 | *(Fallback)* **Bundled Mattermost** | Judges can run it without a Discord bot |
 
 ---
@@ -352,8 +360,10 @@ In dependency order. Write down each result.
 | 8 | Events carry the sender's ID and `addressed`; `list_participants` and `get_agent_detail` give each agent's owner | Read `users` from `get_room_detail` |
 | 9 | A gate's addressing set to `anyone` with `update_agent_detail`, while owner commands are enforced in code | Custom rules in Gateway |
 | 10 | Om can open an agent-only DM room in Console (wanted), but can't open a private gift room created by `rahul-gate` (wanted) | Show the DM through a summary doc; gifts use the courtesy seal |
-| 11 | Hermes on the VM: a Telegram bot; `tn mcp` under `mcp_servers`; the skill loads; a cron job every 2 min calls `inbox` and messages Telegram | `tn --as rahul inbox` / `answer` from the terminal (same code path) |
+| 11 | Hermes on the VM, now acting for **Om** (`om-hermes`, swapped Nov 5): a Telegram bot; `tn mcp` under `mcp_servers`; the skill loads; a cron job every 2 min calls `inbox` and messages Telegram | `tn --as om inbox` / `answer` from the terminal (same code path) |
 | 12 | Discord: bot with Message Content + Server Members intents; `#om-home` created as a private channel by the template; Om's Discord linked | Mattermost |
+
+**Checks 4–6 no longer drive the design.** They tested managed/fallback envoys, cross-envoy addressing and tool denial; after dropping envoys (Nov 5), none of that governs how `om-hermes` and `rahul-agent` talk to each other. Their evidence stays below for the record, and still matters if envoys are ever reintroduced.
 
 Protocol findings from phase 03 (source at `sandbox-quantum/switch@1c9725a`) are in `phases/03-switch-client.md` *Log* and §11; phase 04 confirms them against core 0.31.0. In short: participants carry no owner ID (use `get_agent_detail`); `internal_only` removes only the external bridge; archiving doesn't block writes; room-scoped ops use the connected room.
 
@@ -373,8 +383,8 @@ resolve server identities before authorizing commands. See docs/day0.md.
 |---|---|---|
 | **Nov 5 evening** | Setup: Docker, Switch Console (local server), Discord bot + guild, test users and keys, Tailscale Serve, the VM's controller, `codex login` on the VM. Run checks 1–12. Start `switch_client.py`. | Each check has a result written down; a protocol agent posts in `#om-home`; the Machines page shows the laptop and the VM |
 | **Nov 6 morning** | Gate core: policy, facts, calendar, `free`/`ask`, room level, ledger, `view-as`, tests. `home.template.yaml`. Example data. | Om's Codex agent asks `@om-gate free …` in Discord and gets a level-correct answer |
-| **Nov 6 afternoon** | `gate/envoy.py` (create, brief, invite), `dm`, DM rooms, the brief template, `ask-owner`/`answer`, `propose`/`yes`, `tn cal add`. `rahul-gate` on the VM. Rahul driven from the CLI (`tn --as rahul`). | **Scene 1 runs end to end** without Hermes |
-| **Nov 6 night** | `tn mcp`, Hermes + Telegram + cron on the VM, `SKILL.md` | Scene 1 with Rahul on Telegram |
+| **Nov 6 afternoon** | DM rooms between main agents (gate creates the room, invites both main agents and both gates, posts the share card privately), `dm`, `ask-owner`/`answer`, `propose`/`yes`, `tn cal add`. `rahul-gate` and a managed `rahul-agent` on the VM. Om driven from the CLI (`tn --as om`), standing in for Hermes until phase 18. | **Scene 1 runs end to end** without Hermes |
+| **Nov 6 night** | `tn mcp`, Hermes + Telegram + cron on the VM (acting as `om-hermes`), `SKILL.md` | Scene 1 with Om on Telegram |
 | **Nov 7 morning** | Gift rooms + surprise mode + claims; ask-around; overreach note | Scenes 2 and 3 run |
 | **Nov 7 afternoon** | README (Switch features table, room and machine maps, safety model, one-machine setup), fresh-clone test, record the video, Wispr Insights screenshot | Submitted by 20:00 IST |
 
@@ -382,8 +392,8 @@ resolve server identities before authorizing commands. See docs/day0.md.
 - **P0 (must ship):**
   - gate core, consent, ledger, `view-as`;
   - `#om-home` on Discord;
-  - envoy DMs with ask-your-person, envoys as managed agents (or the fallback runner if checks 4–5 fail);
-  - Scene 1 with Rahul through Hermes, or through the CLI if Hermes slips.
+  - DM rooms between main agents, with ask-your-person and consent;
+  - Scene 1 with Om through Hermes, or through the CLI if Hermes slips.
 - **P1:**
   - Rahul's side on the Azure VM (otherwise his controller runs on the laptop; nothing else changes);
   - Hermes on Telegram, if it slipped from P0;
@@ -391,8 +401,6 @@ resolve server identities before authorizing commands. See docs/day0.md.
   - Scene 3 (ask around);
   - the overreach note.
 - **P2:**
-  - `--separate-users` on the VM;
-  - an envoy template (`run_template` creates managed agents since 0.31);
   - counter-proposals;
   - Priya's own main agent (OpenCode);
   - OpenClaw and Grok Bot recipes;
@@ -405,11 +413,11 @@ resolve server identities before authorizing commands. See docs/day0.md.
 | Time | Beat | On screen |
 |---|---|---|
 | 0:00 | **Hook.** Everyone has an agent now; they can't work together without oversharing. Instinct's answer is one vendor whose agent enforces its own rules. Ours: bring any agent, and the rules live in code. | Title, one line on Instinct |
-| 0:15 | **Cast.** Om on managed Codex (Discord), his envoy on OpenCode with OpenCode Go DeepSeek V4.1 Flash via the trust-network runner, Rahul on Hermes (Telegram), Priya's gate. Trust: Rahul close, Priya friend. Two machines: Om's laptop, Rahul's VM. | Discord + phone + `trust.yaml` + Gateway Machines page |
-| 0:30 | **Outing.** Om dictates the request. The envoys DM each other in Switch Console (OpenCode on the laptop ↔ Codex on the VM). Rahul's envoy asks him about budget on Telegram, P1 is proposed, Om types `yes`, Rahul says "sure". Then "Om ✅ · Rahul ✅ via Hermes", and both calendars update. | Split: Discord / Console / phone |
-| 1:35 | **Gift.** Rahul asks Hermes for ideas, gets the wishlist, claims Catan. Om's Discord is silent; `ledger` shows "1 sealed entry, opens Nov 21". | Phone, then Discord |
-| 2:05 | **Ask around.** "Anyone have a tent?" Priya's gate answers instantly; Rahul is asked on Telegram and says no. | Discord + phone |
-| 2:25 | **Overreach.** Hermes asks for Om's address, gets "not shared", and an alert appears in `#om-home`. `view-as rahul`. | Discord |
+| 0:15 | **Cast.** Om on Hermes (Telegram) — the agent that DMs Rahul's agent directly. Rahul on a managed Codex agent (`rahul-agent`), talked to in Switch Console. Priya's gate. Trust: Rahul close, Priya friend. One VM hosts both Om's Hermes and Rahul's side. | Phone + Console + `trust.yaml` + Gateway Machines page |
+| 0:30 | **Outing.** Om dictates to Hermes. Hermes and `rahul-agent` DM each other directly in Switch Console. `rahul-agent` asks Rahul about budget right there, P1 is proposed, Om tells Hermes "yes", Rahul says yes directly. Then "Om ✅ via Hermes · Rahul ✅", and both calendars update. | Split: phone / Console |
+| 1:35 | **Gift.** Rahul tells his Codex agent to ask for ideas, gets the wishlist, claims Catan. Om's side stays silent; `ledger` shows "1 sealed entry, opens Nov 21". | Console, then phone |
+| 2:05 | **Ask around.** Om asks Hermes "anyone have a tent?" Priya's gate answers instantly; Rahul is asked directly in `rahul-home` and says no. | Phone + Console |
+| 2:25 | **Overreach.** Rahul's agent asks for Om's address, gets "not shared", and an alert reaches Om via Hermes. `view-as rahul`. | Phone + Console |
 | 2:45 | **Close.** Room map, three-factor table, "we wrote zero AI agents", Switch features. | Slides |
 
 ---
@@ -418,16 +426,15 @@ resolve server identities before authorizing commands. See docs/day0.md.
 
 | Risk | Mitigation |
 |---|---|
-| The managed-agent path fails (`create_agent`, re-briefing, envoys addressing each other) | The fallback envoy runner, headless CLIs (checks 4–5) |
 | Tailscale or the laptop drops mid-demo | `caffeinate`; the controller reconnects by itself; scenes are recorded separately; the one-machine layout as backup (check 2) |
 | Cross-owner invites to agent-only rooms are refused | Rooms readable across the workspace + `connect_to_room`; gifts fall back to the courtesy seal (check 7) |
-| Envoys make up facts about their person | The brief says to state only what's in it and otherwise `ask-owner`. Proposals need both people's yes. |
-| Managed OpenCode agents don't start: Console 0.40.1's controller waits for `opencode server listening`, OpenCode 2.x prints `server listening` (found in phase 04). Managed agents can only deny tools for the Claude provider. | Envoys use the fallback runner (phase 13b) with `opencode run` / `codex exec` and CLI-level tool denial. Report the OpenCode prefix mismatch upstream. |
-| Envoys chat forever | The gate counts turns and archives the DM room at 12 turns or 10 minutes, with a summary |
+| A main agent overshares beyond the friend's trust level | `SKILL.md` tells each main agent to keep to what its share card says is allowed; `rahul-agent`'s messages need Rahul's approval in Console; nothing is committed without both people's yes |
+| `rahul-agent`'s managed-Codex path fails on `rahul-vm` (`create_agent`, addressing, the room it needs set up in `rahul-home`) | Fall back to driving Rahul from the CLI (`tn --as rahul`), same as the original Hermes cut line |
+| Main agents chat forever | The gate counts turns and archives the DM room at 12 turns or 10 minutes, with a summary |
 | `archive_room` doesn't block writes (upstream archive is reversible metadata; found in phase 03) | Gates track archived rooms themselves and ignore or refuse anything posted there after archiving |
 | `internal_only` only removes the external bridge (Discord/Mattermost); it doesn't hide the room from Console users (found in phase 03) | Check 10 decides whether gift rooms need the courtesy seal. Never rely on `internal_only` alone for privacy. |
 | Room-scoped ops (`post_message` etc.) act on the agent's connected room and take no `room_id` (found in phase 03) | Phase 04 confirms how a gate that sits in several rooms picks the room (e.g. `connect_to_room` before posting); phases 11 and 14 are built around the answer |
-| Hermes setup varies by version | `tn --as rahul` CLI fallback uses the same code path; Hermes moves to P1 if needed |
+| Hermes setup varies by version | `tn --as om` CLI fallback uses the same code path; Hermes moves to P1 if needed |
 | LLMs format commands badly | Generous date parsing; the gate replies with a correct example; `SKILL.md` has examples |
 | Switch's `main` branch moves fast | Pin Console 0.40.1, switch-core 0.31.0, `switch-agent-controller` 0.31.0; controller 0.31.0 has no self-update switch, but only installs a release the server names, and Console's switch-core names none (`CONTROLLER_RELEASE_VERSION` unset) |
 | A dense 3-minute video | Script dictated and timed on Nov 7 morning; cut ask-around first |
@@ -442,7 +449,7 @@ visibility does not protect gifts against the workspace administrator.
 
 ## 12. Code with Wispr
 
-- [ ] Dictate the Claude Code prompts, `SKILL.md`, the envoy brief template, the README and the video script.
+- [ ] Dictate the Claude Code prompts, `SKILL.md`, the share-card template (`envoy-brief.md.j2`, repurposed), the README and the video script.
 - [ ] Screenshot the Wispr Flow **Insights** tab right before submitting, and attach it.
 
 ## Sources
