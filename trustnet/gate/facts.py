@@ -1,0 +1,1 @@
+"""trustnet.gate.facts module."""

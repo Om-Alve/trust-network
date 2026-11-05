@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.env
+**/ledger.jsonl
+**/claims.json
+data/
+.DS_Store
+*.egg-info/
+build/
+dist/

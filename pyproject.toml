@@ -1,0 +1,40 @@
+[project]
+name = "trust-network"
+version = "0.1.0"
+description = "Trust gates and personal agent coordination over Switch."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "websockets",
+    "httpx",
+    "icalendar",
+    "recurring-ical-events",
+    "dateparser",
+    "pyyaml",
+    "mcp",
+    "jinja2",
+]
+
+[project.scripts]
+tn = "trustnet.tn.cli:main"
+
+[dependency-groups]
+dev = ["pytest", "pytest-asyncio", "ruff"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["trustnet*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
