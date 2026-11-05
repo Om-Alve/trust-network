@@ -75,3 +75,10 @@ All checks passed!
 - Fixture wishlist order is Catan, Hario, Kindle (price filter output order in Scene 2); PLAN §3 lists Catan, Kindle, Hario. Same three items and prices.
 - Fixture addresses are invented placeholder strings (PLAN §3 shows `"…"`); `private` means they are never disclosed in the demo.
 - Calendar files are minimal valid VCALENDARs with no VEVENTs (phase 06 fills them).
+
+### Change 2026-11-05 (after phase close)
+
+- Om's envoy switched from Claude Code to OpenCode with OpenCode Go `deepseek-v4.1-flash`
+  (Om's request: no Claude Code in Switch). `TrustList` gained an optional `envoy_model`
+  (`envoy.model` in `trust.yaml`, omitted on save when empty); `examples/om/trust.yaml` now has
+  `provider: opencode`, `model: opencode-go/deepseek-v4.1-flash`. Test updated.

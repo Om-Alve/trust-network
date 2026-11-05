@@ -5,5 +5,6 @@ people:
 consent:
   default: direct            # Om says yes himself in #om-home
 envoy:
-  provider: claude           # which agent speaks for Om
+  provider: opencode         # which agent speaks for Om
+  model: opencode-go/deepseek-v4.1-flash
   machine: "<laptop machine name in Switch>"   # filled in by scripts/demo_up.py

@@ -144,6 +144,7 @@ class TrustList:
     consent_default: ConsentMode = "direct"
     envoy_provider: str = ""
     envoy_machine: str = ""
+    envoy_model: str = ""  # provider model id; "" = the provider's default
 
     def level_for(self, person: str) -> Level | None:
         return self.people.get(_person_key(person))
@@ -247,10 +248,11 @@ def load_trust_file(path: str | Path) -> TrustList:
     envoy_raw = data.get("envoy") or {}
     if not isinstance(envoy_raw, dict):
         raise FactsError(f"{path}: 'envoy' must be a mapping")
-    _check_keys(envoy_raw, frozenset({"provider", "machine"}), f"{path}: envoy")
+    _check_keys(envoy_raw, frozenset({"provider", "machine", "model"}), f"{path}: envoy")
     provider = envoy_raw.get("provider", "")
     machine = envoy_raw.get("machine", "")
-    for key, value in (("provider", provider), ("machine", machine)):
+    model = envoy_raw.get("model", "")
+    for key, value in (("provider", provider), ("machine", machine), ("model", model)):
         if not isinstance(value, str):
             raise FactsError(f"{path}: envoy.{key} must be a string")
 
@@ -259,6 +261,7 @@ def load_trust_file(path: str | Path) -> TrustList:
         consent_default=consent_default,
         envoy_provider=provider.strip(),
         envoy_machine=machine.strip(),
+        envoy_model=model.strip(),
     )
 
 
@@ -272,6 +275,8 @@ def save_trust(trust: TrustList, path: str | Path) -> None:
             "machine": trust.envoy_machine,
         },
     }
+    if trust.envoy_model:
+        payload["envoy"]["model"] = trust.envoy_model
     _write_yaml(Path(path), payload)
 
 

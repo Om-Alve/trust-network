@@ -20,7 +20,7 @@ A running gate process per person (`python -m trustnet.gate`) that listens on Sw
 - [ ] Silence rule: if `room_level` is `None`, the gate posts nothing at all (a log line only).
 - [ ] Handlers: `free` (calendar view at level), `ask` (values or "not shared at this level"), owner-only `view-as`, `ledger`, `trust`. Unknown commands → command list (overreach note comes in phase 21).
 - [ ] `trustnet/gate/relay.py`: `post_home(person, text)`, which finds the person's home room (`#om-home` for Om; `rahul-home` / `priya-home` agent-only rooms for others, created on first use).
-- [ ] `templates/home.template.yaml`: private Discord channel `om-home`; a Claude Code agent `om-agent` (`provider: "{provider}"`, `allow_existing`, addressing `owner`); `om-gate`; `SKILL.md` as a room doc.
+- [ ] `templates/home.template.yaml`: private Discord channel `om-home`; an OpenCode agent `om-agent` (`provider: "{provider}"` = `opencode`, `model: "opencode-go/deepseek-v4.1-flash"`, `allow_existing`, addressing `owner`); `om-gate`; `SKILL.md` as a room doc.
 - [ ] Stub `skills/trust-network/SKILL.md` with the command list and examples (replaced by the dictated version in phase 18).
 - [ ] Offline tests with `FakeSwitch`: gate answers Rahul-level in a room with `rahul-gate`, friend-level with `priya-gate`, stays silent with a stranger, refuses `trust` from Om's agent, answers `self` level in the home room.
 - [ ] **[human]** Run the template; confirm `#om-home` is a private Discord channel with Om, `om-agent`, `om-gate` (finishes check 12 in `docs/day0.md`).

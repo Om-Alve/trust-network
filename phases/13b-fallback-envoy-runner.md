@@ -17,9 +17,9 @@ target: Nov 6 afternoon
 `trustnet/envoy_runner.py`: our own small process that plays the envoy role. It registers in Switch under its person's key and runs that person's agent CLI headless, in an empty folder with tools off, once per incoming message. It exposes the **same interface** as phase 13 (`ensure_envoy`, `brief_envoy`, `start_conversation`, `ConversationWatch`), so phase 14 doesn't care which one is used.
 
 ## Tasks
-- [ ] Runner: `--person`, `--friend`, `--provider claude|codex|opencode`, `--key-env`. Registers as `<owner>-envoy-<friend>`.
+- [ ] Runner: `--person`, `--friend`, `--provider opencode|codex`, `--key-env`. Registers as `<owner>-envoy-<friend>`.
 - [ ] Per addressed message: build a prompt from the current brief + room transcript; run the CLI in a fresh empty temp dir:
-  - `claude -p --disallowedTools "Bash,Edit,Write,Read,…"`;
+  - `opencode run -m opencode-go/deepseek-v4.1-flash` with Bash/Edit/Write denied in its permission config;
   - `codex exec` with sandbox read-only / no network approvals;
   - `opencode run`;
   and post its stdout (trimmed) to the room.
@@ -30,7 +30,7 @@ target: Nov 6 afternoon
 
 ## Done when
 - [ ] `make check` passes.
-- [ ] Live: Om's runner (Claude) and Rahul's runner (Codex) talk to each other in an agent-only room for at least 4 turns.
+- [ ] Live: Om's runner (OpenCode) and Rahul's runner (Codex) talk to each other in an agent-only room for at least 4 turns.
 - [ ] *Log* lists which checks failed and why this path was taken.
 
 ## Commit

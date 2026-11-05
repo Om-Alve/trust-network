@@ -71,7 +71,8 @@ def test_om_matches_the_plan() -> None:
 
     assert trust.people == {"rahul": Level.CLOSE, "priya": Level.FRIEND}
     assert trust.consent_default == "direct"
-    assert trust.envoy_provider == "claude"
+    assert trust.envoy_provider == "opencode"
+    assert trust.envoy_model == "opencode-go/deepseek-v4.1-flash"
 
     assert profile.facts["diet"] == Fact("vegetarian", Level.ACQUAINTANCE)
     assert profile.facts["drinks"] == Fact("no alcohol", Level.FRIEND)

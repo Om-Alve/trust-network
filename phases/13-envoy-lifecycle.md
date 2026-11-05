@@ -26,7 +26,7 @@ target: Nov 6 afternoon
 
 ## Done when
 - [ ] `make check` passes.
-- [ ] Live: `om-gate` creates `om-envoy-rahul` (Claude Code, laptop) and `rahul-gate` creates `rahul-envoy-om` (Codex, VM, or laptop per check 2/3), each replies in a test room, and a re-brief visibly changes the next reply.
+- [ ] Live: `om-gate` creates `om-envoy-rahul` (OpenCode, `opencode-go/deepseek-v4.1-flash`, laptop; model from `trust.yaml` `envoy.model`) and `rahul-gate` creates `rahul-envoy-om` (Codex, VM, or laptop per check 2/3), each replies in a test room, and a re-brief visibly changes the next reply.
 - [ ] Live: a test room is archived automatically after the 12th envoy turn.
 - [ ] The `create_agent` payload actually sent is pasted in *Log* (shows tools off, auto-mode off).
 

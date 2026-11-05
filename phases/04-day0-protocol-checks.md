@@ -17,9 +17,9 @@ Prove (or disprove) the managed-agent design before building on it. Each result 
 ## Tasks
 - [ ] `scripts/day0_probe.py` with one subcommand per check, using `SwitchClient`. Each prints PASS/FAIL and the raw response, so results are reproducible.
 - [ ] **[human]** Turn on "can manage agents" for `om-gate` and `rahul-gate` in Gateway.
-- [ ] Check 4: `rahul-gate` calls `create_agent(machine=<VM>, provider="codex", instructions=…)`; the envoy answers in an agent-only room; `update_agent_detail` changes its instructions and the next reply reflects the change. Same for `om-gate` + Claude Code on the laptop.
+- [ ] Check 4: `rahul-gate` calls `create_agent(machine=<VM>, provider="codex", instructions=…)`; the envoy answers in an agent-only room; `update_agent_detail` changes its instructions and the next reply reflects the change. Same for `om-gate` + OpenCode (`model="opencode-go/deepseek-v4.1-flash"`) on the laptop.
 - [ ] Check 5: `rahul-envoy-om` can address `om-envoy-rahul` once addressing names it; `get_agent_detail` from `rahul-gate` on `om-envoy-rahul` does **not** expose its instructions; a new DM room starts a fresh session (envoy doesn't remember the previous room).
-- [ ] Check 6: Claude Code envoy with file and shell tools disallowed still replies; Codex with `auto_mode` off doesn't act without asking.
+- [ ] Check 6: OpenCode envoy (`opencode-go/deepseek-v4.1-flash`) with file and shell tools (Bash, Edit, Write) disallowed still replies; Codex with `auto_mode` off doesn't act without asking.
 - [ ] Check 7: `create_room(internal_only=True)` from `om-gate` including `rahul-gate`, or create then `invite_agent_to_room`.
 - [ ] Check 8 (second half): `list_participants` and `get_agent_detail` give each agent's owner.
 - [ ] Check 9: a gate's addressing set to `anyone` via `update_agent_detail`.

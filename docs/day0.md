@@ -126,7 +126,7 @@ Controller pinned to `0.31.0`. See [setup-vm.md](setup-vm.md) step 6.
 - **Check:** **Envoys as managed agents:** with "can manage agents" on,
   `rahul-gate` calls `create_agent(machine=<VM>, provider="codex", instructions=…)`,
   the envoy answers in an agent-only room, and `update_agent_detail` then changes
-  its instructions. Same for `om-gate` with Claude Code on the laptop.
+  its instructions. Same for `om-gate` with OpenCode (`opencode-go/deepseek-v4.1-flash`) on the laptop. Note: on Nov 5 the Console controller reported OpenCode sign-in as "could not verify" although `opencode run -m opencode-go/deepseek-v4.1-flash` works from the shell; confirm here.
 - **Filled in by:** phase 04
 - **Result:** `pending`
 - **Date:** —
@@ -154,7 +154,7 @@ Controller pinned to `0.31.0`. See [setup-vm.md](setup-vm.md) step 6.
 
 ## Check 6 — Tools off
 
-- **Check:** **Tools off:** a Claude Code envoy with file and shell tools disallowed
+- **Check:** **Tools off:** an OpenCode envoy (`opencode-go/deepseek-v4.1-flash`) with file and shell tools disallowed
   still replies in the room. Codex with `auto_mode` off doesn't act without asking.
 - **Filled in by:** phase 04
 - **Result:** `pending`

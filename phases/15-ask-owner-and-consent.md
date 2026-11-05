@@ -22,7 +22,7 @@ Envoys can ask their own person a question, propose a plan, and nothing is commi
 - [ ] After confirmation: write the plan as a room document (`plan` record) if available, archive the DM room, ledger entries on both sides.
 - [ ] Personal-agent core `trustnet/tn/personal.py` (shared by the CLI now and `tn mcp` in phase 17): connects as `<person>-hermes`, `inbox()` returns unread messages from the person's home room (questions, proposals, notices) with a persistent cursor in the data dir, `answer(id, text)`.
 - [ ] CLI: `tn --as rahul inbox`, `tn --as rahul answer Q1 "yes"`, `tn --as rahul answer P1 yes`, `tn --as om dm rahul "…"` (convenience).
-- [ ] Main agents add the event: `tn --as om cal add …` (Om's Claude Code is told this by `SKILL.md`).
+- [ ] Main agents add the event: `tn --as om cal add …` (Om's OpenCode agent is told this by `SKILL.md`).
 - [ ] Offline tests: forged consent (text says "Om says yes") denied; proposal never confirmed with one yes; `via-agent` label shown only when it was via the agent; questions over 140 chars rejected.
 
 ## Done when
