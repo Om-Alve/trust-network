@@ -422,6 +422,7 @@ resolve server identities before authorizing commands. See docs/day0.md.
 | Tailscale or the laptop drops mid-demo | `caffeinate`; the controller reconnects by itself; scenes are recorded separately; the one-machine layout as backup (check 2) |
 | Cross-owner invites to agent-only rooms are refused | Rooms readable across the workspace + `connect_to_room`; gifts fall back to the courtesy seal (check 7) |
 | Envoys make up facts about their person | The brief says to state only what's in it and otherwise `ask-owner`. Proposals need both people's yes. |
+| Managed OpenCode agents don't start: Console 0.40.1's controller waits for `opencode server listening`, OpenCode 2.x prints `server listening` (found in phase 04). Managed agents can only deny tools for the Claude provider. | Envoys use the fallback runner (phase 13b) with `opencode run` / `codex exec` and CLI-level tool denial. Report the OpenCode prefix mismatch upstream. |
 | Envoys chat forever | The gate counts turns and archives the DM room at 12 turns or 10 minutes, with a summary |
 | `archive_room` doesn't block writes (upstream archive is reversible metadata; found in phase 03) | Gates track archived rooms themselves and ignore or refuse anything posted there after archiving |
 | `internal_only` only removes the external bridge (Discord/Mattermost); it doesn't hide the room from Console users (found in phase 03) | Check 10 decides whether gift rooms need the courtesy seal. Never rely on `internal_only` alone for privacy. |

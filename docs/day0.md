@@ -297,3 +297,29 @@ lookup passes; check 5 remains partial until peer and fresh-session evidence exi
 Cleanup completed through Gateway DELETE. All disposable day0 agents and rooms
 returned HTTP 200; see docs/day0-evidence/cleanup.txt. Only om-gate and
 rahul-gate are retained from this run. Existing unrelated agents were left alone.
+
+### Root causes behind checks 4, 6 and 10 (reviewed 2026-11-05)
+
+The phase 04 probe was deliberately short, so two of its failures were weak on their own
+(a 20-second wait for a re-brief reply). These are the causes that actually settle the branch:
+
+- **OpenCode 2.x can't be started by the Console 0.40.1 controller.** The controller spawns
+  `opencode serve` and waits for a stdout line starting with `opencode server listening`
+  (`READY_PREFIX` in `dist-sidecar/agent-controller.mjs`; same on upstream `main`). OpenCode
+  2.1.4 prints `server listening on http://127.0.0.1:<port>`, so every managed OpenCode agent
+  times out after 60 s ("server did not start within 60000ms: server listening on …").
+  This is an upstream incompatibility, not a DeepSeek / OpenCode Go problem; `opencode run -m
+  opencode-go/deepseek-v4.1-flash` works from the shell.
+- **Managed agents can't have tools turned off unless the provider is Claude.** In core 0.31.0
+  `providers/advanced_fields.py`, only `CLAUDE_FIELDS` has `tools` / `disallowedTools`.
+  OpenCode's fields are variant, temperature, topP, maxSteps, webSearch, smallModel; Codex has
+  none for tools. A managed OpenCode or Codex envoy would keep shell and file tools, which
+  breaks the safety model (PLAN.md §6). Om doesn't want Claude Code in Switch.
+- **Check 10 fails partly because Om is the workspace admin** (`admin@switch.local`), and
+  admins can read every room. Whether a non-admin owner can read another owner's private
+  room is untested. A separate non-admin `om` user would make the gift-room test meaningful;
+  until then gifts rely on the courtesy seal (already the decision).
+
+So phase 13b (our own envoy runner: `opencode run -m opencode-go/deepseek-v4.1-flash` for Om,
+`codex exec` for Rahul, each in an empty folder with tools denied through the CLI's own
+permission config) is the right branch for both envoys.
