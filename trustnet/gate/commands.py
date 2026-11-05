@@ -165,13 +165,16 @@ class Quoted:
     def __post_init__(self) -> None:
         if not isinstance(self.text, str):
             raise ValueError("quoted text must be a string")
-        text = self.text.strip()
+        # Match what the gate's normaliser will see, so a line a tool builds is
+        # a line the gate accepts. Dictation's smart double quotes become ' .
+        text = self.text.translate(_QUOTED_SMART)
+        if "\n" in text.strip() or "\r" in text.strip():
+            raise ValueError("quoted text must be one line")
+        text = " ".join(text.split())
         if not text:
             raise ValueError("quoted text must not be empty")
         if len(text) > MAX_QUESTION:
             raise ValueError(f"quoted text must be {MAX_QUESTION} characters or fewer")
-        if "\n" in text or "\r" in text:
-            raise ValueError("quoted text must be one line")
         if '"' in text:
             raise ValueError("quoted text cannot contain a double quote")
         object.__setattr__(self, "text", text)
@@ -589,6 +592,10 @@ _SMART: Final = str.maketrans(
         "\u202f": " ",
     }
 )
+_QUOTED_SMART: Final = {
+    **_SMART,
+    **{ord(c): "'" for c in "\u201c\u201d\u201e\u201f"},
+}
 
 
 def _normalize(text: str) -> str:

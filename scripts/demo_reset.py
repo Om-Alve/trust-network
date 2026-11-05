@@ -15,6 +15,7 @@ STATE_FILES = (
     "claims.json",
     "gift-sessions.json",
     "inbox-cursor.json",
+    "watch-state.json",
     "coordination.json",
     "ask-around.json",
 )

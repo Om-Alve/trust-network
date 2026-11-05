@@ -354,6 +354,7 @@ For CLI stand-ins for the two Hermes profiles, in another terminal:
 ```sh
 export SWITCH_URL=http://127.0.0.1:53330
 export TN_DATA_DIR="$PWD/data/judges"
+export TN_STATE_DIR="$PWD/data"   # retained Hermes identities in data/main-agents/
 uv run tn --as om dm rahul "Sunday bowling dinner"
 uv run tn --as om inbox
 uv run tn --as rahul inbox

@@ -5,6 +5,8 @@ __pycache__/
 .env
 **/ledger.jsonl
 **/claims.json
+**/inbox-cursor.json
+**/watch-state.json
 /data/
 .DS_Store
 *.egg-info/

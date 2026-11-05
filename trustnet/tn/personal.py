@@ -59,8 +59,8 @@ async def home(person, client):
     return rooms[0]["room_id"]
 
 
-async def inbox(person):
-    """Return unread home threads; persist consumed message IDs per person."""
+async def inbox(person, consume=True):
+    """Return unread home threads; persist consumed message IDs unless peeking."""
     path = resolve_data_dir(person) / "inbox-cursor.json"
     seen = set(json.loads(path.read_text())) if path.exists() else set()
     async with session(person) as client:
@@ -68,11 +68,53 @@ async def inbox(person):
         context = await client.read_context(room_id=room, limit=200)
     threads = context.get("threads", [])
     unread = [t for t in threads if t["root"]["id"] not in seen]
+    if not consume:
+        return {"room": room, "threads": unread}
     seen.update(t["root"]["id"] for t in unread)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch(mode=0o600)
     path.write_text(json.dumps(sorted(seen)))
     return {"room": room, "threads": unread}
+
+
+async def watch(person):
+    """Report what needs the agent now, without consuming the inbox.
+
+    Unread home threads, plus each active DM room whose newest message is someone
+    else's and changed since the previous watch. Only the newest DM message IDs are
+    remembered (``watch-state.json``), so a room wakes the agent once per change.
+    """
+    path = resolve_data_dir(person) / "watch-state.json"
+    last = json.loads(path.read_text()) if path.exists() else {}
+    unread = (await inbox(person, consume=False))["threads"]
+    newest, updates = {}, []
+    async with session(person) as client:
+        detail = await client.get_agent_detail(client.agent_id)
+        for membership in detail["rooms"]:
+            if not membership["room_name"].startswith("dm-") or membership.get("archived"):
+                continue
+            rid = membership["room_id"]
+            context = await client.read_context(room_id=rid, limit=50)
+            messages = [
+                m for t in context.get("threads", []) for m in (t["root"], *t.get("replies", []))
+            ]
+            if not messages:
+                continue
+            latest = max(messages, key=lambda m: m["timestamp"])
+            newest[rid] = latest["id"]
+            if latest["id"] != last.get(rid) and latest.get("sender_name") != main_agent(person):
+                updates.append(
+                    {
+                        "room": rid,
+                        "name": membership["room_name"],
+                        "from": latest.get("sender_name"),
+                        "text": latest["body"][:280],
+                    }
+                )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch(mode=0o600)
+    path.write_text(json.dumps(newest))
+    return {"inbox_unread": len(unread), "dm_updates": updates}
 
 
 async def answer(person, id, text):

@@ -43,6 +43,9 @@ def configure(args):
         else env.get("SWITCH_URL", "http://127.0.0.1:53330")
     )
     env["TN_DATA_DIR"] = str(args.data_dir.expanduser().resolve())
+    # Retained Hermes identities live in data/main-agents/ for every layout; without
+    # this, personal.session() would look under TN_DATA_DIR and re-register (409).
+    env.setdefault("TN_STATE_DIR", str(REPO / "data"))
     if args.one_machine:
         env.pop("TN_IDENTITY_URL", None)
         os.environ.pop("TN_IDENTITY_URL", None)
@@ -149,7 +152,9 @@ def main():
         )
         print("VM: ssh om@hermes.<tailnet>.ts.net systemctl --user start rahul-gate.service")
     print(
-        "Local Hermes stand-ins: use tn --as om and tn --as rahul with the same SWITCH_URL and TN_DATA_DIR. No controller required."
+        "Local Hermes stand-ins: use tn --as om and tn --as rahul with the same SWITCH_URL, TN_DATA_DIR and TN_STATE_DIR="
+        + os.environ["TN_STATE_DIR"]
+        + ". No controller required."
     )
     print(
         "Manual phase 18: configure two Hermes profiles with tn mcp and their separate Discord bots, intents, invitations and inbox cron."

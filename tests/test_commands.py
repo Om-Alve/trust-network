@@ -359,6 +359,32 @@ def test_quoted_text_is_validated_on_its_own() -> None:
         Quoted("x" * (MAX_QUESTION + 1))
 
 
+def test_text_the_tools_quote_is_text_the_gate_accepts() -> None:
+    """Tools build gate lines with ``Quoted``; the gate re-parses them.
+
+    Ways the round trip can break: smart quotes pass the tool's check but turn
+    into ``"`` in the gate's normaliser, so the gate answers "Invalid command"
+    after the tool reported success; non-breaking or repeated spaces collapse
+    in the gate, so the gate's text differs from what the tool sent.
+    """
+    dictated = [
+        "Rahul: “Free for dinner Sunday after cricket.” Suggest a place",
+        "Om‘s „idea“: bowling then  dinner",
+        "plain words, nothing fancy",
+    ]
+    lines = {
+        "goal": "@om-gate dm rahul {}",
+        "question": "@om-gate ask-around {}",
+        "text": "@om-gate answer Q3 {}",
+    }
+
+    for text in dictated:
+        quoted = Quoted(text)
+        for attribute, template in lines.items():
+            parsed = p(template.format(quoted))
+            assert getattr(parsed, attribute) == quoted, (template, text)
+
+
 def test_limits_are_inclusive_at_the_boundary() -> None:
     title = "x" * MAX_TITLE
     place = "A" * MAX_PLACE
