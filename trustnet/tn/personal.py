@@ -8,13 +8,16 @@ from pathlib import Path
 
 from trustnet.gate.commands import Answer, Dm, Quoted
 from trustnet.gate.dm import main_agent
-from trustnet.gate.facts import resolve_data_dir
+from trustnet.gate.facts import REPO_ROOT, resolve_data_dir
 from trustnet.switch_client import SwitchClient, SwitchError
 
 
 @asynccontextmanager
 async def session(person):
-    directory = Path("data/main-agents")
+    base = os.environ.get("TN_STATE_DIR") or os.environ.get("TN_DATA_DIR")
+    directory = (Path(base).expanduser() if base else REPO_ROOT / "data") / "main-agents"
+    if not directory.is_absolute():
+        directory = REPO_ROOT / directory
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / f"{person}.json"
     url = os.environ["SWITCH_URL"]
@@ -108,3 +111,28 @@ async def ask_around(person: str, question: str):
     async with session(person) as client:
         await client.connect_to_room(await home(person, client))
         return await client.post_message(f"@{person}-gate ask-around {quoted}")
+
+
+async def ask(person: str, friend: str, fields: list[str]):
+    """Ask a friend's gate through a DM at its room trust level."""
+    from trustnet.gate.commands import Ask
+
+    command = Ask(facts=tuple(fields))
+    friend = Dm(person=friend, goal=Quoted("Facts request")).person
+    await dm(person, friend, "Facts request")
+    pair = "-".join(sorted((person, friend)))
+    async with session(person) as client:
+        for _ in range(150):
+            detail = await client.get_agent_detail(client.agent_id)
+            rooms = [
+                r
+                for r in detail["rooms"]
+                if r["room_name"].startswith(f"dm-{pair}-facts-request") and not r.get("archived")
+            ]
+            if rooms:
+                room = rooms[-1]["room_id"]
+                await client.connect_to_room(room)
+                result = await client.post_message(f"@{friend}-gate ask {' '.join(command.facts)}")
+                return {"room": room, "message": result}
+            await asyncio.sleep(0.1)
+    raise SwitchError("Timed out waiting for facts DM membership")

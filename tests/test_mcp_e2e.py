@@ -45,6 +45,7 @@ from trustnet.gate.runtime import Gate
 
 PERSONS = ("om", "rahul")
 TOOLS = {
+    "ask",
     "inbox",
     "answer",
     "dm",
@@ -398,6 +399,26 @@ async def test_mcp_stdio_end_to_end(tmp_path, monkeypatch):
                 assert ok
                 homes_now = [m["body"] for m in switch.rooms[homes["om"]]["messages"]]
                 assert any(body.startswith("@om-gate ask-around ") for body in homes_now)
+
+                ok, asked = await _call(
+                    session,
+                    artifact["calls"],
+                    "ask",
+                    {"friend": "rahul", "fields": ["diet", "address"]},
+                )
+                assert ok
+                await _wait_for(
+                    lambda: any(
+                        m["sender"] == "rahul-gate" and "diet:" in m["body"]
+                        for m in switch.rooms[asked["room"]]["messages"]
+                    )
+                )
+                ok, facts = await _call(
+                    session, artifact["calls"], "dm_read", {"room": asked["room"]}
+                )
+                assert ok
+                assert "non-vegetarian" in json.dumps(facts)
+                assert "18, 5th Block" not in json.dumps(facts)
 
                 artifact.update(
                     {

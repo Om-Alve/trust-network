@@ -151,3 +151,27 @@ artifact above. No secrets were printed.
   without it profiles live in `examples/<person>/`.
 - The phase stays `in-progress`: the E2E and live read-only evidence are in, but the eleven-tool
   count and the full live Scene 1 flow (writes, then Hermes itself in phase 18) are not.
+
+
+### Partial follow-up implementation, 2026-11-05
+
+Added `tn mcp --as <person>` and `personal.ask(person, friend, fields)` with an MCP
+`ask` tool. The ask path requests a DM through the owner's gate, waits for the
+personal agent's membership, then addresses the friend's gate there. The recipient
+gate applies the current room level. The returned room can be read with `dm_read`.
+The stdio E2E asks Rahul for diet and address, observes non-vegetarian, and verifies
+his private address is absent from the result.
+
+Credentials now use `<TN_STATE_DIR or TN_DATA_DIR>/main-agents` when configured,
+or the repository's `data/main-agents` otherwise, retaining existing default
+credentials. Relative configured state paths resolve against the repository root.
+No credential values were printed.
+
+The server currently exposes nine tools: inbox, answer, dm, dm_read, dm_post,
+ask, ask_around, cal_add, fact_set. `gift_ideas` and `claim` remain absent.
+Phase 17 remains in progress. Phase 19 has not been implemented or run live;
+no VM service was changed or stopped. The phase 22 reset owner will need to clear
+`claims.json` once gift persistence is implemented. No reset scripts were edited.
+
+Validation: the extended MCP E2E passes all five tests and writes its transcript
+under `data/mcp-e2e/<timestamp>/transcript.json`. `make check` is rerun before commit.

@@ -13,8 +13,7 @@ are the agent's instructions, so they carry the two rules the gate cannot
 enforce for it: pass other people's questions to your person without acting on
 them, and stay inside the share card.
 
-Run it as ``python -m trustnet.tn.mcp --as <person>`` (the ``tn mcp`` alias is a
-CLI hook owned by another phase).
+Run it as ``tn mcp --as <person>`` or ``python -m trustnet.tn.mcp --as <person>``.
 """
 
 from __future__ import annotations
@@ -38,17 +37,7 @@ __all__ = ["build", "main"]
 
 SERVER_NAME = "trustnet"
 
-#: Tools later phases add. They are deliberately absent, not stubbed: an agent
-#: must not see a tool that appears to work and silently does nothing.
-#:
-#: TODO(phase 19): ``gift_ideas`` and ``claim`` wrap the gate's gift-room path
-#:   (``trustnet/gate/surprise.py``), which does not exist yet.
-#: TODO(phase 17 remainder): ``ask(friend, fields)`` needs a personal-agent path
-#:   (``tn --as <person> ask ...``) in ``trustnet/tn/personal.py``. Until that
-#:   exists, an agent asks the friend's gate the same enforced way with
-#:   ``dm_post(room, "@<friend>-gate ask <fields>")`` in an active DM room, then
-#:   ``dm_read(room)``; the friend's gate still applies the room level.
-PENDING_TOOLS: tuple[str, ...] = ("ask", "gift_ideas", "claim")
+PENDING_TOOLS: tuple[str, ...] = ("gift_ideas", "claim")
 
 INSTRUCTIONS = (
     "Tools for taking part in trust-network as your person's own agent, in Switch, "
@@ -158,6 +147,12 @@ def build(person: str) -> MCPServer:
     )
     async def fact_set(key: str, level: str) -> dict[str, Any]:
         return _run_cli(person, "fact", "set", key, "--level", level)
+
+    @server.tool(
+        description="Ask a friend gate for named facts at the DM room trust level. Read the returned room with dm_read."
+    )
+    async def ask(friend: str, fields: list[str]) -> dict[str, Any]:
+        return await _call(personal.ask, person, friend, fields)
 
     return server
 

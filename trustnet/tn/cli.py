@@ -256,6 +256,8 @@ def _build_parser() -> argparse.ArgumentParser:
         if name == "dm-post":
             sub.add_argument("text")
         sub.set_defaults(handler=_cmd_dm)
+    mcp = commands.add_parser("mcp", parents=[common], help="run the personal MCP server")
+    mcp.set_defaults(handler=_cmd_mcp)
     return parser
 
 
@@ -637,6 +639,12 @@ def _cmd_dm(context, args):
 
     result = asyncio.run(operate(context.owner(), args.room, getattr(args, "text", None)))
     return context.emit(result, json.dumps(result, ensure_ascii=False))
+
+
+def _cmd_mcp(context, args):
+    from trustnet.tn import mcp
+
+    return mcp.main(["--as", context.owner()])
 
 
 def _cmd_personal(context, args):
