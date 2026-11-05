@@ -418,7 +418,7 @@ Protocol findings from phase 03 (source at `sandbox-quantum/switch@1c9725a`) are
 | Room-scoped ops (`post_message` etc.) act on the agent's connected room and take no `room_id` (found in phase 03) | Phase 04 confirms how a gate that sits in several rooms picks the room (e.g. `connect_to_room` before posting); phases 11 and 14 are built around the answer |
 | Hermes setup varies by version | `tn --as rahul` CLI fallback uses the same code path; Hermes moves to P1 if needed |
 | LLMs format commands badly | Generous date parsing; the gate replies with a correct example; `SKILL.md` has examples |
-| Switch's `main` branch moves fast | Pin Console 0.40.1, switch-core 0.31.0, `switch-agent-controller` 0.31.0; turn off controller self-update (`SWITCH_CONTROLLER_SELF_UPDATE=off`) |
+| Switch's `main` branch moves fast | Pin Console 0.40.1, switch-core 0.31.0, `switch-agent-controller` 0.31.0; controller 0.31.0 has no self-update switch, but only installs a release the server names, and Console's switch-core names none (`CONTROLLER_RELEASE_VERSION` unset) |
 | A dense 3-minute video | Script dictated and timed on Nov 7 morning; cut ask-around first |
 | Solo bandwidth | Cut lines above; P0 is Scene 1 only |
 | Judges must reproduce it | `scripts/demo_up.py`, example data, the one-machine layout (no VM, no Tailscale), Mattermost fallback, no OAuth anywhere |

@@ -34,10 +34,10 @@ Fill these in first. They are referenced by almost every later phase.
 | switch-core host port | `53330` (binds `127.0.0.1`) | Console 0.40.1 runs switch-core **natively, not in Docker**: `~/Library/Application Support/switchdash/local-switch-server/ports.json` (`api`), process `switch-core/0.31.0/venv/bin/python -m switch_core.main`; `curl http://127.0.0.1:53330/health` → `{"status":"ok"}` (2026-11-05) |
 | Gateway host port | `53329` | `ports.json` (`gateway`); also mattermost `53331`, postgres `53332`. `docker ps` shows no Switch containers. Note: `switch-core.env` sets `GATEWAY_PUBLIC_URL`/`FRONTEND_BASE_URL` to `http://localhost:53330`, so links Gateway generates may point at localhost |
 | `SWITCH_URL` | `https://<your-mac>.<tailnet>.ts.net:8443` | `tailscale serve --bg --https=8443 http://127.0.0.1:53330` (port 443 was already serving another local app, so switch-core is on 8443). Tailnet only, no Funnel. From the laptop, `curl $SWITCH_URL/health` → `{"status":"ok"}` [200] (2026-11-05). In `.env`. |
-| HTTP probe path | `____` | Switch agent-protocol docs; PLAN.md only writes `/v1/…` |
-| WebSocket path | `____` | same |
-| Laptop machine name (Switch) | `____` | Gateway → Machines |
-| VM machine name (Switch) | `____` | Gateway → Machines |
+| HTTP probe path | `/health` | switch-core source; there is no `/v1/` prefix |
+| WebSocket path | `/agents/{agent_id}/connection/ws` | `trustnet/switch_client.py` (from switch-core source) |
+| Laptop machine name (Switch) | `Om’s MacBook Pro` (Console controller) | `GET /gateway/management/controllers` as Om |
+| VM machine name (Switch) | `rahul-vm` (owner Rahul, id `3842f071-b122-4b22-b3f9-2b947ab74c43`) | `GET /gateway/management/controllers` as Rahul |
 | Switch Console | `0.40.1` | confirmed: app `CFBundleShortVersionString` |
 | switch-core | `0.31.0` | confirmed: install path `native/switch-core/0.31.0` |
 | `switch-agent-controller` | `0.31.0` | pinned by PLAN.md §11; check with `switch-agent-controller --version` |
@@ -75,11 +75,16 @@ to phase 18. See [setup-laptop.md](setup-laptop.md) step 4.
   (port from `docker ps`). From the VM, a request to
   `https://<laptop>.<tailnet>.ts.net/v1/…` reaches switch-core, WebSockets included.
 - **Filled in by:** phase 02
-- **Result:** `pending`
-- **Date:** —
-- **Evidence:** —
-- **Decision taken:** If fail: Rahul's controller runs on the laptop with its own
-  `--data-dir`, over `localhost` (the judges' layout)
+- **Result:** `pass`
+- **Date:** 2026-11-05
+- **Evidence:** from the VM (`om@hermes`, Ubuntu 24.04, tailnet `100.93.54.79`):
+  `curl $SWITCH_URL/health` → `{"status":"ok"} [200]`; `ws_probe.py --path /health
+  --ws-path /agents/probe/connection/ws` → `PASS GET`, `PASS WS upgrade accepted`,
+  `RESULT: pass`. The controller then held a live connection (check 3).
+- **Decision taken:** Tailnet layout as planned. switch-core is served on **port 8443**
+  (`SWITCH_URL=https://<your-mac>.<tailnet>.ts.net:8443`) because 443 already
+  serves another app. switch-core's paths have no `/v1/` prefix: health is `/health`,
+  the agent WebSocket is `/agents/{id}/connection/ws`, the Gateway API is `/gateway/…`.
 
 Notes: Serve, never Funnel. A `401` or `403` from `/v1/…` still proves
 reachability; a `404` usually means the probe path is wrong, not the network.
@@ -94,10 +99,22 @@ Use `scripts/ws_probe.py` from the VM. See [setup-vm.md](setup-vm.md) step 4–5
   `install.sh --server https://<laptop>.<tailnet>.ts.net --code <code>`;
   `codex login` on the VM; `switch-agent-controller doctor` passes
 - **Filled in by:** phase 02
-- **Result:** `pending`
-- **Date:** —
-- **Evidence:** —
-- **Decision taken:** If fail: As in check 2, or the fallback envoy runner
+- **Result:** `pass`
+- **Date:** 2026-11-05
+- **Evidence:** controller `0.31.0` installed on the VM with the `install.sh` from tag
+  `switch-agent-controller-v0.31.0` (`--version 0.31.0`). One-time code minted as Rahul with
+  `POST /gateway/management/enrollment-codes`, passed over SSH stdin (never printed), then
+  `switch-agent-controller enroll --server $SWITCH_URL --code … --name rahul-vm` →
+  controller `3842f071-…` ("rahul-vm"). `install-service` → systemd user unit, running,
+  linger on. `doctor`: every line `ok` except `claude` / `opencode` sign-in (not needed;
+  Rahul's envoy is Codex). `codex login status` → "Logged in using ChatGPT" (already signed in).
+  `GET /gateway/management/controllers` as Rahul → `rahul-vm` (daemon, linux x64, 0.31.0, codex
+  auth ok); as Om → `Om's MacBook Pro` (Console controller 0.1.1; claude, codex, cursor auth ok).
+- **Decision taken:** Managed-agent path stays. **`SWITCH_CONTROLLER_SELF_UPDATE` does not
+  exist in controller 0.31.0** (no such string in the bundle). The pin holds anyway: the
+  controller only installs a release the server names, and switch-core names one only when
+  `CONTROLLER_RELEASE_VERSION` is set, which Console does not set (`doctor`: "no release is
+  published yet").
 
 Notes: `doctor` must pass as the same user that runs the controller.
 Controller pinned to `0.31.0`. See [setup-vm.md](setup-vm.md) step 6.

@@ -1,5 +1,15 @@
 # VM setup (Rahul's machine, Azure)
 
+> **As actually done on 2026-11-05 (supersedes the steps below where they differ):**
+> SSH via Tailscale SSH (`ssh om@hermes.<tailnet>.ts.net`). Install with the tagged installer:
+> `gh api 'repos/sandbox-quantum/switch/contents/console/packages/agent-controller/install.sh?ref=switch-agent-controller-v0.31.0' --jq .content | base64 -d > install.sh; sh install.sh --version 0.31.0`.
+> Mint the code as Rahul with `POST /gateway/management/enrollment-codes` (Gateway API, signed in
+> with `RAHUL_SWITCH_PASSWORD`), then `switch-agent-controller enroll --server $SWITCH_URL --code <code> --name rahul-vm`
+> and `switch-agent-controller install-service`. `SWITCH_CONTROLLER_SELF_UPDATE` does not exist in
+> 0.31.0 and is not needed (see `day0.md` check 3). switch-core has no `/v1/` prefix: probe with
+> `ws_probe.py --path /health --ws-path /agents/probe/connection/ws`.
+
+
 Phase 02 runbook: join the VM to Om's tailnet, prove it can reach the laptop's
 switch-core over HTTPS and WebSockets (check 2), and enrol Rahul's
 `switch-agent-controller` (check 3).

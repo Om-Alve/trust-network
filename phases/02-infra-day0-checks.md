@@ -28,8 +28,8 @@ Every external piece the code will talk to exists and is reachable: Switch serve
 - [ ] `caffeinate -dims` during work sessions and the demo.
 
 **[human] VM:**
-- [ ] VM joined to the same tailnet. From the VM, `curl https://<laptop>.<tailnet>.ts.net/v1/…` reaches switch-core, and a WebSocket upgrade works (e.g. `websocat` or a 5-line Python script the agent writes in `scripts/ws_probe.py`).
-- [ ] Check 3: Gateway shows **Machines**. Signed in as Rahul, create a one-time code; on the VM, `install.sh --server https://<laptop>.<tailnet>.ts.net --code <code>`; `export SWITCH_CONTROLLER_SELF_UPDATE=off`; `codex login`; `switch-agent-controller doctor` passes. Pin controller **0.31.0**.
+- [x] VM joined to the same tailnet. From the VM, `curl https://<laptop>.<tailnet>.ts.net/v1/…` reaches switch-core, and a WebSocket upgrade works (e.g. `websocat` or a 5-line Python script the agent writes in `scripts/ws_probe.py`).
+- [x] Check 3: Gateway shows **Machines**. Signed in as Rahul, create a one-time code; on the VM, `install.sh --server https://<laptop>.<tailnet>.ts.net --code <code>`; `export SWITCH_CONTROLLER_SELF_UPDATE=off`; `codex login`; `switch-agent-controller doctor` passes. Pin controller **0.31.0**.
 
 **[human] Discord:**
 - [ ] Check 12 (first half): bot with **Message Content** and **Server Members** intents, invited to the guild; Switch's Discord connection configured; Om's Discord account linked. (The `#om-home` channel itself is created by the template in phase 11, which finishes check 12.)
@@ -37,7 +37,7 @@ Every external piece the code will talk to exists and is reachable: Switch serve
 ## Done when
 - [ ] `docs/day0.md` has a recorded result for checks 1, 2, 3 and the first half of 12.
 - [ ] For each failed check, the fallback from PLAN.md §8 is written under *Decision taken* (e.g. check 2 fails → Rahul's controller runs on the laptop with its own `--data-dir` over `localhost`).
-- [ ] Gateway's Machines page shows the laptop and the VM (screenshot path in *Log*), or the fallback is recorded.
+- [x] Gateway's Machines page shows the laptop and the VM (screenshot path in *Log*), or the fallback is recorded.
 - [x] `.env` has `SWITCH_URL` and the keys; `git check-ignore .env` confirms it's ignored.
 
 ## Commit
@@ -98,3 +98,14 @@ fails, use `docs/setup-vm.md` §8 (Rahul's controller on the laptop, own
   `/health` → 200 from the laptop. VM half pending.
 - `.env` has `SWITCH_URL` and the three keys; `git check-ignore .env` → `.env`.
 - Still open: VM (checks 2 VM half, 3; needs SSH access to `hermes`), Discord (12a), caffeinate.
+
+### Progress 2026-11-05 (VM side)
+
+- Check 2 **pass** from the VM (HTTPS 200 + WebSocket upgrade through Tailscale Serve).
+- Check 3 **pass**: controller 0.31.0 enrolled as `rahul-vm` under Rahul, running as a systemd
+  user service, `doctor` ok for codex. Machines (via `GET /gateway/management/controllers`):
+  Rahul → `rahul-vm`; Om → `Om’s MacBook Pro`. API output stands in for the screenshot.
+- Deviations: no `/v1/` prefix on switch-core; `SWITCH_CONTROLLER_SELF_UPDATE` doesn't exist in
+  0.31.0 (pin holds because the server names no release; PLAN.md §11 updated); codex was
+  already logged in on the VM.
+- Remaining: check 12a (Discord bot) and `caffeinate -dims` — both Om's.
