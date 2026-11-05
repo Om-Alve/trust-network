@@ -224,3 +224,11 @@ each gate privately hands its own main agent — see the reworded Goal above. No
 in this phase needed to change: `build_brief`/`write_brief` already produce exactly that text;
 only who consumes it, and how, changes (phase 14 hands it to a main agent instead of an
 `update_agent_detail` call on a per-conversation envoy).
+
+### Both on Hermes, on Discord — 2026-11-05
+
+The managed Codex `rahul-agent` above is dropped the same day: both Om's and Rahul's main
+agent are now their own Hermes profile (`om-hermes`, `rahul-hermes`), on Discord. Nothing in
+this phase changes again — the share card is handed to "the owner's own main agent" either way,
+and that's now Hermes on both sides rather than Hermes on one side and a managed Codex agent on
+the other. The rendered Om→Rahul/Om→Priya briefs in this Log are unaffected.

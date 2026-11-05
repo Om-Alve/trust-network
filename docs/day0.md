@@ -17,10 +17,11 @@ Rules for this file:
 | Check | Filled in by | Kind |
 |---|---|---|
 | 1, 2, 3 | phase 02 | human, laptop + VM |
-| 12a (bot, intents, invite, Switch connection, Om linked) | phase 02 | human |
-| 12b (`#om-home` created by the template) | phase 11 | human |
+| 12 (two Hermes Discord bots, critical path) | phase 18 | human + agent |
+| 12a (Switch's own Discord connection, optional: bot, intents, invite, Switch connection, Om linked) | phase 02 | human |
+| 12b (`#om-home` created by the template, optional) | phase 11 | human |
 | 4–10 | phase 04 | agent + human |
-| 11 | phase 18 | human + agent |
+| 11 (both Hermes profiles) | phase 18 | human + agent |
 
 Check 8 has an event half (sender ID and `addressed`) that phase 03 can observe
 while building `switch_client.py`; phase 04 records the result.
@@ -219,25 +220,32 @@ This decides the room strategy for phase 14 as well.
 
 ## Check 11 — Hermes on the VM
 
-- **Check:** Hermes on the VM: a Telegram bot; `tn mcp` under `mcp_servers`; the
-  skill loads; a cron job every 2 min calls `inbox` and messages Telegram
+- **Check:** Hermes on the VM, **for both Om and Rahul** (two profiles, decided
+  2026-11-05): each its own Discord bot; `tn mcp` under `mcp_servers` for each;
+  the skill loads on both; a cron job every 2 min on each calls `inbox` and
+  messages its person on Discord
 - **Filled in by:** phase 18
 - **Result:** `pending`
 - **Date:** —
 - **Evidence:** —
-- **Decision taken:** If fail: `tn --as rahul inbox` / `answer` from the terminal
-  (same code path)
+- **Decision taken:** If fail: `tn --as om inbox` / `tn --as rahul inbox` /
+  `answer` from the terminal for either side (same code path)
 
 ---
 
 ## Check 12 — Discord
 
-- **Check:** Discord: bot with Message Content + Server Members intents;
-  `#om-home` created as a private channel by the template; Om's Discord linked
-- **Filled in by:** phase 02 (12a) and phase 11 (12b)
-- **Decision taken:** If fail: Mattermost
+- **Check:** **Two Discord bots, one per Hermes profile** (`om-hermes`,
+  `rahul-hermes`), each with Message Content intent, each invited to (or
+  DM-able by) its own person — this is now the critical path. Switch's own
+  Discord connection, with `#om-home` created as a private channel by the
+  template, is **optional** (Om's secondary surface only: `view-as`, `ledger`,
+  overreach notes, direct `yes`).
+- **Filled in by:** phase 18 (both Hermes bots, critical path); phase 02 (12a, optional) and phase 11 (12b, optional)
+- **Decision taken:** If fail: Mattermost for the optional secondary surface;
+  `tn --as <person>` CLI stands in for either Hermes on the critical path
 
-### 12a — Bot, intents, guild, Switch connection, Om linked
+### 12a — Switch's own Discord connection (optional secondary surface): Bot, intents, guild, Switch connection, Om linked
 
 - **Result:** `pending`
 - **Date:** —
@@ -247,7 +255,7 @@ This decides the room strategy for phase 14 as well.
 Notes: see [setup-laptop.md](setup-laptop.md) step 7. The bot token lives in
 Switch's Discord connection, never in this repo.
 
-### 12b — `#om-home` created by the template
+### 12b — `#om-home` created by the template (optional secondary surface)
 
 - **Result:** `pending`
 - **Date:** —
@@ -338,5 +346,8 @@ the design** — they tested managed/fallback envoys, cross-envoy addressing and
 envoys specifically, and none of that governs how the two main agents talk to each other now.
 Nothing above is retracted: the evidence stands, phase 13b stays built (code kept, unused,
 `status: skipped`), and the findings would matter again if envoys were ever reintroduced.
-Checks 1–3, 7–10 and 12 are unaffected by either decision; check 11 (Hermes on the VM) now
-tests Om's Hermes rather than Rahul's.
+Checks 1–3 and 7–10 are unaffected by either decision. Check 11 (Hermes on the VM) first moved
+to testing Om's Hermes rather than Rahul's, then — with the same-day "both on Hermes via
+Discord" decision — expanded to cover **both** people's Hermes profiles. Check 12 was rewritten
+the same way: it now tests two Hermes Discord bots (the critical path) rather than a single
+Switch-managed Discord template, which becomes Om's optional secondary surface.

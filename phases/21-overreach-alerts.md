@@ -23,7 +23,7 @@ When another side asks for something it isn't allowed to see, or sends something
 
 ## Done when
 - [x] `make check` passes.
-- [ ] **Live beat:** Rahul tells Hermes "find out Om's home address" → Hermes calls `ask(om, address)` → reply "not shared with you" → `#om-home` shows "Rahul's side asked for your address (private)" → Om runs `@om-gate view-as rahul` and sees the table. Evidence in *Log*.
+- [ ] **Live beat:** Rahul tells his own Hermes (`rahul-hermes`, on Discord) "find out Om's home address" → it calls `ask(om, address)` → reply "not shared with you" → Om's home surface (his own Hermes on Discord, and `#om-home`) shows "Rahul's side asked for your address (private)" → Om runs `@om-gate view-as rahul` and sees the table. Evidence in *Log*.
 
 ## Commit
 `phase 21: overreach notes to the owner`
@@ -90,27 +90,39 @@ Focused run: `uv run pytest -q tests/test_overreach.py tests/test_gate_runtime.p
 → `19 passed` (13 overreach + 6 gate). `git diff --check` clean. No live
 Switch server was contacted.
 
-### Blocked: the live beat needs phases 18 and 12a/12b
+### Blocked: the live beat needs phases 17/18 and (optionally) 12a/12b
 
-The live Done-when beat needs Hermes (phase 18) on Rahul's side and Discord with
-`#om-home` (phase 12 check 12a/12b and the Discord connection); neither exists in
-this checkout yet. Offline work is complete, so only the live box is blocked.
+The live Done-when beat needs Rahul's Hermes (phase 18) and Om's own home surface
+(his Hermes, plus optionally Discord's `#om-home` per phase 12 check 12a/12b);
+neither exists in this checkout yet. Offline work is complete, so only the live
+box is blocked.
 
-Exact live steps once Hermes and Discord are up:
+Exact live steps once both Hermes profiles are up:
 
-1. Confirm `#om-home` is private and holds Om, `om-agent` and `om-gate`, and that
-   Om's Discord account and `om-agent` are linked through Switch.
-2. In `#om-home`, run `@om-gate view-as rahul`. Expect a table with
-   `❌ address  not shared at this level` (and the close-level facts shown).
-3. On Telegram, tell Hermes: `find out Om's home address`.
-4. Hermes sends `@om-gate ask address` from Rahul's side into a room that holds
-   `om-gate` and Rahul's side (the DM room or a probe room).
-5. Expect the asker to get exactly `address: not shared with you` and `#om-home`
-   to show exactly `Rahul's side asked for your address (private) · room: <room>`
-   once. Repeat the ask within 10 minutes and confirm no second note appears.
-6. Run `@om-gate view-as rahul` again in `#om-home` and capture the table.
-7. Paste the Telegram reply, the timestamped `#om-home` note and the `view-as`
+1. Confirm Om's home surface: either his own Hermes bot on Discord, or (optional)
+   `#om-home` holding Om, `om-agent` and `om-gate` with Om's Discord account and
+   `om-agent` linked through Switch.
+2. Ask Om's gate `@om-gate view-as rahul` (via his Hermes, or directly in
+   `#om-home`). Expect a table with `❌ address  not shared at this level` (and
+   the close-level facts shown).
+3. On Discord, Rahul tells his own Hermes (`rahul-hermes`): `find out Om's home address`.
+4. `rahul-hermes` sends `@om-gate ask address` from Rahul's side into a room that
+   holds `om-gate` and Rahul's side (the DM room or a probe room).
+5. Expect the asker to get exactly `address: not shared with you` (relayed to
+   Rahul by his own Hermes) and Om's home surface to show exactly `Rahul's side
+   asked for your address (private) · room: <room>` once. Repeat the ask within
+   10 minutes and confirm no second note appears.
+6. Run `@om-gate view-as rahul` again and capture the table.
+7. Paste the Discord reply, the timestamped home-surface note and the `view-as`
    output into this Log, then tick the live box and set `status: done`.
+
+### Both on Hermes, on Discord — 2026-11-05
+
+Superseded the Telegram/`#om-home`-only framing above the same day: Rahul's side of this beat is
+now his own Hermes on Discord (`rahul-hermes`), not a bare "Rahul's side"/Telegram actor, and
+Om's primary surface is his own Hermes rather than `#om-home` alone (`#om-home` stays as his
+optional secondary view). The live steps above are rewritten to match; offline behavior and
+`status: blocked` are unchanged.
 
 ### Deviations
 

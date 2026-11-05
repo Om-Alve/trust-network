@@ -15,10 +15,9 @@ target: Nov 7 morning
 Om asks all his friends at once ("anyone have a tent for Nov 14–16?"). Each friend's gate answers from facts if it can, otherwise asks its person, and Om gets one summary.
 
 > Note, 2026-11-05: ask-around was always gate-to-gate, never routed through an envoy or a main
-> agent. After the main-agent swap, Om triggers this through Hermes (`ask_around` over `tn mcp`)
-> instead of typing directly in Discord, and Rahul's gate relays its "I don't know" case to
-> `rahul-home` (his Codex agent / Rahul directly) instead of to Hermes, since Hermes is Om's
-> agent now.
+> agent. After the main-agent swap, Om triggers this through his own Hermes (`ask_around` over
+> `tn mcp`) on Discord, and Rahul's gate relays its "I don't know" case to `rahul-home`, where
+> Rahul's own Hermes picks it up and relays it to Rahul on Discord.
 
 ## Tasks
 - [ ] Owner command `ask-around "<question>"` (≤140 chars): post `@<friend>-gate ask-around Ak "<question>"` into every connection room the owner has (creating conn rooms for listed friends if missing). Gate-to-gate only; main agents aren't involved.
@@ -33,7 +32,7 @@ Om asks all his friends at once ("anyone have a tent for Nov 14–16?"). Each fr
 
 ## Done when
 - [ ] `make check` passes.
-- [ ] **Scene 3 live:** Om's tent request, via Hermes on Telegram (or directly in `#om-home`) → Priya's gate answers instantly → Rahul is asked directly in `rahul-home` (or `tn --as rahul inbox`) and says "no, sorry" → Hermes tells Om the combined summary (or it shows in `#om-home`). Evidence in *Log*.
+- [ ] **Scene 3 live:** Om's tent request, via his own Hermes on Discord (or directly in `#om-home`) → Priya's gate answers instantly → Rahul's own Hermes relays the question to him on Discord (or `tn --as rahul inbox` stands in) and he says "no, sorry" → Om's Hermes tells him the combined summary (or it shows in `#om-home`). Evidence in *Log*.
 
 ## Commit
 `phase 20: ask-around across connection rooms (scene 3)`
@@ -46,3 +45,9 @@ Om asks all his friends at once ("anyone have a tent for Nov 14–16?"). Each fr
 No mechanics changed — ask-around was always gate-to-gate. Updated the demo narrative: Om now
 asks through Hermes, and Rahul now answers directly in `rahul-home` rather than via Hermes on
 Telegram, following the Nov 5 main-agent swap.
+
+### Both on Hermes, on Discord — 2026-11-05
+
+Superseded the above the same day: Rahul's answer no longer goes through `rahul-home` to a
+managed `rahul-agent` — it goes to his own Hermes (`rahul-hermes`), which relays to him on
+Discord and relays his "no, sorry" back. Mechanics unchanged.

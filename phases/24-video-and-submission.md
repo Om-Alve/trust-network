@@ -33,3 +33,11 @@ A 3-minute video following PLAN.md §10, and a submission in by **20:00 IST on N
 
 ## Log
 <!-- evidence, deviations, notes -->
+
+### Both on Hermes, on Discord — 2026-11-05
+
+Cast for this video is now: Om on his own Hermes, in Discord; Rahul on his own Hermes, a second
+Discord bot/account Om records from; Priya's gate. No Telegram, no managed Codex main agent.
+`docs/video/script.md` is updated in full to match (every beat, the shot list and the
+teleprompter), still ≤ 3:00. This phase's own tasks/Done-when are unaffected — they just point at
+whatever `docs/video/script.md` says to record.

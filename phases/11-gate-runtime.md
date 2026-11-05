@@ -150,3 +150,13 @@ installation changes were needed.
 Decision-update validation: `make check` passed with `76 files already formatted`,
 `All checks passed!`, and `433 passed in 1.37s`. `git diff --check` passed.
 Existing APIs and Om's envoy trust configuration were not changed.
+
+### Both on Hermes, on Discord — 2026-11-05
+
+PLAN.md's Nov 5 decision puts **both** Om and Rahul on their own Hermes, on Discord; the
+briefly-planned managed-Codex `rahul-agent` is dropped. This phase's own scope doesn't change:
+`om-agent` (Discord, `#om-home`) stays exactly as built above, now explicitly **optional** —
+Om's secondary surface only (`view-as`, `ledger`, overreach notes, direct `yes P1`), no longer
+load-bearing for Scene 1. Check 12 in `docs/day0.md` is reworded accordingly: the critical path
+is now two Hermes Discord bots (phase 18), and `#om-home`/Switch's own Discord connection is
+optional. No task or `status` here changed.

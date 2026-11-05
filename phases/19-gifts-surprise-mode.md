@@ -16,8 +16,8 @@ Rahul can ask Om's gate for gift ideas and claim one, and Om learns nothing unti
 
 > Note, 2026-11-05: this phase was never routed through envoys, and the no-envoy decision and
 > main-agent swap don't change its mechanics — only who triggers it in the demo. Rahul now
-> triggers it through his own Codex agent (`rahul-agent`, via `tn --as rahul gift-ideas …` in
-> `rahul-home`), not through Hermes (Hermes is Om's agent now).
+> triggers it through his own Hermes (`rahul-hermes`, via `gift_ideas` over `tn mcp`, or
+> `tn --as rahul gift-ideas …` as the terminal stand-in), on Discord.
 
 ## Tasks
 - [ ] Asker side (`gift_ideas` from `tn mcp`/CLI): the asker's gate creates `gift-<asker>-<for>-<slug>` as agent-only **and** private (`read_visibility`), members = asker's gate + recipient's gate only; sends `@<for>-gate gift-ideas <occasion> <date> budget<=N`.
@@ -32,7 +32,7 @@ Rahul can ask Om's gate for gift ideas and claim one, and Om learns nothing unti
 
 ## Done when
 - [ ] `make check` passes.
-- [ ] **Scene 2 live:** Rahul tells his Codex agent (`rahul-agent`, in `rahul-home`) for ideas under ₹3k → gets Catan Seafarers (≈₹2,500), Hario V60 (≈₹2,000), Kindle (over budget), interests, size M → claims Catan → Om's home surface (Hermes/`#om-home`) shows nothing → `@om-gate ledger` shows "1 sealed entry, opens Nov 21" → Om's wishlist still shows Catan. Optional: Priya's ask shows "Catan Seafarers: taken". Evidence in *Log*.
+- [ ] **Scene 2 live:** Rahul tells his own Hermes (`rahul-hermes`, on Discord) for ideas under ₹3k → gets Catan Seafarers (≈₹2,500), Hario V60 (≈₹2,000), Kindle (over budget), interests, size M → claims Catan → Om's home surface (his own Hermes/`#om-home`) shows nothing → `@om-gate ledger` shows "1 sealed entry, opens Nov 21" → Om's wishlist still shows Catan. Optional: Priya's ask shows "Catan Seafarers: taken". Evidence in *Log*.
 - [ ] Check 10's second half holds live: Om can't open the gift room in Console (or the courtesy-seal fallback is noted).
 
 ## Commit
@@ -46,3 +46,9 @@ Rahul can ask Om's gate for gift ideas and claim one, and Om learns nothing unti
 No mechanics changed — gift rooms were always gate-to-gate, never routed through an envoy.
 Updated the demo narrative only: Rahul now triggers `gift_ideas`/`claim` through his own Codex
 agent (`rahul-agent`) instead of Hermes, since Hermes is Om's agent after the swap.
+
+### Both on Hermes, on Discord — 2026-11-05
+
+Superseded the above the same day: `rahul-agent` is dropped. Rahul triggers `gift_ideas`/`claim`
+through his own Hermes (`rahul-hermes`), on Discord, same as Om would on his side. Mechanics are
+still unchanged — gift rooms remain gate-to-gate only.

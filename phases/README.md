@@ -46,9 +46,9 @@ Front matter is the single source of truth for status. The index table below has
 | 13b | [Fallback envoy runner — built, unused after the no-envoy decision](13b-fallback-envoy-runner.md) | P0 if needed | agent | 04, 11, 12 | Nov 6 afternoon |
 | 14 | [DM rooms between main agents](14-dm-rooms.md) | P0 | agent | 11, 12 | Nov 6 afternoon |
 | 15 | [Ask-your-person and consent → Scene 1 via CLI](15-ask-owner-and-consent.md) | P0 | agent | 14, 10 | Nov 6 afternoon |
-| 16 | [Azure VM: om-hermes, rahul-gate, rahul-agent](16-rahul-on-vm.md) | P1 | human + agent | 15 | Nov 6 night |
+| 16 | [Azure VM: om-hermes, rahul-hermes, rahul-gate](16-rahul-on-vm.md) | P1 | human + agent | 15 | Nov 6 night |
 | 17 | [`tn mcp` server](17-tn-mcp.md) | P0 | agent | 15 | Nov 6 night |
-| 18 | [Hermes, Telegram and `SKILL.md` → Scene 1 on Telegram](18-hermes-and-skill.md) | P0 (P1 if it slips) | human + agent | 17 | Nov 6 night |
+| 18 | [Hermes, Discord and `SKILL.md` → Scene 1 on Discord](18-hermes-and-skill.md) | P0 (P1 if it slips) | human + agent | 17 | Nov 6 night |
 | 19 | [Gift rooms and surprise mode → Scene 2](19-gifts-surprise-mode.md) | P1 | agent | 15, 17 | Nov 7 morning |
 | 20 | [Ask around → Scene 3](20-ask-around.md) | P1 | agent | 15 | Nov 7 morning |
 | 21 | [Overreach alerts](21-overreach-alerts.md) | P1 | agent | 11 | Nov 7 morning |
