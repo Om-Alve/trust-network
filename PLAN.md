@@ -451,3 +451,8 @@ visibility does not protect gifts against the workspace administrator.
 - Switch agent management: [controller README](https://github.com/sandbox-quantum/switch/blob/main/console/packages/agent-controller/README.md) · [design: agent controllers v1](https://github.com/sandbox-quantum/switch/blob/main/docs/design/agent-controllers-v1.md) (`create_agent`, "can manage agents", definitions) · [CHANGELOG](https://github.com/sandbox-quantum/switch/blob/main/CHANGELOG.md) (0.30: `create_agent`; 0.31: templates create managed agents)
 - Tailscale: [Serve](https://tailscale.com/kb/1312/serve) · [HTTPS certificates](https://tailscale.com/kb/1153/enabling-https)
 - Hermes: [cron](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron) · [MCP setup](https://arcade.dev/blog/connect-hermes-agent-mcp-arcade/)
+
+Phase 11 runtime note: core 0.31.0 requires a local read-only server identity
+export (clients/agents/users/client_rooms) because agent operations omit the
+transport mapping and Gateway members. Remote deployment needs an authenticated
+server adapter; unknown identities and unlinked external users remain silent.

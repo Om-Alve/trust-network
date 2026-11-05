@@ -1,0 +1,35 @@
+version: 2
+params:
+  provider: {type: provider, default: opencode}
+  machine: {type: machine, default: [$first]}
+  directory: {type: directory, default: '{$agents_dir}/om-agent'}
+  bridge: {type: bridge, description: Discord connection display name}
+resources:
+  main:
+    type: agent
+    name: om-agent
+    provider: '{provider}'
+    machine: '{machine}'
+    directory: '{directory}'
+    model: opencode-go/deepseek-v4.1-flash
+    allow_existing: true
+    addressing: owner
+    instructions: Ask @om-gate for personal facts and availability. Read SKILL.md in the room.
+  home:
+    type: room
+    name: om-home
+    description: Om's private trust-network home
+    bridge: '{bridge}'
+    channel_type: channel_private
+    agents: [main, om-gate]
+    users: ['{$creator}']
+    docs:
+      - name: SKILL.md
+        description: Trust network command reference
+        instructions: Use the gate for disclosures.
+
+        content: |
+          Ask @om-gate free 2026-11-08..2026-11-09 or @om-gate ask diet wishlist.
+          Owner user commands: view-as <person>, ledger, trust <person> <level>.
+          Reserved gate relays: join-dm <room> "goal"; consent P1 yes|no via-agent|direct.
+          Full skill: skills/trust-network/SKILL.md in the trust-network repository.

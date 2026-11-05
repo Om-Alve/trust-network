@@ -254,6 +254,11 @@ Switch's Discord connection, never in this repo.
 - **Evidence:** —
 - **Decision taken:** If fail: Mattermost
 
+Phase 11: template passes installed core 0.31.0 compiler/schema validation; live
+run is blocked by pending 12a and the Console/OpenCode readiness mismatch.
+Agent-only home substitution passed a direct Om Gateway calendar request; this
+does not establish Discord or managed-agent delivery. See phases/11-gate-runtime.md.
+
 Notes: phase 11 runs `templates/home.template.yaml`. Record the channel ID or a
 screenshot path, and confirm it is private and lists Om, `om-agent` and `om-gate`.
 
