@@ -3,10 +3,15 @@ import shutil
 import pytest
 from fakes.fake_switch import FakeSwitch
 
-from trustnet.gate import ledger
+from trustnet.gate import ledger, relay
 from trustnet.gate.policy import Identity
 from trustnet.gate.runtime import Gate
 from trustnet.switch_client import Event
+
+
+async def _no_home(person, text, *, client):
+    """Keep the pre-phase-21 gate tests free of home-room traffic."""
+    return None
 
 
 @pytest.mark.parametrize(
@@ -15,6 +20,7 @@ from trustnet.switch_client import Event
 async def test_gate_disclosures(tmp_path, monkeypatch, peer, level):
     shutil.copytree("examples/om", tmp_path / "om")
     monkeypatch.setenv("TN_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(relay, "post_home", _no_home)
     switch = FakeSwitch()
     client = switch.client("om-gate", "om")
     switch.client(peer + "-agent", peer)
@@ -48,7 +54,13 @@ async def test_gate_disclosures(tmp_path, monkeypatch, peer, level):
     )
     before = len(messages)
     await gate.handle(Event(rid, peer + "-agent", "user", "@om-gate trust stranger close", True))
-    assert len(messages) == before
+    if level == "self":
+        # The owner's own agent is not another side: no refusal, no note.
+        assert len(messages) == before
+    else:
+        # Phase 21: an owner-only command from another side is refused, not ignored.
+        assert len(messages) == before + 1
+        assert messages[-1]["body"] == "Not allowed."
 
 
 async def test_unknown_identity_and_unaddressed_are_silent(tmp_path, monkeypatch):
