@@ -15,7 +15,7 @@ async def test_gate_relay_identity_and_room(command):
         (Identity.agent("rahul-gate", "rahul"), "conn-om-rahul", True),
         (Identity.agent("rahul-agent", "rahul"), "conn-om-rahul", False),
         (Identity.user("rahul"), "conn-om-rahul", False),
-        (Identity.agent("rahul-gate", "rahul"), "dm-om-rahul-sun", False),
+        (Identity.agent("rahul-gate", "rahul"), "dm-om-rahul-sun", command == "consent"),
     ]:
         assert bool(authorize(command, sender, "om", "via-agent", room_name=room)) == allowed
 

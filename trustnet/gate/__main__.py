@@ -50,7 +50,17 @@ async def run(args):
             )
             return read_identities(args.identity_map)
 
-        await Gate(args.person, client, identities).run()
+        gate_task = asyncio.create_task(Gate(args.person, client, identities).run())
+        try:
+            await client.ready.wait()
+            detail = await client.get_agent_detail(client.agent_id)
+            for room in detail["rooms"]:
+                if not room.get("archived"):
+                    await client.connect_to_room(room["room_id"])
+            await gate_task
+        finally:
+            gate_task.cancel()
+            await asyncio.gather(gate_task, return_exceptions=True)
     finally:
         await client.aclose()
 

@@ -306,7 +306,10 @@ def authorize(
             sender.kind is SenderKind.AGENT
             and sender.person != owner_key
             and sender.id == f"{sender.person}-gate"
-            and room_name == f"conn-{pair}"
+            and (
+                room_name == f"conn-{pair}"
+                or (name == "consent" and room_name.startswith(f"dm-{pair}-"))
+            )
         ):
             return Allowed("cross-boundary")
         return Denied(DenialCode.NOT_OWNER_AGENT, "gate relay requires the matching connection")

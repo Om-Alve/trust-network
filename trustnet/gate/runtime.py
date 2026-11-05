@@ -15,7 +15,7 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from trustnet.gate import commands as c
-from trustnet.gate import dm, ledger, relay
+from trustnet.gate import consent, dm, ledger, relay
 from trustnet.gate.calendar import TIME_ZONE, busy
 from trustnet.gate.facts import Level, load_profile, load_trust, resolve_data_dir, save_trust
 from trustnet.gate.policy import (
@@ -72,7 +72,11 @@ class Gate:
             return
         room_detail = await self._room_detail(event.room_id)
         if room_detail and room_detail.get("archived"):
-            return
+            try:
+                if not isinstance(c.parse(event.text), c.Consent):
+                    return
+            except c.ParseError:
+                return
         await self.client.connect_to_room(event.room_id)
         participants = await self.client.list_participants()
         identities = self.identities()
@@ -116,7 +120,7 @@ class Gate:
                     f" ({_snippet(event.text)})",
                 )
             return
-        name = {c.ViewAs: "view-as", c.JoinDm: "join-dm"}.get(
+        name = {c.ViewAs: "view-as", c.JoinDm: "join-dm", c.AskOwner: "ask-owner"}.get(
             type(command), type(command).__name__.lower()
         )
         direction = Direction.OUTBOUND if sender.person == self.person else Direction.INBOUND
@@ -125,6 +129,7 @@ class Gate:
             sender,
             self.person,
             trust.consent_default,
+            personal_agents=(dm.main_agent(self.person),),
             direction=direction,
             room_name=room_detail.get("name", room_detail.get("room_name", ""))
             if room_detail
@@ -168,7 +173,8 @@ class Gate:
         if isinstance(command, (c.ViewAs, c.Ledger, c.Trust)) and level != Level.SELF:
             return
         # Consent is a gate relay, never an alias for the owner's yes command.
-        if isinstance(command, c.Consent):
+        if isinstance(command, (c.AskOwner, c.Answer, c.Propose, c.Yes, c.No, c.Consent)):
+            await consent.handle(self, event, command, sender, decision.mode)
             return
         if isinstance(command, c.Dm):
             if level == Level.SELF:

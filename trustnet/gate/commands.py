@@ -397,6 +397,7 @@ class Consent(_Addressed):
     proposal_id: str
     agreed: bool
     via: ConsentVia = "direct"
+    fingerprint: str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "proposal_id", _proposal_id(self.proposal_id))
@@ -964,7 +965,7 @@ def _handle_join_dm(args: str, *, target: str | None, now: datetime, raw: str) -
 
 def _handle_consent(args: str, *, target: str | None, now: datetime, raw: str) -> Command:
     match = re.fullmatch(
-        r"(?P<id>P\d+)\s+(?P<answer>yes|no)\s+(?P<via>via-agent|direct)",
+        r"(?P<id>P\d+)\s+(?P<answer>yes|no)\s+(?P<via>via-agent|direct)(?:\s+(?P<fingerprint>[a-f0-9]{64}))?",
         args.strip(),
         re.IGNORECASE,
     )
@@ -978,6 +979,7 @@ def _handle_consent(args: str, *, target: str | None, now: datetime, raw: str) -
         proposal_id=match["id"],
         agreed=match["answer"].lower() == "yes",
         via=match["via"].lower(),
+        fingerprint=match["fingerprint"] or "",
         target=target,
     )
 

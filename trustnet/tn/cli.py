@@ -238,6 +238,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     view.set_defaults(handler=_cmd_view_as)
 
+    for name in ("inbox", "answer", "dm"):
+        sub = commands.add_parser(name, parents=[common])
+        if name == "answer":
+            sub.add_argument("id")
+            sub.add_argument("text")
+        if name == "dm":
+            sub.add_argument("friend")
+            sub.add_argument("goal")
+        sub.set_defaults(handler=_cmd_personal)
+
     for name in ("dm-read", "dm-post"):
         sub = commands.add_parser(name, parents=[common])
         sub.add_argument("room")
@@ -624,6 +634,20 @@ def _cmd_dm(context, args):
     from trustnet.tn.dm import operate
 
     result = asyncio.run(operate(context.owner(), args.room, getattr(args, "text", None)))
+    return context.emit(result, json.dumps(result, ensure_ascii=False))
+
+
+def _cmd_personal(context, args):
+    import asyncio
+
+    from trustnet.tn import personal
+
+    values = {
+        "inbox": (),
+        "answer": (getattr(args, "id", None), getattr(args, "text", None)),
+        "dm": (getattr(args, "friend", None), getattr(args, "goal", None)),
+    }
+    result = asyncio.run(getattr(personal, args.command)(context.owner(), *values[args.command]))
     return context.emit(result, json.dumps(result, ensure_ascii=False))
 
 
