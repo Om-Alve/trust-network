@@ -21,10 +21,10 @@ import httpx
 from websockets.exceptions import WebSocketException
 from websockets.sync.client import connect
 
-# Neither endpoint is named in PLAN.md; these defaults are guesses. Override
-# them with --path / --ws-path until switch-core answers. See docs/setup-vm.md.
-DEFAULT_PATH = "/v1/health"
-DEFAULT_WS_PATH = "/v1/ws"
+# Verified against switch-core 0.31.0 on 2026-11-05 (docs/day0.md check 2). The
+# WebSocket upgrade is accepted before the agent id is checked, so any id works.
+DEFAULT_PATH = "/health"
+DEFAULT_WS_PATH = "/agents/probe/connection/ws"
 
 TIMEOUT_SECONDS = 10.0
 
@@ -90,12 +90,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--path",
         default=DEFAULT_PATH,
-        help=f"HTTP path for the GET probe (default: {DEFAULT_PATH}, may be wrong)",
+        help=f"HTTP path for the GET probe (default: {DEFAULT_PATH})",
     )
     parser.add_argument(
         "--ws-path",
         default=DEFAULT_WS_PATH,
-        help=f"path for the WebSocket upgrade (default: {DEFAULT_WS_PATH}, may be wrong)",
+        help=f"path for the WebSocket upgrade (default: {DEFAULT_WS_PATH})",
     )
     args = parser.parse_args(argv)
 
