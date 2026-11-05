@@ -179,7 +179,7 @@ facts:
 
 ```
 @om-gate free 2026-11-08..2026-11-09                     → busy blocks (+ titles at friend and close)
-@om-gate ask diet interests                              → values, or "not shared at this level"
+@om-gate ask diet interests                              → values, or "<field>: not shared with you" (no hint whether it exists or its level; `view-as` shows the owner "not shared at this level")
 @om-gate ask-owner Q3 "Is ₹1,500 per person okay?"       → asks Om (Discord); reply comes back as `answer Q3 …`
 @om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"
 @om-gate counter P1 P2 2026-11-09T19:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"
