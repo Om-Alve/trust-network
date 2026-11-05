@@ -96,7 +96,7 @@ Rahul and Priya are separate Switch users with their own registration keys. **Th
 ```
  DISCORD (primary: each person's own Hermes bot)        SWITCH, agent-only rooms (agents)              DISCORD (optional secondary)
  ────────────────────────────────────────────────       ──────────────────────────────────────         ────────────────────────────
- Om ⇄ his Hermes bot                                    dm-om-rahul-sat                                 #om-home
+ Om ⇄ his Hermes bot                                    dm-om-rahul-sun                                 #om-home
    │ tn mcp (om-hermes)                                    om-hermes ⇄ rahul-hermes                       Om ⇄ om-agent
    ▼                                                       om-gate ⇄ rahul-gate (answers,                 (view-as, ledger,
  rahul-home/#om-home inbox ◀────────────────────────                ask-your-person, P1)                  overreach, yes)
@@ -217,7 +217,7 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 1. **Om, dictating with Wispr into Discord, tells his Hermes:** "plan something fun with Rahul Sunday evening, not pricey."
 2. **`om-hermes`** (Om's Hermes, acting in Switch through `tn mcp`) sends `@om-gate dm rahul "something fun Sunday evening, not pricey"`.
 3. **`om-gate`:**
-   - creates `dm-om-rahul-sat` (agent-only);
+   - creates `dm-om-rahul-sun` (agent-only);
    - invites `om-hermes` to the room;
    - privately hands `om-hermes` a **share card**: what Rahul's trust level allows Om's side to say (Rule 7) — this is guidance for the agent, not a hard filter;
    - posts `@rahul-gate join-dm <room> "<goal>"` in `conn-om-rahul`.
@@ -268,7 +268,7 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 |---|---|---|
 | `switch_client.py` | Agent protocol client: register with a person's key, WebSocket events (`addressed`, sender), ops (`post_message`, `create_room`, `invite_agent_to_room`, `list_participants`, `get_agent_detail`, `archive_room`, `create_agent`, `update_agent_detail`, `list_machines`) | ~200 lines |
 | `gate/` | Policy (levels, room level, consent, tighten-only), facts, `.ics` reader, command parser, relays, surprise mode, ledger, `view-as` | ~600 lines + tests |
-| *(unused since Nov 5)* `gate/envoy.py` | Built in phase 13b for the dropped envoy design (gate-side registration, brief handoff, turn/time-limited lifecycle). Nothing calls it now that main agents talk directly; kept in the repo. | ~80 lines |
+| `gate/envoy.py` *(partly unused since Nov 5)* | Built in phase 13b for the dropped envoy design. Its envoy creation, brief handoff and registration parts are unused; its `ConversationWatch` (12 turns / 10 minutes, then a summary home and archive) is what `gate/dm.py` uses for DM rooms between main agents. | ~80 lines |
 | `tn` CLI | `init`, `trust`, `fact set/get`, `cal add`, `view-as`, `--as <person>` for the demo | ~200 lines |
 | `tn mcp` | MCP server (stdio) for personal agents, generic across who runs it. **Now runs twice in the demo** (`--as om`, acting as `om-hermes`; `--as rahul`, acting as `rahul-hermes`), one instance per Hermes profile: `inbox`, `dm`, `dm_read`, `dm_post`, `ask`, `gift_ideas`, `claim`, `ask_around`, `answer`, `cal_add`, `fact_set`. `dm_read`/`dm_post` (new, Nov 5) let a Hermes-style agent read and post plain-language text in a DM room it's already a member of, since the main agent now carries that conversation itself. | ~180 lines |
 | `SKILL.md` | The manual for every agent, in Agent Skill format. Attached to rooms as a doc, and loaded by both Hermes profiles and (optionally) `om-agent`. **Dictated with Wispr.** | 1 page |
