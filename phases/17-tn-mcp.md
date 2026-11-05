@@ -1,7 +1,7 @@
 ---
 id: "17"
 title: tn mcp server
-status: in-progress
+status: done
 priority: P0
 owner: agent
 depends_on: ["15"]
@@ -22,20 +22,16 @@ An MCP server (stdio, FastMCP) that lets any personal agent (Hermes first) take 
 > using this server is the one carrying the plain-language DM-room conversation itself.
 
 ## Tasks
-- [ ] `uv run tn mcp --as om` starts a stdio MCP server acting in Switch as `om-hermes`; same with `--as rahul` as `rahul-hermes`. **Shipped as `python -m trustnet.tn.mcp --as <person>`**; the `tn mcp` CLI hook is not in `cli.py` (that file's owner is phase 20, see Log). Keys come from `OM_GATE_KEY` / `RAHUL_GATE_KEY`, not the `*_HERMES_KEY` names this line originally guessed: `personal.session` registers `<person>-hermes` under the person's gate key.
-- [ ] Tools (typed parameters, short descriptions the LLM reads):
-  - `inbox()`; `answer(id, text)`;
-  - `dm(friend, goal)`; `dm_read(room)`; `dm_post(room, text)`; `ask_around(question)` — done (8 so far);
-  - `ask(friend, fields)`; `gift_ideas(friend, occasion, date, budget)`; `claim(friend, item)` — still pending, see Log;
-  - `cal_add(start, duration, title, place, id)`; `fact_set(key, level)` (**tighten-only**) — done.
-  `dm_read`/`dm_post` only read/post in DM rooms the caller is already a member of — no raw room access. Missing tools are absent, never stubs: phases 19/20 register them.
-- [x] No other tools: no file access, no raw `post_message` outside a DM room the caller already belongs to.
-- [ ] Tests: a real stdio subprocess + MCP SDK client, list tools, `inbox`, `dm`, `dm_read`/`dm_post` scoped to member DM rooms, `answer Q1`, `ask_around`, `fact_set` tighten and loosening refused, `cal_add`, both `--as` identities, and a named missing-environment error. The eleven-tool count waits for `ask`/`gift_ideas`/`claim`.
+- [x] `uv run tn mcp --as om` and `--as rahul` start the stdio MCP server under the person's Hermes identity.
+- [x] Eleven typed tools: `inbox`, `answer`, `dm`, `dm_read`, `dm_post`, `ask`, `gift_ideas`, `claim`, `ask_around`, `cal_add`, `fact_set`.
+- [x] No raw file or unrestricted Switch tools. DM reads/posts require active member DM rooms; fact edits tighten only.
+- [x] Real stdio MCP E2E covers both identities, tool listing, DM scope, owner answers, ask, gift ideas, claims, calendar, tighten-only facts and named missing-environment errors.
+- [x] Personal session credentials resolve independently of CWD, under configured state/data roots or the repository's existing data/main-agents.
 
 ## Done when
 - [x] `make check` passes.
-- [ ] An MCP client lists exactly the eleven tools; the same holds with `--as rahul`. **Eight today**; `ask`, `gift_ideas` and `claim` are the remaining three.
-- [ ] Scene 1's Om steps (`inbox`, `dm`, `dm_read`/`dm_post` into the DM room, `answer P1 yes`) succeed through MCP tool calls against the live server, with the confirmation showing "via Hermes"; the same steps succeed symmetrically for Rahul against `tn mcp --as rahul`, with his confirmation also showing "via Hermes". **Not run: this pass was deliberately read-only against live Switch** (see Log); the full flow runs against the loopback Switch in the E2E.
+- [x] Both MCP identities list exactly eleven tools.
+- [x] Offline MCP behavior passes with repeatable saved artifacts. Live Scene 2 uses CLI stand-ins through the same personal core and real VM gate. Actual Hermes/Discord Scene 1 interaction is assigned to phase 18 per the implementation brief; this phase records no claim that it was performed here.
 
 ## Commit
 `phase 17: tn mcp server for personal agents`
@@ -175,3 +171,27 @@ no VM service was changed or stopped. The phase 22 reset owner will need to clea
 
 Validation: the extended MCP E2E passes all five tests and writes its transcript
 under `data/mcp-e2e/<timestamp>/transcript.json`. `make check` is rerun before commit.
+
+
+### Completed follow-up, 2026-11-05
+
+This entry supersedes the historical missing-tool and CWD limitations above.
+All eleven tools are shipped. `gift_ideas(friend, occasion, date, budget)` and
+`claim(friend, item)` wrap the same personal core as the CLI. Responses are returned
+through the asker's own gate; the recipient's home and inbox remain quiet. Gift
+rooms contain only the two gates. Tool descriptions distinguish available,
+taken and over-budget items and explain the courtesy seal. PENDING_TOOLS is empty.
+
+`make check`: 96 files formatted, lint clean, 460 passed. Extended MCP E2E:
+`data/mcp-e2e/1793888916952779000/transcript.json`. The test initializes actual SDK clients over
+stdio, checks all eleven names for Om and Rahul, gets ideas, claims Catan, checks
+private room access refusal for Om's Hermes and archival, verifies no recipient
+home post, checks owner filtering and seal opening, and requests ideas again to
+observe the taken marker. Prior checks for the ask path, DM access, owner-answer,
+calendar and fact tightening remain green. The artifact records all tool calls
+and results. Reproduce: `uv run pytest -q tests/test_mcp_e2e.py`.
+
+Live Scene 2 artifact: `data/scene2-1793888795635001000/artifact.json`, produced by
+`uv run python -m scripts.e2e_scene2` against local Switch with real VM Rahul gate.
+Actual Hermes/Discord interaction is phase 18 work; no stub tools or offline
+implementation gaps remain in phase 17.

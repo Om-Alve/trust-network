@@ -37,7 +37,7 @@ __all__ = ["build", "main"]
 
 SERVER_NAME = "trustnet"
 
-PENDING_TOOLS: tuple[str, ...] = ("gift_ideas", "claim")
+PENDING_TOOLS: tuple[str, ...] = ()
 
 INSTRUCTIONS = (
     "Tools for taking part in trust-network as your person's own agent, in Switch, "
@@ -153,6 +153,18 @@ def build(person: str) -> MCPServer:
     )
     async def ask(friend: str, fields: list[str]) -> dict[str, Any]:
         return await _call(personal.ask, person, friend, fields)
+
+    @server.tool(
+        description="Get gift ideas from a friend gate using stored facts only. Suggestions fit the budget and room level; taken and over-budget items are separate. The recipient is never notified. The seal is a courtesy; workspace admins can read rooms."
+    )
+    async def gift_ideas(friend: str, occasion: str, date: str, budget: int) -> dict[str, Any]:
+        return await _call(personal.gift_ideas, person, friend, occasion, date, budget)
+
+    @server.tool(
+        description="Claim an offered gift from your latest active gift session with a friend. It is hidden from their own views until after the occasion and marked taken for other askers."
+    )
+    async def claim(friend: str, item: str) -> dict[str, Any]:
+        return await _call(personal.claim, person, friend, item)
 
     return server
 

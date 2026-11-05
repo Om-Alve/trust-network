@@ -45,6 +45,8 @@ from trustnet.gate.runtime import Gate
 
 PERSONS = ("om", "rahul")
 TOOLS = {
+    "gift_ideas",
+    "claim",
     "ask",
     "inbox",
     "answer",
@@ -419,6 +421,97 @@ async def test_mcp_stdio_end_to_end(tmp_path, monkeypatch):
                 assert ok
                 assert "non-vegetarian" in json.dumps(facts)
                 assert "18, 5th Block" not in json.dumps(facts)
+
+                # Om's default level for Rahul is close. Recipient never gets a home post.
+                async with stdio_client(
+                    StdioServerParameters(
+                        command=sys.executable,
+                        args=["-m", "trustnet.tn.mcp", "--as", "rahul"],
+                        env=env,
+                        cwd=str(tmp_path),
+                    ),
+                    errlog=log,
+                ) as (rr, rw):
+                    async with ClientSession(rr, rw) as rahul:
+                        await rahul.initialize()
+                        before = list(switch.rooms[homes["om"]]["messages"])
+                        ok, gifts = await _call(
+                            rahul,
+                            artifact["calls"],
+                            "gift_ideas",
+                            {
+                                "friend": "om",
+                                "occasion": "birthday",
+                                "date": "2026-11-20",
+                                "budget": 3000,
+                            },
+                        )
+                        assert ok
+                        assert gifts["suggestions"] == [
+                            {"item": "Catan Seafarers", "price": 2500},
+                            {"item": "Hario V60", "price": 2000},
+                        ]
+                        ok, claimed = await _call(
+                            rahul,
+                            artifact["calls"],
+                            "claim",
+                            {"friend": "om", "item": "Catan Seafarers"},
+                        )
+                        assert ok and claimed == {"status": "claimed", "item": "Catan Seafarers"}
+                        assert switch.rooms[homes["om"]]["messages"] == before
+                        gift_rooms = [
+                            r
+                            for r in switch.rooms.values()
+                            if r["name"].startswith("gift-rahul-om-")
+                        ]
+                        assert len(gift_rooms) == 1
+                        assert gift_rooms[0]["archived"]
+                        assert gift_rooms[0]["read_visibility"] == "private"
+                        with pytest.raises(PermissionError):
+                            await switch.client("om-hermes", "om").read_context(
+                                room_id=gift_rooms[0]["id"]
+                            )
+
+                        from datetime import datetime
+
+                        from trustnet.gate import ledger, surprise
+                        from trustnet.gate.calendar import TIME_ZONE
+
+                        sealed = ledger.format_ledger(
+                            person="om", now=datetime(2026, 11, 20, tzinfo=TIME_ZONE)
+                        )
+                        assert "1 sealed entry, opens Nov 21" in sealed
+                        assert "Catan Seafarers" not in json.dumps(
+                            surprise.owner_value(
+                                "om", "wishlist", [{"item": "Catan Seafarers", "price": 2500}]
+                            )
+                        )
+                        opened = ledger.format_ledger(
+                            person="om", now=datetime(2026, 11, 21, tzinfo=TIME_ZONE)
+                        )
+                        assert "sealed entry" not in opened and "gift" in opened
+                        ok, other = await _call(
+                            rahul,
+                            artifact["calls"],
+                            "gift_ideas",
+                            {
+                                "friend": "om",
+                                "occasion": "birthday",
+                                "date": "2026-11-20",
+                                "budget": 3000,
+                            },
+                        )
+                        assert ok and other["taken"] == [
+                            {"item": "Catan Seafarers", "status": "taken"}
+                        ]
+                        artifact["gift"] = {
+                            "ideas": gifts,
+                            "claim": claimed,
+                            "other_ask": other,
+                            "sealed": sealed,
+                            "opened": opened,
+                            "recipient_home_unchanged": True,
+                        }
 
                 artifact.update(
                     {
