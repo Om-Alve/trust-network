@@ -1,7 +1,7 @@
 ---
 id: "16"
 title: Rahul's side on the Azure VM
-status: todo
+status: blocked
 priority: P1
 owner: human + agent
 depends_on: ["15"]
@@ -25,18 +25,22 @@ Rahul's gate and his main agent (his own **Hermes** profile, acting as `rahul-he
 > enrolled, unused and optional, kept only in case a managed agent is ever wanted again.
 
 ## Tasks
-- [ ] `scripts/vm_up.sh` (idempotent, Ubuntu): installs Node 22, `uv`, Tailscale (if missing); installs `switch-agent-controller` 0.31.0 and enrolls with a one-time code passed as an argument (kept for optional future use, not required by any flow here); sets `SWITCH_CONTROLLER_SELF_UPDATE=off`; clones/updates this repo; writes a systemd unit for `rahul-gate` (`uv run python -m trustnet.gate --person rahul`, env from `/etc/trust-network/rahul.env`); confirms or writes Om's Hermes config (already installed at `~/.local/bin/hermes` under user `om` per the Nov 5 note) and prints its `mcp_servers` entry for `tn mcp --as om`; installs and configures a **second** Hermes profile for Rahul, with its own Discord bot token, and prints its `mcp_servers` entry for `tn mcp --as rahul` (both used in phase 18).
-- [ ] Data dir on the VM: `TN_DATA_DIR` with Rahul's fixtures copied in.
-- [ ] **Stand up Rahul's Hermes profile.** No Switch agent-management placement is needed (unlike the dropped managed-Codex plan) — Rahul's Hermes registers itself directly through `tn mcp --as rahul`, the same code path Om's Hermes uses. `rahul-home` is a plain agent-only Switch room holding `rahul-gate` and `rahul-hermes`, created the same way `conn-*`/`dm-*` rooms are (no template needed).
-- [ ] **[human]** Run `vm_up.sh` on the VM; confirm `systemctl status rahul-gate`, and that both Hermes profiles (`om-hermes`, `rahul-hermes`) are reachable on their own Discord bots.
+- [x] Idempotent laptop-invoked Ubuntu deployment in `scripts/vm_up.sh`: check/install git and uv, sync committed source, `uv sync --locked --python 3.12`, install systemd user service. Node/codex/controller remain optional and untouched.
+- [x] Seed `TN_DATA_DIR` with only Rahul's fixtures; retain his registration and transfer only `RAHUL_GATE_KEY` and `SWITCH_URL` in a mode-0600 environment file.
+- [x] Check laptop for duplicate gate processes; install, enable and restart VM service.
+- [ ] Addressed `free` / `ask` round-trip with both gates across machines (blocked by gate identity resolver).
+- [ ] Phase 17: provide `tn mcp` on the VM, using each main agent's own credentials.
+- [ ] Phase 18: create Rahul's Hermes profile, Discord bot and home room; wire both profiles to MCP. Om's existing Hermes configuration remains untouched in this phase.
 
 ## Done when
-- [ ] `shellcheck scripts/vm_up.sh` is clean (or warnings explained in *Log*), and a second run of the script changes nothing.
-- [ ] `rahul-gate` survives a VM reboot (systemd) and reconnects after a Tailscale drop.
-- [ ] Scene 1 (CLI version from phase 15) passes again with `rahul-gate` and a live `rahul-hermes` on the VM, and Om driven through his own Hermes (also on the VM) or its CLI stand-in; Gateway's Machines page shows the laptop and the VM (screenshot in *Log*).
+- [x] Shellcheck passes; repeated deployment succeeds without replacing Rahul's mutable profile or registration.
+- [x] User service is enabled, linger is on, and explicit restart returns active/running.
+- [ ] VM reboot and Tailscale drop recovery verified (not exercised).
+- [ ] Live gate command exchange and full Scene 1 with both main agents pass.
+- [ ] Both Hermes Discord profiles and Machines-page screenshot verified (phase 18).
 
 ## Commit
-`phase 16: vm_up.sh, rahul-gate and both Hermes profiles on the Azure VM`
+`phase 16: rahul-gate on the VM, vm_up.sh`
 
 ## Log
 <!-- evidence, deviations, notes -->
@@ -60,3 +64,75 @@ needed at all now, since Hermes registers itself directly via `tn mcp --as rahul
 `om-hermes` does. The `rahul-vm` controller enrollment reverts to optional/unused — nothing in
 this phase's critical path needs it. Goal, tasks and Done-when above are rewritten accordingly;
 `status` unchanged (`todo`).
+
+### VM deployment — 2026-11-05
+
+Deployed committed source snapshot `ffe1751` to `/home/om/trust-network` using
+`git archive HEAD` over SSH. This is a source snapshot rather than a remote clone:
+there is no remote, and archiving committed paths excludes the other agent's
+unfinished phase 15 changes, `.env`, `data/`, and Om's uncommitted AGENTS.md edit.
+Om/Priya example directories are omitted as well. Re-running after a phase 15/17
+commit updates the source. No production Om/Priya data or credentials were copied.
+The generated archive and filtered secrets exist only in a temporary 0700 local
+directory (archive 0600), deleted when SSH completes. The VM environment file is
+`~/.config/trust-network/rahul.env` (0600). Identity aliases are non-secret trusted
+server metadata, copied separately; no database credentials travel.
+
+Retained Rahul registration `423f4fd8-f632-4bb3-b5a9-66ca3109436d` is in VM
+`data/rahul-state.json` (0600, Rahul entry only). No re-registration was needed.
+Laptop process inspection found no persistent gate processes; phase 11/14 probes
+owned their gates for bounded runs. Do not run those old two-gate probes while
+this service is running: they reuse the same Rahul registration. The deployment
+refuses known local gate/probe processes. This is an operational check, not a
+cross-machine lock; future bootstrap code must respect VM ownership.
+
+`systemctl --user show rahul-gate -p ActiveState -p SubState -p NRestarts` after
+restart: `ActiveState=active`, `SubState=running`, `NRestarts=0`.
+`loginctl show-user om -p Linger`: `Linger=yes`. Controller and Hermes gateway
+were already active and were not reconfigured. `uv run tn --help` succeeds.
+Second `scripts/vm_up.sh` run succeeded (resolved/audited existing dependencies).
+Re-running intentionally restarts the service; it preserves mutable profile and
+registration files. It does not promise an unchanged PID.
+
+Live artifact: gitignored `data/phase16-evidence.log`, produced by
+`PYTHONPATH=. uv run python data/phase16-probe.py` (retained local probe).
+Room `8bc80b5e-9cfe-4516-8ebb-9d7c1eb1cfb2` contained om-gate and rahul-gate.
+Om posted `@rahul-gate free 2026-11-08..2026-11-09`; the VM made successful
+get_room_detail/connect_to_room/list_participants HTTP 200 calls, then logged
+`ERROR:trustnet.gate.runtime:gate dispatch failed: FileNotFoundError`.
+There were zero Rahul command replies (server join greetings excluded).
+Room deletion returned HTTP 200. An earlier connectivity-only room
+`55212b0b-9ee1-4fa3-8bf0-eae6ce41681a` was also deleted (HTTP 200).
+No free/ask round-trip or Scene 1 success is claimed.
+
+Blocking code change, owned by phase 15: `trustnet/gate/__main__.py` always runs
+`~/Library/Application Support/switchdash/local-switch-server/native/switch-core/0.31.0/venv/bin/python`
+to export identities on every addressed command. This macOS executable and local
+server database do not exist on Ubuntu. `--identity-map` selects the output file,
+not a read-only external-map mode. Add a supported remote identity source (or an
+explicit pre-exported-map mode with a trusted refresh procedure), then redeploy
+and repeat free/ask both ways, restart, network recovery and Scene 1. Do not copy
+Switch's database password or Om's private data onto the VM as a workaround.
+No gate or tn code was edited by this phase.
+
+Remaining phase 17/18 steps: deploy their committed implementation with vm_up;
+provide `tn mcp`, separate main-agent registration credentials and state; create
+Rahul's separate Hermes/Discord profile and home room; configure Om's MCP only
+under phase 18 authorization; verify consent/calendar Scene 1 through both bots.
+Hermes keys must go in separate 0600 files; vm_up intentionally transfers no
+Hermes keys yet. Reboot and Tailscale interruption still need live verification.
+
+Deviations: user instructions narrow the older PLAN §5 row and phase tasks:
+Node 26 is already installed, controller is optional, systemd is a user service,
+and Hermes configuration belongs to phase 18. Source deployment uses a filtered
+git archive rather than clone/bundle/rsync to avoid uncommitted concurrent work.
+
+Validation: `uvx --from shellcheck-py shellcheck scripts/vm_up.sh` and
+`bash -n scripts/vm_up.sh` passed. `git diff --check` passed. `make check` was
+run before committing, twice, but stopped at ruff format: concurrent phase 15
+file `scripts/e2e_scene1.py:31` needs a blank line after its logging import
+(86 other files formatted). That file is outside this phase's ownership and
+was left untouched; pytest did not run in those attempts. Phase remains blocked.
+VM stat confirmed 0600 for env/registration. All three user services
+`rahul-gate`, `hermes-gateway`, `switch-agent-controller` were active after
+the repeated deployment.

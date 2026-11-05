@@ -1,3 +1,70 @@
+# Azure VM deployment (phase 16)
+
+Run from the laptop checkout:
+
+```sh
+scripts/vm_up.sh                         # defaults to om@hermes.<tailnet>.ts.net
+scripts/vm_up.sh om@hermes.<tailnet>.ts.net
+```
+
+The script sends a filtered `git archive HEAD` snapshot over SSH because this
+repository has no remote. Only committed source is deployed, so commit phase
+15/17 changes before redeploying them. Om/Priya example directories are omitted.
+This is a source snapshot, not a VM git checkout. It installs missing git/uv,
+selects Python 3.12 and syncs the lockfile. SSH, sudo and Tailscale connectivity
+must already work. Node, codex, controller and Hermes are optional and untouched.
+
+Local `.env` must contain SWITCH_URL and RAHUL_GATE_KEY; retained registration
+must exist in `data/day0-state.json`. Only those two env entries and Rahul's
+registration are transferred, with non-secret server identity aliases. Temporary
+local files and VM secrets use restrictive permissions; nothing prints keys.
+No Hermes registration keys are transferred yet. Future phases must provision
+those separately without replacing Om's existing Hermes configuration.
+
+VM paths:
+
+- Source and venv: `/home/om/trust-network`
+- Environment: `/home/om/.config/trust-network/rahul.env` (0600)
+- Retained registration: `data/rahul-state.json` (0600, Rahul only)
+- Trusted aliases: `data/gate-identities.json` (0600)
+- Mutable profile: `data/profiles/rahul/`, seeded once from examples/rahul
+- User unit: `~/.config/systemd/user/rahul-gate.service`
+
+Re-running syncs source and restarts the service but preserves existing profile
+files and registration. It refuses known local gates/probes to prevent duplicate
+Rahul consumers. Do not start old two-gate live probes concurrently.
+
+```sh
+ssh om@hermes.<tailnet>.ts.net 'systemctl --user status rahul-gate --no-pager'
+ssh om@hermes.<tailnet>.ts.net 'systemctl --user restart rahul-gate; systemctl --user show rahul-gate -p ActiveState -p SubState -p NRestarts'
+ssh om@hermes.<tailnet>.ts.net 'loginctl show-user om -p Linger'
+ssh om@hermes.<tailnet>.ts.net 'cd ~/trust-network; ~/.local/bin/uv run tn --help'
+ssh om@hermes.<tailnet>.ts.net 'journalctl --user -u rahul-gate -n 20 --no-pager'
+```
+
+Measured: enabled, active/running after restart, linger yes; second deployment
+succeeds. **Command handling is blocked**: the gate entrypoint invokes the
+laptop's macOS Switch Python to refresh identities. Ubuntu raises FileNotFoundError
+on addressed commands despite an active transport connection. Phase 15 must add
+a supported external identity map/refresh path; then redeploy and verify actual
+free/ask replies. The local repeatable probe and redacted output are retained in
+`data/phase16-probe.py` and `data/phase16-evidence.log`; run from the laptop with
+`PYTHONPATH=. uv run python data/phase16-probe.py`. It creates an internal room,
+sends a dated free query, records replies excluding join greetings, and deletes
+the room in finally. See the phase 16 Log for IDs and outcome. Reboot, Tailscale
+drop recovery and full Scene 1 are still unverified.
+
+Switch stays on the laptop with Om/Priya gate ownership. Rahul's canonical gate
+service is on the VM. Om's existing Hermes and optional controller remain as-is.
+Phase 17 supplies tn mcp; phase 18 creates Rahul's Hermes profile/Discord bot and
+wires both profiles to their own MCP identity, credentials, home inbox and consent.
+
+The following is the historical phase 02 runbook; its controller/envoy requirements
+are optional under the current design. The measured day0 checks supersede guessed
+paths and installer flags below.
+
+---
+
 # VM setup (Rahul's machine, Azure)
 
 > **As actually done on 2026-11-05 (supersedes the steps below where they differ):**
