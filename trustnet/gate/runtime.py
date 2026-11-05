@@ -17,7 +17,7 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from trustnet.gate import commands as c
-from trustnet.gate import consent, dm, ledger, relay
+from trustnet.gate import consent, dm, ledger, relay, surprise
 from trustnet.gate.calendar import TIME_ZONE, busy
 from trustnet.gate.facts import Level, load_profile, load_trust, resolve_data_dir, save_trust
 from trustnet.gate.policy import (
@@ -107,6 +107,8 @@ class Gate:
         level = room_level(self.person, members, trust)
         if level is None or sender is None or sender not in members:
             LOG.info("command=unknown room=%s level=%s decision=silent", event.room_id, level)
+            return
+        if await surprise.handle(self, event, sender, level, room_detail):
             return
         own_side = _is_own_side(self.person, sender)
         try:
@@ -198,7 +200,10 @@ class Gate:
         disclosed = {}
         overreach: list[tuple[str, str]] = []
         if isinstance(command, c.Ask):
-            values = visible_facts(profile, level)
+            values = {
+                k: surprise.owner_value(self.person, k, v, self._now()) if own_side else v
+                for k, v in visible_facts(profile, level).items()
+            }
             fields = list(dict.fromkeys(command.facts))
             disclosed = {key: values[key] for key in fields if key in values}
             lines = []
@@ -239,9 +244,11 @@ class Gate:
                 or "Nothing busy in this range."
             )
         elif isinstance(command, c.ViewAs):
-            text = view_as(profile, trust, command.person).render()
+            text = view_as(
+                profile, trust, command.person, now=self._now(), claims=surprise.claims(self.person)
+            ).render()
         elif isinstance(command, c.Ledger):
-            text = ledger.format_ledger(person=self.person)
+            text = ledger.format_ledger(person=self.person, now=self._now())
         elif isinstance(command, c.Trust):
             trust.people[command.person] = command.level
             save_trust(trust, resolve_data_dir(self.person) / "trust.yaml")
@@ -488,6 +495,7 @@ class Gate:
         while True:
             await asyncio.sleep(1)
             async with self._dispatch_lock:
+                await surprise.expire(self)
                 for watch in list(self.watches.values()):
                     await watch.check()
 

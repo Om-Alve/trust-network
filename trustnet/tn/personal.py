@@ -136,3 +136,50 @@ async def ask(person: str, friend: str, fields: list[str]):
                 return {"room": room, "message": result}
             await asyncio.sleep(0.1)
     raise SwitchError("Timed out waiting for facts DM membership")
+
+
+async def _gift(person, friend, action, **values):
+    import uuid
+
+    friend = Dm(person=friend, goal=Quoted("Gift request")).person
+    token = uuid.uuid4().hex
+    request = {"friend": friend, "token": token, "action": action, **values}
+    async with session(person) as client:
+        room = await home(person, client)
+        await client.connect_to_room(room)
+        await client.post_message(f"@{person}-gate gift-request " + json.dumps(request))
+        prefix = f"gift-result {token} "
+        for _ in range(200):
+            context = await client.read_context(room_id=room, limit=200)
+            for thread in context.get("threads", []):
+                root = thread["root"]
+                text = root.get("body", root.get("text", ""))
+                if text.startswith(prefix):
+                    result = json.loads(text[len(prefix) :])
+                    if "error" in result:
+                        raise SwitchError(result["error"])
+                    return result
+            await asyncio.sleep(0.15)
+    raise SwitchError("Timed out waiting for gift gate response")
+
+
+async def gift_ideas(person: str, friend: str, occasion: str, date: str, budget: int):
+    from trustnet.gate.commands import GiftIdeas, parse
+
+    command = parse(f"gift-ideas {occasion} {date} budget<={budget}")
+    if not isinstance(command, GiftIdeas):
+        raise ValueError("Invalid gift request")
+    return await _gift(
+        person,
+        friend,
+        "ideas",
+        occasion=command.occasion,
+        date=command.on.isoformat(),
+        budget=command.budget,
+    )
+
+
+async def claim(person: str, friend: str, item: str):
+    from trustnet.gate.commands import Claim
+
+    return await _gift(person, friend, "claim", item=Claim(item=item).item)

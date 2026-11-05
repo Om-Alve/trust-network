@@ -238,11 +238,11 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 3. **`rahul-gate`** creates `gift-rahul-om-bday` (agent-only, private) with `om-gate` and sends `@om-gate gift-ideas birthday 2026-11-20 budget<=3000`.
 4. **`om-gate` answers from stored facts only. It never asks Om.** Rahul is close, so: `wishlist: Catan Seafarers (≈₹2,500), Hario V60 (≈₹2,000), Kindle Paperwhite (over budget) · interests: board games, sci-fi · sizes: tshirt M`.
 5. **`rahul-hermes` suggests Catan Seafarers. Rahul:** "get that." `rahul-hermes` calls `claim(om, "Catan Seafarers")` over `tn mcp`.
-6. **Om's view stays unchanged:**
+6. **Om's home stays quiet:**
    - his home surface (his own Hermes on Discord, or `#om-home`) shows nothing;
-   - his own wishlist still shows Catan;
+   - his own wishlist hides claimed Catan until Nov 21;
    - `@om-gate ledger` (or asking his Hermes) shows "1 sealed entry, opens Nov 21".
-7. **Optional beat:** Priya's side then asks for gift ideas and sees "Catan Seafarers: taken".
+7. **Optional beat:** another close asker sees "Catan Seafarers: taken". Priya at friend level receives interests only.
 
 *Being honest about the seal:* it's a courtesy seal. The ledger file is on Om's own laptop, like a wrapped present he could open early.
 

@@ -13,6 +13,7 @@ from trustnet.switch_client import SwitchClient
 STATE_FILES = (
     "ledger.jsonl",
     "claims.json",
+    "gift-sessions.json",
     "inbox-cursor.json",
     "coordination.json",
     "ask-around.json",

@@ -238,6 +238,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     view.set_defaults(handler=_cmd_view_as)
 
+    for name in ("gift-ideas", "claim"):
+        sub = commands.add_parser(name, parents=[common])
+        sub.add_argument("friend")
+        if name == "gift-ideas":
+            sub.add_argument("occasion")
+            sub.add_argument("date")
+            sub.add_argument("budget", type=int)
+        else:
+            sub.add_argument("item")
+        sub.set_defaults(handler=_cmd_gift)
+
     for name in ("inbox", "answer", "dm", "ask-around"):
         sub = commands.add_parser(name, parents=[common])
         if name == "ask-around":
@@ -365,6 +376,8 @@ def _cmd_trust(context: Context, args: argparse.Namespace) -> int:
 def _cmd_fact_get(context: Context, args: argparse.Namespace) -> int:
     owner = context.owner()
     profile = load_profile(owner)
+    from trustnet.gate.surprise import owner_value
+
     names = tuple(key.strip() for key in args.keys if key.strip())
     if names:
         missing = [name for name in names if name not in profile.facts]
@@ -378,7 +391,7 @@ def _cmd_fact_get(context: Context, args: argparse.Namespace) -> int:
         "owner": owner,
         "facts": {
             name: {
-                "value": _jsonable(profile.facts[name].value),
+                "value": _jsonable(owner_value(owner, name, profile.facts[name].value)),
                 "level": _level_name(name, profile),
             }
             for name in names
@@ -394,7 +407,7 @@ def _cmd_fact_get(context: Context, args: argparse.Namespace) -> int:
     for name in names:
         fact = profile.facts[name]
         lines.append(
-            f"  {name:<{width}}  {fact.level.value:<{level_width}}  {_format_value(fact.value)}"
+            f"  {name:<{width}}  {fact.level.value:<{level_width}}  {_format_value(owner_value(owner, name, fact.value))}"
         )
     return context.emit(payload, "\n".join(lines))
 
@@ -573,7 +586,9 @@ def _cmd_view_as(context: Context, args: argparse.Namespace) -> int:
     trust = load_trust(owner)
     if args.days <= 0:
         raise CliError("--days must be a positive number")
-    result = view_as(profile, trust, args.person_name, days=args.days)
+    from trustnet.gate.surprise import claims
+
+    result = view_as(profile, trust, args.person_name, days=args.days, claims=claims(owner))
 
     payload = {
         "owner": owner,
@@ -638,6 +653,20 @@ def _cmd_dm(context, args):
     from trustnet.tn.dm import operate
 
     result = asyncio.run(operate(context.owner(), args.room, getattr(args, "text", None)))
+    return context.emit(result, json.dumps(result, ensure_ascii=False))
+
+
+def _cmd_gift(context, args):
+    import asyncio
+
+    from trustnet.tn import personal
+
+    if args.command == "gift-ideas":
+        result = asyncio.run(
+            personal.gift_ideas(context.owner(), args.friend, args.occasion, args.date, args.budget)
+        )
+    else:
+        result = asyncio.run(personal.claim(context.owner(), args.friend, args.item))
     return context.emit(result, json.dumps(result, ensure_ascii=False))
 
 
