@@ -353,6 +353,8 @@ In dependency order. Write down each result.
 | 11 | Hermes on the VM: a Telegram bot; `tn mcp` under `mcp_servers`; the skill loads; a cron job every 2 min calls `inbox` and messages Telegram | `tn --as rahul inbox` / `answer` from the terminal (same code path) |
 | 12 | Discord: bot with Message Content + Server Members intents; `#om-home` created as a private channel by the template; Om's Discord linked | Mattermost |
 
+Protocol findings from phase 03 (source at `sandbox-quantum/switch@1c9725a`) are in `phases/03-switch-client.md` *Log* and §11; phase 04 confirms them against core 0.31.0. In short: participants carry no owner ID (use `get_agent_detail`); `internal_only` removes only the external bridge; archiving doesn't block writes; room-scoped ops use the connected room.
+
 ---
 
 ## 9. Schedule (solo; Claude Code does most of the typing, prompts dictated with Wispr)
@@ -411,6 +413,9 @@ In dependency order. Write down each result.
 | Cross-owner invites to agent-only rooms are refused | Rooms readable across the workspace + `connect_to_room`; gifts fall back to the courtesy seal (check 7) |
 | Envoys make up facts about their person | The brief says to state only what's in it and otherwise `ask-owner`. Proposals need both people's yes. |
 | Envoys chat forever | The gate counts turns and archives the DM room at 12 turns or 10 minutes, with a summary |
+| `archive_room` doesn't block writes (upstream archive is reversible metadata; found in phase 03) | Gates track archived rooms themselves and ignore or refuse anything posted there after archiving |
+| `internal_only` only removes the external bridge (Discord/Mattermost); it doesn't hide the room from Console users (found in phase 03) | Check 10 decides whether gift rooms need the courtesy seal. Never rely on `internal_only` alone for privacy. |
+| Room-scoped ops (`post_message` etc.) act on the agent's connected room and take no `room_id` (found in phase 03) | Phase 04 confirms how a gate that sits in several rooms picks the room (e.g. `connect_to_room` before posting); phases 11 and 14 are built around the answer |
 | Hermes setup varies by version | `tn --as rahul` CLI fallback uses the same code path; Hermes moves to P1 if needed |
 | LLMs format commands badly | Generous date parsing; the gate replies with a correct example; `SKILL.md` has examples |
 | Switch's `main` branch moves fast | Pin Console 0.40.1, switch-core 0.31.0, `switch-agent-controller` 0.31.0; turn off controller self-update (`SWITCH_CONTROLLER_SELF_UPDATE=off`) |
