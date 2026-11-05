@@ -34,7 +34,8 @@ def parse_event(frame: dict[str, Any]) -> Event | None:
     payload = data["payload"]
     if not isinstance(payload.get("addressed"), bool):
         raise SwitchError("Message has no boolean addressed field")
-    # UNVERIFIED: older servers omit sender_kind. Never infer user/agent from a name.
+    # Core 0.31.0 emits null for ordinary senders and transport IDs, not participant UUIDs.
+    # Keep unknown explicit; authorization must resolve identity before trusting it.
     return Event(
         data["room_id"],
         payload["sender"],
@@ -407,6 +408,7 @@ class SwitchClient(Operations):
         self.max_backoff = max_backoff
         self.cursor: int | str = "head"
         self.rooms: list[str] = []
+        self.ready = asyncio.Event()
 
     @classmethod
     async def register(
@@ -492,6 +494,7 @@ class SwitchClient(Operations):
                             self.rooms = data["rooms"]
                             self.cursor = data["cursor"]
                             delay = self.backoff
+                            self.ready.set()
                         if "id" in frame:
                             self.cursor = frame["id"]
                         event = parse_event(frame)

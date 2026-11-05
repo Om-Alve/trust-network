@@ -64,3 +64,11 @@ async def test_reconnect():
         assert "start_from=0" in connections[1]
         await stream.aclose()
         await client.aclose()
+
+
+def test_live_null_kind_is_not_guessed():
+    frame = json.loads(Path("tests/data/switch_frames/live-message.json").read_text())
+    event = parse_event(frame)
+    assert event.sender_kind == "unknown"
+    assert event.sender_id.startswith("@switch-agent-")
+    assert event.addressed is False

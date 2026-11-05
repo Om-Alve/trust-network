@@ -1,0 +1,25 @@
+{
+  "event": "message",
+  "data": {
+    "type": "message",
+    "room_id": "411621c0-3752-4928-8cfe-8ac6035ec72d",
+    "bridge_id": null,
+    "channel_type": "channel_public",
+    "payload": {
+      "addressed": false,
+      "sender": "@switch-agent-0dc73efc:localhost",
+      "sender_name": "day0-rahul-envoy",
+      "sender_kind": null,
+      "on_behalf_of": null,
+      "message_id": "sw_01dfea5847d74c87935578bebb58047c",
+      "body": "DAY0_BETA",
+      "timestamp": 1793880447952,
+      "thread_id": null,
+      "attachments": [],
+      "opening_message": null,
+      "sender_role": null
+    },
+    "sequence": 9007194959773714
+  },
+  "id": 9007194959773714
+}

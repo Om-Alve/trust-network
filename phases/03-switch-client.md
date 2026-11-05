@@ -1,7 +1,7 @@
 ---
 id: "03"
 title: Switch protocol client + fake Switch
-status: blocked
+status: done
 priority: P0
 owner: agent
 depends_on: ["01"]
@@ -25,8 +25,8 @@ Read first: [Agent protocol](https://docs.switchagents.ai/switch-rooms/internals
 
 ## Done when
 - [x] `make check` passes, including tests for the fake.
-- [ ] Live: `uv run scripts/probe_post.py …` posts a message that appears in a room in Switch Console (and in `#om-home` once it exists). Evidence in *Log*.
-- [ ] A live event received by the client shows sender ID and `addressed` (sample frame saved under `tests/data/switch_frames/`). This also gives the first half of check 8.
+- [x] Live: `uv run scripts/probe_post.py …` posts a message that appears in a room in Switch Console (and in `#om-home` once it exists). Evidence in *Log*.
+- [x] A live event received by the client shows sender ID and `addressed` (sample frame saved under `tests/data/switch_frames/`). This also gives the first half of check 8.
 - [x] Every op name and payload shape used is checked against the protocol docs or source; any guess is marked `# UNVERIFIED` in code and listed in *Log* for phase 04.
 
 ## Commit
@@ -107,3 +107,19 @@ implements WebSocket too. Fixtures have explicit doc-derived provenance.
 - Fake management/document/history operations model only offline essentials,
   not controllers, provider execution, timestamp pagination or tool policy.
 - PLAN.md intentionally untouched per coordination instructions.
+
+### Live evidence, 2026-11-05
+
+- Core 0.31.0 installed source confirms the operation signatures and WebSocket path.
+- `probe_post.py` with `--room new --name day0-smoke2 --agent-type opencode` posted
+  `hello from trust-network`, event `sw_1727797529534f78832b507e118e0b9e`,
+  in `day0-post-smoke`. Gateway room read confirms Console access; no browser used.
+  `#om-home` remains phase 11 work.
+- Real frame saved as `tests/data/switch_frames/live-message.json`. Ordinary
+  sender_kind is null; sender is a transport mxid, not list_participants UUID.
+  Keep unknown rather than inventing an identity. Addressed is boolean.
+- Operations require an active WebSocket or return 409. Client exposes ready;
+  smoke probe now drains events and waits for connection_state before operations.
+- Remaining historical UNVERIFIED entries above are resolved by these live
+  observations and phase 04 findings. No credentials appear in fixtures.
+- `make check`: 57 files already formatted; All checks passed; 48 passed in 0.12s.
