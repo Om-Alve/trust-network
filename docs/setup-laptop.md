@@ -331,3 +331,68 @@ The exporter sets transaction-local app.tenant_id to Switch's tenant-zero UUID.
 Set TN_SWITCH_TENANT in the publisher environment for another tenant. The
 application role enforces row-level security; a column-only LIMIT 0 query does
 not exercise that policy.
+
+## One-machine judges' layout
+
+Start the local Switch server in Console, listening at `http://127.0.0.1:53330`.
+From the repository root:
+
+```sh
+uv sync --locked
+uv run python -m scripts.demo_up --one-machine --data-dir data/judges
+```
+
+The script creates missing users/keys through `switch_users.py`, reuses credentials
+in `data/day0-state.json` and `data/main-agents/`, copies missing example files,
+sets gate addressing, exports identities and prints three gate commands.
+Run each printed command in a separate terminal. The local exporter refreshes
+identity mappings; no VM, controller, Tailscale or publisher is required.
+Existing Tailscale Serve mappings can remain running.
+
+For CLI stand-ins for the two Hermes profiles, in another terminal:
+
+```sh
+export SWITCH_URL=http://127.0.0.1:53330
+export TN_DATA_DIR="$PWD/data/judges"
+uv run tn --as om dm rahul "Sunday bowling dinner"
+uv run tn --as om inbox
+uv run tn --as rahul inbox
+```
+
+Use `tn --as <person> dm-read`, `dm-post` and `answer` to drive each person.
+Phase 18 replaces those terminals with two Hermes Discord bots using `tn mcp`.
+No managed main agents or envoys are needed.
+
+Before resetting, stop all three gates and both Hermes inbox pollers. Then:
+
+```sh
+uv run python -m scripts.demo_reset --one-machine --data-dir data/judges --dry-run
+uv run python -m scripts.demo_reset --one-machine --data-dir data/judges
+```
+
+Reset archives demo DM/gift/ask/connection rooms, removes coordination state,
+ledgers, claims, cursors and share cards, and restores fixture calendars.
+It preserves keys, `.env`, facts and trust settings. Restart the printed gates.
+Without `--one-machine`, reset also clears the deployed VM Rahul profile over SSH;
+stop its user service first and restart it after resetting.
+
+Never run the same registration on two processes. On Om's existing deployment,
+stop the VM gate before a local Rahul run, and restore it afterwards:
+
+```sh
+ssh om@hermes.<tailnet>.ts.net systemctl --user stop rahul-gate.service
+# Run the local demo; stop the local Rahul gate when finished.
+ssh om@hermes.<tailnet>.ts.net systemctl --user start rahul-gate.service
+ssh om@hermes.<tailnet>.ts.net systemctl --user is-active rahul-gate.service
+```
+
+Repeatable live acceptance, with existing gates stopped:
+
+```sh
+PYTHONPATH=. uv run python tests/e2e_demo_bootstrap.py
+```
+
+It creates `data/phase22-<timestamp>/`, bootstraps, runs Scene 1 twice with a
+reset between runs, and retains `scene1-take1.json` and `scene1-take2.json`.
+Each artifact includes the transcript, both approvals, ledgers and calendars.
+

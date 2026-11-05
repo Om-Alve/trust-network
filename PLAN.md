@@ -78,7 +78,7 @@ Rahul and Priya are separate Switch users with their own registration keys. **Th
 - **Serve the switch-core port, not the Gateway's.** The controller calls `/v1/...` on switch-core. Console picks the ports, so find them with `docker ps`.
 - **Everything on the VM goes through the same address:** both Hermes profiles, their `tn mcp` instances, and `rahul-gate` (the `rahul-vm` controller enrollment stays, but nothing runs through it now).
 - **The laptop stays awake** during the demo (`caffeinate -dims`). The controller reconnects by itself if the link drops.
-- **Judges can run everything on one machine:** a second controller with its own `--data-dir`, over `localhost`, with no Tailscale. The README documents this layout.
+- **Judges can run everything on one machine:** all three gates and both Hermes CLI stand-ins against `http://127.0.0.1:53330`, using the local identity exporter, with no controller, VM or Tailscale. The README documents this layout.
 
 ### Rooms
 

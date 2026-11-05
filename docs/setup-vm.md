@@ -323,36 +323,12 @@ server, re-run step 3 and 4: `doctor` fails the same way the probe does.
 
 ---
 
-## 8. If check 2 fails: run Rahul's controller on the laptop
+## 8. One-machine fallback
 
-**[PLAN]** §8 check 2 fallback: "Rahul's controller runs on the laptop with its own
-`--data-dir`, over `localhost` (the judges' layout)." §2: a second controller with
-its own `--data-dir`, no Tailscale.
-
-On the **laptop** (not the VM):
-
-```sh
-export SWITCH_CONTROLLER_SELF_UPDATE=off
-switch-agent-controller --data-dir ~/.switch-rahul --server http://localhost:<switch-core-port>
-```
-
-- `--data-dir` and "over localhost" are PLAN.md's words; the exact spelling of the
-  server flag for this local run is **not** given. `--server` is reused from
-  check 3's `install.sh` line because PLAN.md uses that name there. Confirm with
-  `switch-agent-controller --help`.
-- The controller still has to be **Rahul's**: get the one-time code from
-  Gateway → Machines while signed in as Rahul, exactly as in step 6.1. PLAN.md §2
-  requires his envoy to run under his account, not Om's.
-- The `--data-dir` must be a fresh directory, so it does not collide with Om's
-  Console controller data.
-- No Tailscale in this layout; this is also the one-machine layout judges use,
-  which the README documents in phase 23.
-
-**Consequence PLAN.md does not spell out:** check 2's fallback moves only the
-controller. `rahul-gate` (phase 16) and Hermes (phase 18) also need to reach
-switch-core, so if the VM cannot reach the laptop they have to run on the laptop
-too, or phase 16 is cut (PLAN.md §9 cut lines). Record which you chose in
-`docs/day0.md` and in phase 16's *Log*.
+Use the [one-machine judges' layout](setup-laptop.md#one-machine-judges-layout).
+All three gates and both Hermes CLI stand-ins run locally against port 53330.
+No second controller, VM or Tailscale is needed. Stop the VM Rahul service
+before starting the same registration locally, then restore it afterwards.
 
 ---
 
