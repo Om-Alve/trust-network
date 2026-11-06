@@ -2,7 +2,7 @@
 people:
   om: friend
 consent:
-  default: direct            # Priya answers for herself
+  default: via-agent         # Priya answers through her own agent (Codex, phase 26)
 envoy:
   provider: opencode         # optional in the demo; her gate answers from facts
   machine: "<laptop machine name in Switch>"   # filled in by scripts/demo_up.py

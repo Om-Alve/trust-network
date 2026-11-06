@@ -32,7 +32,7 @@ async def run(args):
         client = SwitchClient(os.environ["SWITCH_URL"], credentials["id"], credentials["api_key"])
     # One connection per open room: Switch only delivers a room's addressed
     # messages to a session in that room (see trustnet/room_pool.py).
-    pool = RoomPool(client)
+    pool = RoomPool(client, name=args.person + "-gate")
     try:
         identities = IdentitySource(args.identity_map, args.identity_url)
 

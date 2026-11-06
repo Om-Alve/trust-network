@@ -16,10 +16,17 @@ events. Ways this can go wrong, and what the pool does about each:
   addressed to ``@x-gate`` waits (up to ``LIVE_WAIT`` s) until Switch reports that
   gate ``live`` in the room;
 - an anchor's stream fails → it's dropped and re-created on the next sync;
-- archived rooms keep connections open → the sync closes their anchors;
+- archived rooms keep connections open → the sync closes their anchors (only
+  for rooms its listing shows archived or past the cap: a room created after the
+  listing was fetched isn't in it, and must keep its fresh anchor);
 - Switch refuses a 33rd connection per agent, and a gate can be in many open
   rooms → only the newest ``MAX_ANCHORS`` open rooms are anchored (older ones are
-  released), so a new room never loses out to stale ones.
+  released), so a new room never loses out to stale ones;
+- another connection with the same agent key (a script, a second gate) connects
+  to a room → Switch moves the agent's session there, and when that connection
+  closes the gate has no session in the room → before each post, and every
+  ``HEAL_EVERY`` syncs for all anchors, the pool checks that Switch shows itself
+  ``live`` and reconnects the anchor if not.
 """
 
 from __future__ import annotations
@@ -38,6 +45,7 @@ SYNC_EVERY = 2.0
 #: Switch allows 32 connections per agent; leave room for the main one and for
 #: short-lived tool sessions (``tn`` runs under the gate key only to register).
 MAX_ANCHORS = 24
+HEAL_EVERY = 15
 _ADDRESSED_GATE = re.compile(r"@([a-z0-9][a-z0-9_-]*-gate)\b")
 
 
@@ -61,8 +69,10 @@ async def wait_until_live(client, room: str, body: str, timeout: float = LIVE_WA
 
 
 class RoomPool:
-    def __init__(self, main: SwitchClient):
+    def __init__(self, main: SwitchClient, name: str | None = None):
         self.main = main
+        self.name = name  # the agent's Switch name, as ``agent_statuses`` keys it
+        self._syncs = 0
         self.agent_id = main.agent_id
         self.ready = main.ready
         self.anchors: dict[str, SwitchClient] = {}
@@ -122,10 +132,15 @@ class RoomPool:
 
     async def sync(self) -> None:
         rooms = (await self.main.get_agent_detail(self.agent_id))["rooms"]
-        # Switch lists rooms oldest first; keep the newest open ones.
-        keep = [r["room_id"] for r in rooms if not r.get("archived")][-MAX_ANCHORS:]
+        # Switch lists rooms oldest first; keep the newest open ones. A room the
+        # listing doesn't show yet (created after it was fetched) is kept.
+        open_rooms = [r["room_id"] for r in rooms if not r.get("archived")]
+        keep = open_rooms[-MAX_ANCHORS:]
+        release = {r["room_id"] for r in rooms if r.get("archived")} | set(
+            open_rooms[:-MAX_ANCHORS]
+        )
         for room in list(self.anchors):
-            if room not in keep:
+            if room in release:
                 await self._drop(room)
         for room in reversed(keep):
             try:
@@ -133,10 +148,23 @@ class RoomPool:
             except Exception as exc:
                 LOG.warning("could not anchor %s: %s", room, type(exc).__name__)
 
+    async def heal(self, room: str) -> None:
+        """Reconnect the anchor for ``room`` if Switch shows no session for this agent."""
+        if self.name is None or room not in self.anchors:
+            return
+        statuses = (await self.main.get_room_detail(room) or {}).get("agent_statuses")
+        if statuses is not None and statuses.get(self.name) != "live":
+            LOG.warning("no session in %s; reconnecting", room)
+            await self.anchors[room].connect_to_room(room)
+
     async def _sync_forever(self) -> None:
         while True:
             try:
                 await self.sync()
+                self._syncs += 1
+                if self._syncs % HEAL_EVERY == 0:
+                    for room in list(self.anchors):
+                        await self.heal(room)
             except Exception as exc:
                 LOG.warning("room sync failed: %s", type(exc).__name__)
             await asyncio.sleep(SYNC_EVERY)
@@ -177,6 +205,7 @@ class RoomPool:
 
     async def post_message(self, body: str, thread_id: str | None = None) -> Any:
         if self.current is not None:
+            await self.heal(self.current)
             await wait_until_live(self.main, self.current, body)
         return await self._here().post_message(body, thread_id)
 

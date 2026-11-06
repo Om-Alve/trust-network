@@ -269,6 +269,15 @@ def _build_parser() -> argparse.ArgumentParser:
         sub.set_defaults(handler=_cmd_dm)
     mcp = commands.add_parser("mcp", parents=[common], help="run the personal MCP server")
     mcp.set_defaults(handler=_cmd_mcp)
+    wake = commands.add_parser(
+        "wake", parents=[common], help="run any CLI agent as this person's agent"
+    )
+    agent = wake.add_mutually_exclusive_group(required=True)
+    agent.add_argument("--agent", choices=["codex"], help="a known agent CLI")
+    agent.add_argument("--cmd", help="any agent command: prompt on stdin, reply on stdout")
+    wake.add_argument("--model", default="gpt-6.1-sol", help="model for --agent codex")
+    wake.add_argument("--every", type=float, default=15.0, help="seconds between watches")
+    wake.set_defaults(handler=_cmd_wake)
     return parser
 
 
@@ -674,6 +683,12 @@ def _cmd_mcp(context, args):
     from trustnet.tn import mcp
 
     return mcp.main(["--as", context.owner()])
+
+
+def _cmd_wake(context, args):
+    from trustnet.tn import wake
+
+    return wake.main(context.owner(), args)
 
 
 def _cmd_personal(context, args):

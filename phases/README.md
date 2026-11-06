@@ -56,6 +56,7 @@ Front matter is the single source of truth for status. The index table below has
 | 23 | [README and fresh-clone test](23-readme-and-fresh-clone.md) | P0 | human + agent | 22 | Nov 7 afternoon |
 | 24 | [Video and submission](24-video-and-submission.md) | P0 | human | 23 | Nov 7, submit by 20:00 IST |
 | 25 | [P2 stretch goals](25-p2-stretch.md) | P2 | agent | 18 | only if time is left |
+| 26 | [Agent protocol: spec, gate handshake, any-agent runner](26-agent-protocol.md) | P1 | agent | 18 | Nov 6 afternoon |
 
 ## Dependency graph
 
@@ -74,7 +75,7 @@ Layer 7  14 DM rooms (main agents) ← 11,12
 Layer 8  15 consent, Scene 1 via CLI ← 14,10
 Layer 9  16 VM ← 15   17 tn mcp ← 15   20 ask-around ← 15   22 demo bootstrap ← 15
 Layer 10 18 Hermes ← 17   19 gifts ← 15,17   23 README ← 22
-Layer 11 24 video + submit ← 23   25 P2 ← 18
+Layer 11 24 video + submit ← 23   25 P2 ← 18   26 agent protocol ← 18
 ```
 
 **Critical path to P0 (Scene 1):** 01 → 03 → 04 → 11 → 12 → 14 → 15 → 17 → 18 → 22 → 23 → 24.

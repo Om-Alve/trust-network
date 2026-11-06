@@ -146,7 +146,7 @@ async def handle(gate, event, command, sender, mode):
     elif set(votes) == {person, friend} and all(v[0] for v in votes.values()):
         item["status"] = "confirmed"
         labels = " · ".join(
-            f"{p.title()} ✅ " + ("via Hermes" if votes[p][1] == "via-agent" else "direct")
+            f"{p.title()} ✅ " + ("via agent" if votes[p][1] == "via-agent" else "direct")
             for p in sorted(votes)
         )
         text = f"✅ {ref}: {item['card']} · {labels}"

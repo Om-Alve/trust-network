@@ -34,10 +34,12 @@ done
 ssh "$VM" 'systemctl --user start rahul-gate'
 sleep 8
 
-env SWITCH_URL="$SU" TN_DATA_DIR="$PWD/data/profiles" TN_STATE_DIR="$PWD/data" \
-  .venv/bin/tn --as om --json inbox >/dev/null
-env SWITCH_URL="$SU" TN_DATA_DIR="$PWD/data/profiles" TN_STATE_DIR="$PWD/data" \
-  .venv/bin/tn --as om --json watch >/dev/null
+for p in om priya; do
+  for step in inbox watch; do
+    env SWITCH_URL="$SU" TN_DATA_DIR="$PWD/data/profiles" TN_STATE_DIR="$PWD/data" \
+      .venv/bin/tn --as "$p" --json "$step" >/dev/null
+  done
+done
 ssh "$VM" "cd ~/trust-network && env $VM_ENV .venv/bin/tn --as rahul --json inbox >/dev/null && env $VM_ENV .venv/bin/tn --as rahul --json watch >/dev/null"
 
 hermes -p om cron resume "$OM_JOB" >/dev/null

@@ -159,6 +159,13 @@ class Gate:
             return
         if not decision:
             if own_side:
+                if decision.code is DenialCode.CONSENT_MODE:
+                    # Say why, or the agent reports a yes that was never recorded.
+                    ref = getattr(command, "reference", None) or getattr(command, "proposal_id", "")
+                    await self.client.post_message(
+                        f"{ref} not recorded: {_display(self.person)} answers this directly"
+                        f" (consent is set to direct), not through an agent."
+                    )
                 return
             if decision.code is DenialCode.UNKNOWN_COMMAND:
                 await self.client.post_message(COMMAND_LIST)

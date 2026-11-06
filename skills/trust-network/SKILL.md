@@ -38,7 +38,8 @@ and no files; these tools are all you need.
 
 1. Call `dm(friend, goal)` with your person's own words as the goal.
 2. Call `inbox` until the DM room and your **share card** arrive. The card lists
-   what this friend's level lets you say about your person.
+   what this friend's level lets you say about your person. If it hasn't arrived
+   yet, end your turn; you'll be woken when it does. Never ask for it in the room.
 3. Plan in plain language with `dm_read` / `dm_post`. Say only what the card
    allows. Nothing else stops you from saying more, so this is on you.
    Open with **one** message (your person's idea, when they're free, the budget)

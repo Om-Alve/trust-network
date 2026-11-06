@@ -217,27 +217,27 @@ def test_every_command_example_parses(profile: Profile, om_trust: TrustList) -> 
     text, _ = build_brief(profile, om_trust, "rahul", ROOM, GOAL, DAYS)
     examples = COMMAND_RE.findall(text)
 
-    assert len(examples) == 5
+    assert len(examples) == 2
     parsed = [commands.parse(example) for example in examples]
     kinds = [type(command) for command in parsed]
-    assert kinds.count(commands.AskOwner) == 1
-    assert kinds.count(commands.Propose) == 2
-    assert kinds.count(commands.Counter) == 2
-    assert {command.target for command in parsed} == {"om-gate", "rahul-gate"}
+    assert kinds == [commands.AskOwner, commands.Propose]
+    assert {command.target for command in parsed} == {"om-gate"}
 
     ask = next(command for command in parsed if isinstance(command, commands.AskOwner))
     assert ask.question_id == "Q1"
     assert str(ask.question) == '"Is ₹1,500 per person okay?"'
 
 
-def test_command_examples_use_the_friends_gate(profile: Profile, om_trust: TrustList) -> None:
+def test_command_examples_never_address_the_friends_gate(
+    profile: Profile, om_trust: TrustList
+) -> None:
+    # Proposals go through your own gate only, which forwards them; a card that
+    # @-mentions the friend's gate also makes Switch flag it in the home room.
     text, _ = build_brief(profile, om_trust, "priya", "dm-om-priya-sat", GOAL, DAYS)
-    examples = COMMAND_RE.findall(text)
 
-    assert "@priya-gate propose" in text
-    assert "@priya-gate counter" in text
+    assert "@priya-gate" not in text
     assert "@rahul-gate" not in text
-    assert {commands.parse(example).target for example in examples} == {"om-gate", "priya-gate"}
+    assert "@om-gate propose" in text
 
 
 # --------------------------------------------------------------------------

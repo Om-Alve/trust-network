@@ -1,0 +1,72 @@
+---
+id: "26"
+title: Agent protocol — spec, gate handshake, any-agent runner
+status: in-progress
+priority: P1
+owner: agent
+depends_on: ["18"]
+plan_refs: ["§3 Rules and commands", "§9 Cut lines"]
+target: Nov 6 afternoon
+---
+
+# 26 · Agent protocol — spec, gate handshake, any-agent runner
+
+## Goal
+Turn trust-network from "two Hermes bots" into an agent-to-agent protocol any agent can speak:
+a written spec, a versioned handshake between gates, and proof that different agent
+frameworks plan together (Om's Hermes ↔ Priya's Codex) with the same consent rules.
+
+Added 2026-11-06 at Om's request ("turn it into a complete agent-to-agent communication
+solution"); scope chosen: spec + handshake + a second framework.
+
+## Tasks
+- [ ] `PROTOCOL.md`: roles (person, agent, gate), transport (Switch rooms), identity, rooms,
+  the full message grammar, flows (plan, consent, questions, gifts, ask-around), security
+  properties, versioning, and how to bring a new agent framework.
+- [ ] Gate handshake: `hello trust-network/<major> <capabilities>` exchanged in the gates'
+  connection room; a gate refuses to open or join a planning room with a peer gate that hasn't
+  said a compatible hello.
+- [x] `tn wake`: an agent-agnostic runner. Polls `tn watch`, wakes any CLI agent on news, and
+  lets the person talk to their agent in the same terminal. Preset for Codex.
+- [x] Priya's agent runs on Codex through `tn mcp` (`examples/priya/agent.md` persona).
+- [x] E2E: Om's Hermes plans with Priya's Codex agent; both people say yes; confirmed on both
+  sides; artifact in `data/`.
+
+## Done when
+- [ ] `make check` passes.
+- [x] A Hermes ↔ Codex plan is confirmed end to end, with both people's yes; transcript saved.
+- [ ] A gate without a compatible hello is refused (test).
+
+## Commit
+`phase 26: <item>`
+
+## Log
+<!-- evidence, deviations, notes -->
+- Switch sets an agent's profile (`description`) only at registration (`register-known` →
+  409 for an existing name; `update_agent_detail` on itself → 403), so gates can't publish a
+  card on their profile. The card is exchanged as a `hello` handshake instead.
+- The agent slot keeps the Switch name `<person>-hermes` whatever framework fills it
+  (renaming would re-register both live Hermes); the spec calls it the person's agent.
+- Codex: `codex exec` refuses MCP tool calls unless the server sets
+  `default_tools_approval_mode="approve"` (passed with `-c`, user config ignored).
+- **Hermes ↔ Codex E2E passed — 2026-11-06 14:44 IST.** `tn --as priya wake --agent codex`
+  (gpt-6.1-sol) as Priya; Om's Hermes (om profile) as Om. Om's Hermes opened the room; Priya's
+  agent offered Mon 9 Nov 19:30 and asked for a venue; Om's offered Dialogues ₹700–900; Priya's
+  narrowed it to ₹700–800; Om's agreed and proposed P1 through om-gate, forwarded to priya-gate.
+  Priya typed `yes` in her terminal, Om said yes to his Hermes. Both home rooms:
+  `✅ P1: 2026-11-09T19:30:00+05:30 120m "Board games evening" @ "Dialogues, Koramangala" · Om ✅ via Hermes · Priya ✅ via Hermes`;
+  both calendars have it. Artifact: `data/phase26-hermes-codex-20261106-1444.txt`.
+- Bugs the E2E found, fixed in this commit:
+  - Pool: a sync whose room listing predates a new room released that room's fresh anchor, so
+    posts fell back to the main connection's room. Now only rooms the listing shows archived or
+    past the cap are released.
+  - Pool: a script connecting with a gate's key moved the gate's room session; when it closed the
+    gate had none (`no_session`, posts failed). The pool now checks itself `live` before posting
+    and every 30 s, and reconnects.
+  - A refused own-side answer (consent set to `direct`) was silent, so Priya's agent reported a
+    yes that was never recorded. The gate now says why in the room.
+  - The share card still told agents to propose through both gates and named the friend's gate
+    (`@priya-gate …`), which Switch flagged in the home room. It now says own gate only.
+  - The confirmation said "via Hermes" for any agent; now "via agent".
+- Deviation: Priya's example consent default `direct` → `via-agent` (she now has an agent and
+  no Switch user to answer directly from).
