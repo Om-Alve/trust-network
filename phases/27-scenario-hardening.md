@@ -1,7 +1,7 @@
 ---
 id: "27"
 title: Scenario hardening — many end-to-end scenarios, refined by Codex and DeepSeek
-status: in-progress
+status: done
 priority: P1
 owner: agent
 depends_on: ["26"]
@@ -29,12 +29,12 @@ Two areas, worked in parallel on separate branches, then merged:
 - [x] A: scenarios written down (failure modes first), run in-process on `FakeSwitch` with the
   real gate code, bugs fixed, `PROTOCOL.md` kept true.
 - [x] B: the same for its area.
-- [ ] Merged; live re-check of Scene 1 on the real Switch.
+- [x] Merged; live re-check of Scene 1 on the real Switch.
 
 ## Done when
-- [ ] `make check` passes on the merged branch.
-- [ ] Every scenario in both lists has a test or a written reason it can't have one.
-- [ ] Scene 1 still passes live after the merge.
+- [x] `make check` passes on the merged branch.
+- [x] Every scenario in both lists has a test or a written reason it can't have one.
+- [x] Scene 1 still passes live after the merge.
 
 ## Commit
 `phase 27: <item>`
@@ -274,4 +274,19 @@ artifacts: data/scenarios-facts-1793962935521588000
 ```
 
 `make check`: ruff format and lint clean, 501 tests passed.
+
+### Merge and live re-check
+- Merged A (`t3/planning-consent-hardening`) then B (`t3/phase-27-facts-gifts`) into main with no
+  conflicts. Also: `demo_reset` now clears `room-watches/` (A's persisted room limits).
+- `make check`: **509 passed**. `scripts/e2e_planning_scenarios.py` 8/8 PASS,
+  `scripts.e2e_facts_scenarios` 10/10 PASS on the merged tree.
+- Live Scene 1, 2026-11-06 16:35–16:47 IST, merged code on the laptop gates and the VM
+  (`scene_reset.sh --deploy`), cron delivery set to `local` for the run and restored to
+  `discord` after. Om's Hermes opened the room; Rahul's moved it to 9pm (booked until 8:30);
+  Om's proposed P1 `2026-11-08T21:00 120m "Bowling rematch" @ "Smaaash, Indiranagar"`; both
+  said yes; both gates `confirmed` with `via-agent` votes; both calendars have it. No spurious
+  `Not recorded` / `Not allowed` refusals. Artifact: `data/phase27-scene1-live-20261106-1647.txt`.
+- Harness note (not a product bug): a `hermes chat -t skills,todo,memory,session_search` run
+  has no trust-network tools; Hermes looped 290 messages searching memory until its provider
+  rate-limited (429). Drive Hermes without `-t`.
 
