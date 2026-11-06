@@ -8,7 +8,7 @@ from pathlib import Path
 
 from trustnet.gate.commands import Answer, Dm, Quoted
 from trustnet.gate.dm import main_agent
-from trustnet.gate.facts import REPO_ROOT, resolve_data_dir
+from trustnet.gate.facts import REPO_ROOT, load_trust, resolve_data_dir
 from trustnet.room_pool import wait_until_live
 from trustnet.switch_client import SwitchClient, SwitchError
 
@@ -101,7 +101,7 @@ async def watch(person):
             ]
             if not messages:
                 continue
-            latest = max(messages, key=lambda m: m["timestamp"])
+            latest = max(messages, key=lambda m: m.get("timestamp", 0))
             newest[rid] = latest["id"]
             if latest["id"] != last.get(rid) and latest.get("sender_name") != main_agent(person):
                 updates.append(
@@ -118,19 +118,37 @@ async def watch(person):
     return {"inbox_unread": len(unread), "dm_updates": updates}
 
 
+def known_friend(person: str, friend: str) -> str:
+    """Return a listed friend's key.
+
+    The gate silently ignores a `dm` for someone not on the trust list, so the
+    tool refuses it here instead: an agent that gets an event id back would
+    wait forever for a room that will never open.
+    """
+    key = Dm(person=friend, goal=Quoted("Friend check")).person
+    if load_trust(person).level_for(key) is None:
+        raise SwitchError(f"no friend named {key}; add them to {person}'s trust list first")
+    return key
+
+
 async def answer(person, id, text):
     """Send an answer as the registered Hermes; the gate authenticates consent."""
     command = Answer(reference=id, text=Quoted(text))
+    if command.reference.startswith("P") and command.text.text.strip().lower() not in {
+        "yes",
+        "no",
+    }:
+        raise ValueError('a proposal answer must be "yes" or "no"')
     async with session(person) as client:
         await client.connect_to_room(await home(person, client))
         return await client.post_message(
-            f"@{person}-gate answer {command.reference} {json.dumps(text, ensure_ascii=False)}"
+            f"@{person}-gate answer {command.reference} {command.text}"
         )
 
 
 async def dm(person, friend, goal):
     """Request a DM through the owner's gate from their home membership."""
-    command = Dm(person=friend, goal=Quoted(goal))
+    command = Dm(person=known_friend(person, friend), goal=Quoted(goal))
     async with session(person) as client:
         await client.connect_to_room(await home(person, client))
         return await client.post_message(f"@{person}-gate dm {command.person} {command.goal}")
@@ -161,7 +179,7 @@ async def ask(person: str, friend: str, fields: list[str]):
     from trustnet.gate.commands import Ask
 
     command = Ask(facts=tuple(fields))
-    friend = Dm(person=friend, goal=Quoted("Facts request")).person
+    friend = known_friend(person, friend)
     await dm(person, friend, "Facts request")
     pair = "-".join(sorted((person, friend)))
     async with session(person) as client:
@@ -186,7 +204,7 @@ async def ask(person: str, friend: str, fields: list[str]):
 async def _gift(person, friend, action, **values):
     import uuid
 
-    friend = Dm(person=friend, goal=Quoted("Gift request")).person
+    friend = known_friend(person, friend)
     token = uuid.uuid4().hex
     request = {"friend": friend, "token": token, "action": action, **values}
     async with session(person) as client:

@@ -190,6 +190,9 @@ see:
 - `<ref> not recorded: <Person> answers this directly (consent is set to direct), not through an agent.`
 - `join-dm refused: <reason>.` (section 6)
 - In the owner's home room: `✅ P1: <card> · Om ✅ via agent · Priya ✅ via agent`, or `❌ P1 declined`.
+- `<value>` is the readable form, not a language literal: a list is `a, b`, a
+  mapping is `key: value, key: value`, and a wishlist entry with a price is
+  `item (≈₹2,500)`. `view-as` renders the same value the same way.
 
 ## 6. Handshake and versioning
 
@@ -370,11 +373,14 @@ Agents never put gift traffic in a planning room; they use `gift_ideas` and
 3. The recipient's ledger entry is sealed until the day after the occasion.
 4. `claim "<item>"` in the same room marks an item taken. Claims are hidden from
    the recipient's own view of their wishlist until after the occasion, and
-   marked taken for other askers.
+   marked taken for other askers. The owner's own `ask` and `view-as` drop a
+   claimed item until that day; a friend's `ask` returns the wishlist unchanged
+   and never says which item was claimed.
 5. The asker's gate relays the result to its home as `gift-result <token> {...}`;
    the room is archived on a claim or after 10 minutes.
 6. In a gift room, `ask` is refused, overreach is logged and not posted home,
-   and no consent relay runs.
+   and no consent relay runs. A malformed command there is ignored: no reply,
+   no owner note, and nothing raised out of the gate's dispatch loop.
 
 The seal is a courtesy: workspace admins can read rooms.
 
@@ -389,8 +395,9 @@ The seal is a courtesy: workspace admins can read rooms.
 3. Each friend's gate accepts it only from the friend's own gate in
    `conn-<pair>`. It replies on its own, from facts at that level: the `has`
    and `recommends` facts, prefixed `Profile lists, no lending promise:`.
-   It also puts a local `A<ns2>` question in its owner's home so the person
-   can answer in their own words.
+   A reply longer than 140 characters is cut short with `…` rather than
+   dropped. It also puts a local `A<ns2>` question in its owner's home so the
+   person can answer in their own words.
 4. Replies arrive as `answer A<ns> "<text>"` in the same conn room. The asker's
    gate accepts one per friend, before expiry, and posts the collected answers
    in home. Each reply is ledgered.
@@ -464,6 +471,11 @@ You need two things.
    `inbox`, `answer`, `dm`, `dm_read`, `dm_post`, `ask_around`, `cal_add`,
    `fact_set`, `ask`, `gift_ideas`, `claim`. The tool descriptions are the
    agent's instructions; the skill text is `skills/trust-network/SKILL.md`.
+   A tool that names a friend (`dm`, `ask`, `gift_ideas`, `claim`) refuses a
+   name that is not on the person's trust list, instead of posting a command
+   the gate would silently ignore. `answer` refuses a `P<n>` text other than
+   yes or no, and `fact_set` only tightens. These checks are local; the gate
+   still enforces the same rules on the message.
 2. **Something that wakes the agent.** An agent only acts when it gets a
    message, and nothing in Switch sends one when the other side replies. Poll
    `tn --as <person> watch`: it reports unread home items and each DM room whose

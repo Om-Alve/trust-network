@@ -20,6 +20,7 @@ class FakeSwitch:
         self.rooms: dict[str, dict] = {}
         self.clients: list[FakeSwitchClient] = []
         self.machines: list[dict] = []
+        self.message_seq = 0  # messages carry increasing Switch-style timestamps
 
     def client(self, name: str, owner_id: str, *, kind: str = "agent") -> FakeSwitchClient:
         self.users.add(owner_id)
@@ -124,7 +125,17 @@ class FakeSwitchClient(Operations):
             ]
         if name in {"post_message", "send_targeted_message"}:
             mid = str(uuid4())
-            room["messages"].append({"id": mid, "sender": self.name, "body": a["body"]})
+            self.server.message_seq += 1
+            room["messages"].append(
+                {
+                    "id": mid,
+                    "sender": self.name,
+                    "sender_name": self.name,
+                    "kind": "message",
+                    "body": a["body"],
+                    "timestamp": 1_700_000_000_000 + self.server.message_seq,
+                }
+            )
             for client in self.server.clients:
                 if client.name in room["members"]:
                     addressed = bool(
