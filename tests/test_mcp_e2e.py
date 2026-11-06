@@ -448,16 +448,19 @@ async def test_mcp_stdio_end_to_end(tmp_path, monkeypatch):
                         )
                         assert ok
                         assert gifts["suggestions"] == [
-                            {"item": "Catan Seafarers", "price": 2500},
+                            {"item": "Lego Millennium Falcon", "price": 2500},
                             {"item": "Hario V60", "price": 2000},
                         ]
                         ok, claimed = await _call(
                             rahul,
                             artifact["calls"],
                             "claim",
-                            {"friend": "om", "item": "Catan Seafarers"},
+                            {"friend": "om", "item": "Lego Millennium Falcon"},
                         )
-                        assert ok and claimed == {"status": "claimed", "item": "Catan Seafarers"}
+                        assert ok and claimed == {
+                            "status": "claimed",
+                            "item": "Lego Millennium Falcon",
+                        }
                         assert switch.rooms[homes["om"]]["messages"] == before
                         gift_rooms = [
                             r
@@ -481,9 +484,11 @@ async def test_mcp_stdio_end_to_end(tmp_path, monkeypatch):
                             person="om", now=datetime(2026, 11, 20, tzinfo=TIME_ZONE)
                         )
                         assert "1 sealed entry, opens Nov 21" in sealed
-                        assert "Catan Seafarers" not in json.dumps(
+                        assert "Lego Millennium Falcon" not in json.dumps(
                             surprise.owner_value(
-                                "om", "wishlist", [{"item": "Catan Seafarers", "price": 2500}]
+                                "om",
+                                "wishlist",
+                                [{"item": "Lego Millennium Falcon", "price": 2500}],
                             )
                         )
                         opened = ledger.format_ledger(
@@ -502,7 +507,7 @@ async def test_mcp_stdio_end_to_end(tmp_path, monkeypatch):
                             },
                         )
                         assert ok and other["taken"] == [
-                            {"item": "Catan Seafarers", "status": "taken"}
+                            {"item": "Lego Millennium Falcon", "status": "taken"}
                         ]
                         artifact["gift"] = {
                             "ideas": gifts,

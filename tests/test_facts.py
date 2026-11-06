@@ -78,7 +78,7 @@ def test_om_matches_the_plan() -> None:
     assert profile.facts["address"].level is Level.PRIVATE
     assert profile.facts["wishlist"].level is Level.CLOSE
     assert profile.facts["wishlist"].value == [
-        {"item": "Catan Seafarers", "price": 2500},
+        {"item": "Lego Millennium Falcon", "price": 2500},
         {"item": "Hario V60", "price": 2000},
         {"item": "Kindle Paperwhite", "price": 14000},
     ]

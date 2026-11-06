@@ -187,36 +187,36 @@ def test_the_window_is_india_time_even_from_a_naive_now(
 
 
 def test_a_claim_is_hidden_until_its_reveal_day(profile: Profile, om_trust: TrustList) -> None:
-    claim = Claim("Catan Seafarers", date(2026, 11, 21))
+    claim = Claim("Lego Millennium Falcon", date(2026, 11, 21))
 
     before = view_as(profile, om_trust, "rahul", now=NOW, claims=[claim])
     assert [item["item"] for item in before.visible_values["wishlist"]] == [
         "Hario V60",
         "Kindle Paperwhite",
     ]
-    assert "Catan" not in before.render()
+    assert "Lego" not in before.render()
 
     after = view_as(
         profile, om_trust, "rahul", now=datetime(2026, 11, 21, 9, 0, tzinfo=IST), claims=[claim]
     )
     assert [item["item"] for item in after.visible_values["wishlist"]] == [
-        "Catan Seafarers",
+        "Lego Millennium Falcon",
         "Hario V60",
         "Kindle Paperwhite",
     ]
-    assert "Catan Seafarers" in after.render()
+    assert "Lego Millennium Falcon" in after.render()
 
 
 def test_a_claim_matches_case_insensitively(profile: Profile, om_trust: TrustList) -> None:
-    claim = Claim("  catan seafarers ", date(2026, 11, 21))
+    claim = Claim("  lego millennium falcon ", date(2026, 11, 21))
     view = view_as(profile, om_trust, "rahul", now=NOW, claims=[claim])
-    assert "Catan Seafarers" not in view.render()
+    assert "Lego Millennium Falcon" not in view.render()
 
 
 def test_a_claim_leaves_other_facts_alone(
     rahul_view, profile: Profile, om_trust: TrustList
 ) -> None:
-    claim = Claim("Catan Seafarers", date(2026, 11, 21))
+    claim = Claim("Lego Millennium Falcon", date(2026, 11, 21))
     view = view_as(profile, om_trust, "rahul", now=NOW, claims=[claim])
     assert view.visible_values["diet"] == rahul_view.visible_values["diet"]
     assert view.visible_values["sizes"] == rahul_view.visible_values["sizes"]
@@ -241,7 +241,7 @@ def test_priya_render_hides_close_facts_without_hiding_the_rows(priya_view) -> N
     text = priya_view.render()
     assert "view-as priya — friend" in text
     assert "❌ wishlist" in text
-    assert "Catan Seafarers" not in text
+    assert "Lego Millennium Falcon" not in text
     assert "✅ interests" in text
 
 

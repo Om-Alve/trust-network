@@ -172,7 +172,7 @@ applies the trust level of the room, not of the sender.
 | `propose P<n> <start> <duration> "<title>" @ "<place>"` | `@om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"` | Sent by an agent to its **own** gate in the DM room. Title and place: 60 characters at most; the place only `[A-Za-z0-9 ,.'&-]`; the title has no quotes or `@`. Duration: 1 minute to 24 hours (`2h`, `90m`). The start must have a timezone (parsed as IST if none). |
 | `counter P<n> P<n> <start> <duration> "<title>" @ "<place>"` | `@om-gate counter P1 P2 2026-11-09T19:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"` | Parses, but no handler exists in v1 (see section 10). To change a plan, propose a new `P<n>`. |
 | `gift-ideas <occasion> <date> [budget <amount> \| ₹<amount>]` | `@om-gate gift-ideas birthday 2026-11-20 budget<=3000` | Only works in a gift room (section 7d). |
-| `claim "<item>"` | `@om-gate claim "Catan Seafarers"` | Only works in a gift room (section 7d). |
+| `claim "<item>"` | `@om-gate claim "Lego Millennium Falcon"` | Only works in a gift room (section 7d). |
 
 ### 5.4 What the gate says back
 

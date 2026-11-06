@@ -233,7 +233,7 @@ async def gifts_and_claims(base: Path) -> dict:
                 first["suggestions"]
                 == second["suggestions"]
                 == [
-                    {"item": "Catan Seafarers", "price": 2500},
+                    {"item": "Lego Millennium Falcon", "price": 2500},
                     {"item": "Hario V60", "price": 2000},
                 ]
             )
@@ -241,17 +241,17 @@ async def gifts_and_claims(base: Path) -> dict:
                 {"item": "Kindle Paperwhite", "price": 14000, "status": "over budget"}
             ]
 
-            claimed = await personal.claim("rahul", "om", "Catan Seafarers")
+            claimed = await personal.claim("rahul", "om", "Lego Millennium Falcon")
             assert claimed["status"] == "claimed"
             try:
-                await personal.claim("priya", "om", "Catan Seafarers")
+                await personal.claim("priya", "om", "Lego Millennium Falcon")
             except SwitchError as exc:
                 second_claim = str(exc)
                 assert "Item unavailable" in second_claim
             else:  # pragma: no cover
                 raise AssertionError("two askers claimed the same item")
             third = await personal.gift_ideas("priya", "om", "birthday", OCCASION, 3000)
-            assert third["taken"] == [{"item": "Catan Seafarers", "status": "taken"}]
+            assert third["taken"] == [{"item": "Lego Millennium Falcon", "status": "taken"}]
             assert [item["item"] for item in third["suggestions"]] == ["Hario V60"]
             assert world.home_bodies("om") == home_before
 

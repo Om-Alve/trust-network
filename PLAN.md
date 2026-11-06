@@ -150,7 +150,7 @@ facts:
   recommends:    {value: {dentist: "Dr. Rao, 12th Main"},   level: friend}
   neighbourhood: {value: Indiranagar,                       level: close}
   sizes:         {value: {tshirt: M},                       level: close}
-  wishlist:      {value: [Catan Seafarers, Kindle Paperwhite, Hario V60], level: close}
+  wishlist:      {value: [Lego Millennium Falcon, Kindle Paperwhite, Hario V60], level: close}
   address:       {value: "…",                               level: private}   # never shared
 ```
 
@@ -190,7 +190,7 @@ facts:
 @om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"
 @om-gate counter P1 P2 2026-11-09T19:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"
 @om-gate gift-ideas birthday 2026-11-20 budget<=3000     → wishlist with 'taken' flags (close), interests (friend)
-@om-gate claim "Catan Seafarers"                         → hidden from Om until after the 20th
+@om-gate claim "Lego Millennium Falcon"                         → hidden from Om until after the 20th
 @om-gate ask-around "tent to borrow, Nov 14-16"          → gate-to-gate only
 ```
 
@@ -236,13 +236,13 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 1. **Rahul tells his own Hermes, on Discord:** "Om's birthday is the 20th. Gift ideas under ₹3k?"
 2. **`rahul-hermes`** calls `gift_ideas(om, birthday, 2026-11-20, 3000)` over `tn mcp` (acting as `rahul-hermes`), which acts through `rahul-gate`.
 3. **`rahul-gate`** creates `gift-rahul-om-bday` (agent-only, private) with `om-gate` and sends `@om-gate gift-ideas birthday 2026-11-20 budget<=3000`.
-4. **`om-gate` answers from stored facts only. It never asks Om.** Rahul is close, so: `wishlist: Catan Seafarers (≈₹2,500), Hario V60 (≈₹2,000), Kindle Paperwhite (over budget) · interests: board games, sci-fi · sizes: tshirt M`.
-5. **`rahul-hermes` suggests Catan Seafarers. Rahul:** "get that." `rahul-hermes` calls `claim(om, "Catan Seafarers")` over `tn mcp`.
+4. **`om-gate` answers from stored facts only. It never asks Om.** Rahul is close, so: `wishlist: Lego Millennium Falcon (≈₹2,500), Hario V60 (≈₹2,000), Kindle Paperwhite (over budget) · interests: board games, sci-fi · sizes: tshirt M`.
+5. **`rahul-hermes` suggests Lego Millennium Falcon. Rahul:** "get that." `rahul-hermes` calls `claim(om, "Lego Millennium Falcon")` over `tn mcp`.
 6. **Om's home stays quiet:**
    - his home surface (his own Hermes on Discord, or `#om-home`) shows nothing;
-   - his own wishlist hides claimed Catan until Nov 21;
+   - his own wishlist hides claimed Lego set until Nov 21;
    - `@om-gate ledger` (or asking his Hermes) shows "1 sealed entry, opens Nov 21".
-7. **Optional beat:** another close asker sees "Catan Seafarers: taken". Priya at friend level receives interests only.
+7. **Optional beat:** another close asker sees "Lego Millennium Falcon: taken". Priya at friend level receives interests only.
 
 *Being honest about the seal:* it's a courtesy seal. The ledger file is on Om's own laptop, like a wrapped present he could open early.
 
@@ -418,7 +418,7 @@ resolve server identities before authorizing commands. See docs/day0.md.
 | 0:00 | **Hook.** Everyone has an agent now; they can't work together without oversharing. Instinct's answer is one vendor whose agent enforces its own rules. Ours: bring any agent, and the rules live in code. | Title, one line on Instinct |
 | 0:15 | **Cast.** Om on his own Hermes, in Discord — the agent that DMs Rahul's Hermes directly. Rahul on his own Hermes, a second Discord bot/account, also acting in Switch. Priya's gate. Trust: Rahul close, Priya friend. One VM hosts both people's Hermes. | Discord (two bots/accounts) + Console + `trust.yaml` + Gateway Machines page |
 | 0:30 | **Outing.** Om dictates to his Hermes on Discord. The two Hermes DM each other directly, visible in Switch Console. Rahul's Hermes asks him about budget right there on Discord, P1 is proposed, Om tells his Hermes "yes", Rahul tells his Hermes "yes". Then "Om ✅ via Hermes · Rahul ✅ via Hermes", and both calendars update. | Split: Discord / Console |
-| 1:35 | **Gift.** Rahul tells his own Hermes to ask for ideas, gets the wishlist, claims Catan. Om's side stays silent; `ledger` shows "1 sealed entry, opens Nov 21". | Console, then Discord |
+| 1:35 | **Gift.** Rahul tells his own Hermes to ask for ideas, gets the wishlist, claims the Lego set. Om's side stays silent; `ledger` shows "1 sealed entry, opens Nov 21". | Console, then Discord |
 | 2:05 | **Ask around.** Om asks his Hermes "anyone have a tent?" on Discord. Priya's gate answers instantly; Rahul's Hermes asks him on Discord and he says no. | Discord + Console |
 | 2:25 | **Overreach.** Rahul tells his Hermes to find out Om's address, gets "not shared", and an alert reaches Om via his own Hermes on Discord. `view-as rahul`. | Discord + Console |
 | 2:45 | **Close.** Room map, three-factor table, "we wrote zero AI agents", Switch features. | Slides |

@@ -18,7 +18,7 @@ Only state these facts, in your own words. Do not add, guess or infer anything e
 - **recommends**: dentist: Dr. Rao, 12th Main
 - **neighbourhood**: Indiranagar
 - **sizes**: tshirt: M
-- **wishlist**: Catan Seafarers (≈₹2,500), Hario V60 (≈₹2,000), Kindle Paperwhite (≈₹14,000)
+- **wishlist**: Lego Millennium Falcon (≈₹2,500), Hario V60 (≈₹2,000), Kindle Paperwhite (≈₹14,000)
 
 ## When Om is busy (Sun Nov 8 to Mon Nov 9, Asia/Kolkata)
 

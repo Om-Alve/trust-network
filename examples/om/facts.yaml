@@ -11,7 +11,7 @@ facts:
   sizes:         {value: {tshirt: M},                       level: close}
   wishlist:
     value:
-      - {item: Catan Seafarers, price: 2500}
+      - {item: Lego Millennium Falcon, price: 2500}
       - {item: Hario V60, price: 2000}
       - {item: Kindle Paperwhite, price: 14000}
     level: close

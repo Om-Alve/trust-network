@@ -161,7 +161,7 @@ def test_record_brief_does_not_write_for_an_empty_brief(data_dir: Path) -> None:
 
 def test_record_brief_can_seal_its_entries(data_dir: Path) -> None:
     entries = ledger.record_brief(
-        {"wishlist": [{"item": "Catan Seafarers", "price": 2500}]},
+        {"wishlist": [{"item": "Lego Millennium Falcon", "price": 2500}]},
         "rahul",
         "gift-rahul-om-bday",
         person="om",
@@ -180,7 +180,7 @@ def test_record_brief_can_seal_its_entries(data_dir: Path) -> None:
 def sealed_entry() -> ledger.Entry:
     return ledger.record(
         "wishlist",
-        [{"item": "Catan Seafarers", "price": 2500}],
+        [{"item": "Lego Millennium Falcon", "price": 2500}],
         "rahul",
         "gift-rahul-om-bday",
         "gift",

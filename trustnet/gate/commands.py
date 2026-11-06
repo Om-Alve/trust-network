@@ -22,7 +22,7 @@ Cross-boundary commands
     gift-ideas <occasion> <date> [budget <amount> | ₹<amount>]
         ``@om-gate gift-ideas birthday 2026-11-20 budget<=3000``
     claim "<item>"
-        ``@om-gate claim "Catan Seafarers"``
+        ``@om-gate claim "Lego Millennium Falcon"``
     ask-around "<question>"
         ``@om-gate ask-around "tent to borrow, Nov 14-16"``
 
@@ -129,7 +129,7 @@ EXAMPLES: Final[dict[str, str]] = {
         '@om-gate counter P1 P2 2026-11-09T19:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"'
     ),
     "gift-ideas": "@om-gate gift-ideas birthday 2026-11-20 budget<=3000",
-    "claim": '@om-gate claim "Catan Seafarers"',
+    "claim": '@om-gate claim "Lego Millennium Falcon"',
     "ask-around": '@om-gate ask-around "tent to borrow, Nov 14-16"',
     "dm": '@om-gate dm rahul "something fun Sunday evening, not pricey"',
     "yes": "@om-gate yes P1",

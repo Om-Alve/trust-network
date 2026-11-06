@@ -123,7 +123,7 @@ async def main():
             before = await om.read_context(room_id=home_room, limit=200)
             ideas = await cli("rahul", "gift-ideas", "om", "birthday", "2026-11-20", "3000")
             assert ideas["suggestions"] == [
-                {"item": "Catan Seafarers", "price": 2500},
+                {"item": "Lego Millennium Falcon", "price": 2500},
                 {"item": "Hario V60", "price": 2000},
             ]
             assert ideas["sizes"] == {"tshirt": "M"}
@@ -131,12 +131,12 @@ async def main():
                 {"item": "Kindle Paperwhite", "price": 14000, "status": "over budget"}
             ]
             assert "address" not in ideas
-            claimed = await cli("rahul", "claim", "om", "Catan Seafarers")
-            assert claimed == {"status": "claimed", "item": "Catan Seafarers"}
+            claimed = await cli("rahul", "claim", "om", "Lego Millennium Falcon")
+            assert claimed == {"status": "claimed", "item": "Lego Millennium Falcon"}
             own = await cli("om", "fact", "get", "wishlist")
-            assert "Catan Seafarers" not in json.dumps(own)
+            assert "Lego Millennium Falcon" not in json.dumps(own)
             view = await cli("om", "view-as", "rahul")
-            assert "Catan Seafarers" not in json.dumps(view)
+            assert "Lego Millennium Falcon" not in json.dumps(view)
             after = await om.read_context(room_id=home_room, limit=200)
             assert before == after, "Gift flow wrote to Om home"
             recipient_sessions = json.loads((output / "om/gift-sessions.json").read_text())
@@ -158,7 +158,7 @@ async def main():
             assert friend["suggestions"] == [] and friend["taken"] == [] and "sizes" not in friend
             await cli("om", "trust", "priya", "close")
             other = await other_ask()
-            assert other["taken"] == [{"item": "Catan Seafarers", "status": "taken"}]
+            assert other["taken"] == [{"item": "Lego Millennium Falcon", "status": "taken"}]
             assert other["suggestions"] == [{"item": "Hario V60", "price": 2000}]
             artifact["other_askers"] = {"friend": friend, "close": other}
             artifact["checks"] = dict(

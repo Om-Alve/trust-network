@@ -160,7 +160,10 @@ def test_fact_get_subset_is_exact_and_speaks_json(data_dir: Path, run) -> None:
     assert list(payload["facts"]) == ["diet", "wishlist"]
     assert payload["facts"]["diet"] == {"value": "vegetarian", "level": "acquaintance"}
     assert payload["facts"]["wishlist"]["level"] == "close"
-    assert payload["facts"]["wishlist"]["value"][0] == {"item": "Catan Seafarers", "price": 2500}
+    assert payload["facts"]["wishlist"]["value"][0] == {
+        "item": "Lego Millennium Falcon",
+        "price": 2500,
+    }
 
 
 def test_fact_get_reports_an_unknown_key(data_dir: Path, run) -> None:
@@ -390,7 +393,7 @@ def test_view_as_speaks_json(data_dir: Path, run) -> None:
     facts = {row["name"]: row for row in payload["facts"]}
     assert facts["address"]["visible"] is False
     assert facts["wishlist"]["visible"] is True
-    assert facts["wishlist"]["value"][0]["item"] == "Catan Seafarers"
+    assert facts["wishlist"]["value"][0]["item"] == "Lego Millennium Falcon"
     assert payload["titles_visible"] is True
     assert set(payload["window"]) == {"start", "end"}
 

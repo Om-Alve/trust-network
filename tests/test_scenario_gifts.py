@@ -45,7 +45,7 @@ async def test_two_askers_taken_items_and_the_recipients_seal(tmp_path, monkeypa
             first["suggestions"]
             == second["suggestions"]
             == [
-                {"item": "Catan Seafarers", "price": 2500},
+                {"item": "Lego Millennium Falcon", "price": 2500},
                 {"item": "Hario V60", "price": 2000},
             ]
         )
@@ -54,16 +54,16 @@ async def test_two_askers_taken_items_and_the_recipients_seal(tmp_path, monkeypa
         ]
         assert first["taken"] == []
 
-        assert await personal.claim("rahul", "om", "Catan Seafarers") == {
+        assert await personal.claim("rahul", "om", "Lego Millennium Falcon") == {
             "status": "claimed",
-            "item": "Catan Seafarers",
+            "item": "Lego Millennium Falcon",
         }
         # A second asker who asked before the claim cannot take the same item.
         with pytest.raises(SwitchError, match="Item unavailable"):
-            await personal.claim("priya", "om", "Catan Seafarers")
+            await personal.claim("priya", "om", "Lego Millennium Falcon")
 
         third = await personal.gift_ideas("priya", "om", "birthday", OCCASION, 3000)
-        assert third["taken"] == [{"item": "Catan Seafarers", "status": "taken"}]
+        assert third["taken"] == [{"item": "Lego Millennium Falcon", "status": "taken"}]
         assert [item["item"] for item in third["suggestions"]] == ["Hario V60"]
         assert [item["item"] for item in third["over_budget"]] == ["Kindle Paperwhite"]
 
@@ -85,7 +85,7 @@ async def test_two_askers_taken_items_and_the_recipients_seal(tmp_path, monkeypa
         sealed = ledger.format_ledger(person="om", now=on)
         opened = ledger.format_ledger(person="om", now=after)
         assert "sealed entr" in sealed and "opens Nov 21" in sealed
-        assert "Catan Seafarers" not in sealed
+        assert "Lego Millennium Falcon" not in sealed
         assert "sealed entr" not in opened and "gift" in opened
     finally:
         await world.stop()
