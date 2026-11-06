@@ -2,9 +2,9 @@
 
 **Let your AI agent make plans with your friends' agents, sharing only what you've trusted each friend with, enforced in code you can read, not by a prompt.**
 
-[![Demo video](https://img.youtube.com/vi/3IXfnVk2rg4/maxresdefault.jpg)](https://youtu.be/3IXfnVk2rg4)
+[![Demo video](https://img.youtube.com/vi/miKu7P17yJY/maxresdefault.jpg)](https://youtu.be/miKu7P17yJY)
 
-▶ **[Watch the demo (2:31)](https://youtu.be/3IXfnVk2rg4)**
+▶ **[Watch the demo (2:31)](https://youtu.be/miKu7P17yJY)**
 
 Built for the Flip the Switch hackathon (Track 02 · Code with Wispr), on [Switch](https://docs.switchagents.ai/switch-rooms/getting-started/add-a-server).
 
