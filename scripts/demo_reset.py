@@ -30,6 +30,9 @@ STATE_FILES = (
     "inbox-cursor.json",
     "watch-state.json",
     "coordination.json",
+    "decisions.sqlite3",
+    "decisions.sqlite3-journal",
+    "fact-changes.json",
     "ask-around.json",
     "peers.json",
 )

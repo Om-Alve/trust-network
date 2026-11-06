@@ -26,6 +26,7 @@ CAPABILITIES = (
     "free",
     "ask",
     "propose",
+    "counter",
     "consent",
     "ask-around",
     "gift-ideas",

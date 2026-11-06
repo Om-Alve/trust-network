@@ -464,3 +464,22 @@ Phase 11 runtime note: core 0.31.0 requires a local read-only server identity
 export (clients/agents/users/client_rooms) because agent operations omit the
 transport mapping and Gateway members. Remote deployment needs an authenticated
 server adapter; unknown identities and unlinked external users remain silent.
+
+
+## Durable planning update (phase 32)
+
+Accepted proposal state and pending delivery jobs now commit together in each
+owner's `decisions.sqlite3`. Existing coordination JSON is imported once and
+retained as a readable projection. Restart and periodic recovery retry pending
+jobs. The gate process holds a per-owner lock. Calendar and ledger writes use
+stable operation IDs; calendar and YAML files are replaced atomically.
+
+Both approvals enqueue a local ICS event without requiring another agent call.
+Switch messages and documents have at-least-once delivery because its operations
+do not expose an idempotency key. Duplicate consent does not change a vote.
+Fact/trust approvals record an applying decision before materializing YAML and
+an idempotent ledger entry, then record completion.
+
+`counter P1 P2 ...` replaces a pending proposal in the same room. The agent
+initiating a counter must not have voted on P1. Both sides require fresh votes
+on P2. The peer must advertise `counter` in its handshake capabilities.

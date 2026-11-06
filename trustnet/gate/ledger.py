@@ -6,6 +6,7 @@ sealed gift entries until their reveal date.
 
 from __future__ import annotations
 
+import fcntl
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -175,6 +176,7 @@ def record(
     person: str,
     sealed_until: date | datetime | str | None = None,
     now: datetime | None = None,
+    operation_id: str | None = None,
 ) -> Entry:
     """Append one disclosure to ``person``'s ledger and return it.
 
@@ -191,7 +193,7 @@ def record(
         kind=kind,
         sealed_until=sealed_until,
     )
-    _append(entry, ledger_path(person))
+    _append(entry, ledger_path(person), operation_id=operation_id)
     return entry
 
 
@@ -341,16 +343,27 @@ def format_ledger(
     return "\n".join(lines)
 
 
-def _append(entry: Entry, path: Path) -> None:
-    """Append one JSON line. The only write path in this module."""
+def _append(entry: Entry, path: Path, *, operation_id=None) -> None:
+    from trustnet.gate.storage import atomic_write
+
+    payload = entry.to_dict()
+    if operation_id:
+        payload["_operation_id"] = operation_id
     try:
-        payload = json.dumps(entry.to_dict(), ensure_ascii=False)
+        line = (json.dumps(payload, ensure_ascii=False) + "\n").encode()
     except TypeError as exc:
-        raise LedgerError(f"value {entry.value!r} is not JSON-serializable: {exc}") from None
+        raise LedgerError(f"value is not JSON-serializable: {exc}") from None
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(payload + "\n")
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with path.with_suffix(".lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            existing = path.read_bytes() if path.exists() else b""
+            if operation_id and any(
+                json.loads(line).get("_operation_id") == operation_id
+                for line in existing.splitlines()
+            ):
+                return
+            atomic_write(path, existing + line)
     except OSError as exc:
         raise LedgerError(f"{path}: cannot append to ledger: {exc}") from None
 

@@ -34,6 +34,7 @@ existing event. Re-adding the same ``uid`` is a no-op, which is what makes
 
 from __future__ import annotations
 
+import fcntl
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -131,35 +132,39 @@ def add_event(
     caller might retry. A missing or empty file becomes a new ``VCALENDAR``.
     """
     path = Path(path)
-    start_ist = _as_ist(start, "start")
-    length = _as_duration(duration)
-    title = str(title).strip()
-    place = str(place).strip()
-    uid = str(uid).strip() if uid is not None else ""
-
-    calendar = _load_or_new(path)
-    if uid:
-        existing = _find_event(calendar, uid)
-        if existing is not None:
-            stored = _block_from_event(existing)
-            if stored is not None:
-                return stored
-            raise CalendarError(f"{path}: event {uid!r} has no timed start or end")
-
-    uid = uid or f"{uuid.uuid4().hex}@trust-network"
-    event = Event()
-    event.add("UID", uid)
-    event.add("DTSTAMP", datetime.now(timezone.utc))
-    event.add("DTSTART", start_ist)
-    event.add("DTEND", start_ist + length)
-    event.add("SUMMARY", title)
-    if place:
-        event.add("LOCATION", place)
-    calendar.add_component(event)
-
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(calendar.to_ical())
-    return Block(start_ist, start_ist + length, title)
+    with path.with_suffix(".lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        start_ist = _as_ist(start, "start")
+        length = _as_duration(duration)
+        title = str(title).strip()
+        place = str(place).strip()
+        uid = str(uid).strip() if uid is not None else ""
+
+        calendar = _load_or_new(path)
+        if uid:
+            existing = _find_event(calendar, uid)
+            if existing is not None:
+                stored = _block_from_event(existing)
+                if stored is not None:
+                    return stored
+                raise CalendarError(f"{path}: event {uid!r} has no timed start or end")
+
+        uid = uid or f"{uuid.uuid4().hex}@trust-network"
+        event = Event()
+        event.add("UID", uid)
+        event.add("DTSTAMP", datetime.now(timezone.utc))
+        event.add("DTSTART", start_ist)
+        event.add("DTEND", start_ist + length)
+        event.add("SUMMARY", title)
+        if place:
+            event.add("LOCATION", place)
+        calendar.add_component(event)
+
+        from trustnet.gate.storage import atomic_write
+
+        atomic_write(path, calendar.to_ical())
+        return Block(start_ist, start_ist + length, title)
 
 
 def _as_ist(value: datetime, label: str) -> datetime:

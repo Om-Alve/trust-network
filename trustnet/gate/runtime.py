@@ -9,6 +9,7 @@ mode): there the gate logs the overreach and posts nothing home.
 """
 
 import asyncio
+import fcntl
 import json
 import logging
 from collections.abc import Callable, Mapping
@@ -64,10 +65,23 @@ class Gate:
             await self._handle(event)
 
     async def _handle(self, event):
+        await consent.recover(self, force=False)
+        from trustnet.gate import fact_changes
+
+        fact_changes.recover(self.person)
         watch = self.watches.get(event.room_id)
         if watch:
             if watch.closed:
-                return
+                try:
+                    command = c.parse(event.text)
+                except c.ParseError:
+                    return
+                if (
+                    not isinstance(command, c.Consent)
+                    or consent.load(self.person).get(command.proposal_id, {}).get("status")
+                    != "confirmed"
+                ):
+                    return
             identity = self.identities().get(event.sender_id)
             if (
                 identity
@@ -75,7 +89,7 @@ class Gate:
                 and identity.person
             ):
                 await watch.turn(event.text)
-            if watch.closed:
+            if watch.closed and not isinstance(c.parse(event.text), c.Consent):
                 return
         if not event.addressed:
             return
@@ -210,7 +224,9 @@ class Gate:
             await handshake.handle(self, event, command, sender)
             return
         # Consent is a gate relay, never an alias for the owner's yes command.
-        if isinstance(command, (c.AskOwner, c.Answer, c.Propose, c.Yes, c.No, c.Consent)):
+        if isinstance(
+            command, (c.AskOwner, c.Answer, c.Propose, c.Counter, c.Yes, c.No, c.Consent)
+        ):
             await consent.handle(self, event, command, sender, decision.mode)
             return
         if isinstance(command, c.Dm):
@@ -284,8 +300,10 @@ class Gate:
         elif isinstance(command, c.Ledger):
             text = ledger.format_ledger(person=self.person, now=self._now())
         elif isinstance(command, c.Trust):
-            trust.people[command.person] = command.level
-            save_trust(trust, resolve_data_dir(self.person) / "trust.yaml")
+            with fact_changes.editing(self.person):
+                trust = load_trust(self.person)
+                trust.people[command.person] = command.level
+                save_trust(trust, resolve_data_dir(self.person) / "trust.yaml")
             text = f"Trust for {command.person}: {command.level}"
         else:
             text = COMMAND_LIST
@@ -535,17 +553,32 @@ class Gate:
         while True:
             await asyncio.sleep(1)
             async with self._dispatch_lock:
-                await surprise.expire(self)
-                for watch in list(self.watches.values()):
-                    await watch.check()
+                try:
+                    await consent.recover(self, force=False)
+                    from trustnet.gate import fact_changes
+
+                    fact_changes.recover(self.person)
+                    await surprise.expire(self)
+                    for watch in list(self.watches.values()):
+                        await watch.check()
+                except Exception as exc:
+                    LOG.warning("recovery pending: %s", type(exc).__name__)
 
     async def run(self):
-        timer = asyncio.create_task(self._timeouts())
-        try:
-            await self._events()
-        finally:
-            timer.cancel()
-            await asyncio.gather(timer, return_exceptions=True)
+        directory = resolve_data_dir(self.person)
+        directory.mkdir(parents=True, exist_ok=True)
+        with (directory / "gate.lock").open("a") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise RuntimeError(f"a gate is already running for {self.person}") from None
+            await consent.recover(self)
+            timer = asyncio.create_task(self._timeouts())
+            try:
+                await self._events()
+            finally:
+                timer.cancel()
+                await asyncio.gather(timer, return_exceptions=True)
 
     async def _events(self):
         async for event in self.client.events():

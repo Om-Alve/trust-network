@@ -5,10 +5,12 @@ trust each other. Equipment lending can reuse ask-around, but an inventory match
 must remain separate from permission to lend. Gift coordination works within a
 shared workspace when participants accept that its administrator can read rooms.
 
-These are open engineering issues, ordered by their effect on that first use case.
-They are outside the behavior-preserving cleanup in phase 29.
+Phase 29 identified these engineering issues. Phases 30-32 implement the
+authorized follow-ups. TN-04 remains outside this work.
 
 ## TN-01 · Complete the calendar handoff
+
+Implemented in phase 32. The following records the original gap and acceptance criteria.
 
 `trustnet/gate/consent.py` confirms a proposal and creates a room document after
 both approvals. It does not call `calendar.add_event`. The calendar write is a
@@ -23,6 +25,8 @@ Acceptance requires an E2E run that approves both sides, restarts between
 confirmation and delivery, and finds exactly one event in each calendar.
 
 ## TN-02 · Recover interrupted approvals
+
+Implemented in phase 32. The following records the original gap and acceptance criteria.
 
 `trustnet/gate/consent.py` saves votes before sending the consent relay. A crash
 after saving can leave a peer waiting, while a repeated vote is refused.
@@ -57,6 +61,8 @@ be unable to transmit that address to the friend through any available tool.
 Do not judge the meaning of outgoing prose with keyword lists.
 
 ## TN-05 · Support plan revisions explicitly
+
+Implemented in phase 32. The following records the original gap and acceptance criteria.
 
 `commands.py` parses `counter` and `policy.py` allows it, but `runtime.py` does
 not dispatch Counter to a handler. It returns the command list. Before offering

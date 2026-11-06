@@ -170,7 +170,7 @@ applies the trust level of the room, not of the sender.
 | `ask <fact> [<fact> ...]` | `@om-gate ask diet interests` | Values at the room level, or `<fact>: not shared with you`. A fact that is hidden and a fact that does not exist look the same. |
 | `ask-owner Q<n> "<question>"` | `@om-gate ask-owner Q3 "Is ₹1,500 per person okay?"` | Sent by an agent to its own gate. Puts the question in the owner's home room. |
 | `propose P<n> <start> <duration> "<title>" @ "<place>"` | `@om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"` | Sent by an agent to its **own** gate in the DM room. Title and place: 60 characters at most; the place only `[A-Za-z0-9 ,.'&-]`; the title has no quotes or `@`. Duration: 1 minute to 24 hours (`2h`, `90m`). The start must have a timezone (parsed as IST if none). |
-| `counter P<n> P<n> <start> <duration> "<title>" @ "<place>"` | `@om-gate counter P1 P2 2026-11-09T19:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"` | Parses, but no handler exists in v1 (see section 10). To change a plan, propose a new `P<n>`. |
+| `counter P<n> P<n> <start> <duration> "<title>" @ "<place>"` | `@om-gate counter P1 P2 2026-11-09T19:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"` | Supersedes a pending plan with a fresh ID and fresh votes; the initiator must not have voted yet. |
 | `gift-ideas <occasion> <date> [budget <amount> \| ₹<amount>]` | `@om-gate gift-ideas birthday 2026-11-20 budget<=3000` | Only works in a gift room (section 7d). |
 | `claim "<item>"` | `@om-gate claim "Lego Millennium Falcon"` | Only works in a gift room (section 7d). |
 
@@ -312,8 +312,8 @@ side that sent it, notes it as overreach to its owner; it then accepts
     and stops the room's limit counter. The gate that receives the second vote
     from the peer also archives the room; an archived room accepts nothing
     except `consent`, so the last relay still lands.
-11. Each agent calls `cal_add` with the agreed time, title and place. The
-    calendar is the person's; the gate does not write it.
+11. Both approvals enqueue an idempotent event in each owner's ICS calendar.
+    Agents do not need a separate `cal_add` call for a confirmed proposal.
 
 A changed plan is a new proposal with the next number. `consent` that arrives
 for a proposal that is not pending (already decided) does not change it.
@@ -323,7 +323,7 @@ Home-room answers for a closed planning room are refused. Limit-closed rooms
 ignore subsequent messages, including consent; confirmation archiving still
 allows the final consent relay to reach the pending peer.
 Room deadlines, turn counts and closure are saved per person in `room-watches/`
-and restored on restart. Proposal and question state is in `coordination.json`;
+and restored on restart. Proposal and question state is in owner-local SQLite, with a `coordination.json` projection;
 handshakes are in `peers.json`. A restarted gate replies to a new hello once
 again. Persisted peers remain compatible until a new hello changes their version.
 
@@ -528,13 +528,12 @@ have the plan. (The confirmation text now says `via agent`.) The transcript is
 ## 10. Known limits (v1)
 
 - **Naming.** The agent slot is `<person>-hermes` for every framework.
-- **`counter` has no handler.** It parses, but the gate does not act on it; to
-  change a plan, propose with a new `P<n>`.
+- **Plan revisions.** Use `counter` before voting. Confirmed plans cannot be revised through this command.
 - **`gift-ideas` outside a gift room** is rejected as an unknown command by
   `authorize` (the runtime names it `giftideas`, which is not in the known set),
   so it only works through the gift flow.
 - **Handshake coverage.** Ask-around and gift rooms do not check the handshake.
-  Capabilities are recorded and never read.
+  Counter proposals require the peer's advertised `counter` capability.
 - **Hello memory.** The set of rooms a gate has said hello in is held in memory.
   After a restart a gate may say hello again; that is harmless.
 - **ID collisions.** `P<n>` and `Q<n>` are chosen by the agents, and they are
@@ -547,8 +546,7 @@ have the plan. (The confirmation text now says `via agent`.) The transcript is
   answers slowly can hit the time limit.
 - **Ask-around expires** after 5 minutes. Gift sessions after 10.
 - **Connections.** A gate anchors the newest 24 open rooms.
-- **Calendars.** The gate reads calendars (`.ics`); the agent writes them
-  (`cal_add`). A confirmed plan is not on a calendar until the agent adds it.
+- **Calendars.** Both approvals enqueue an idempotent local ICS event. Remote calendar provider adapters are not implemented.
 - **Switch is trusted.** Identity and membership come from Switch. A
   compromised Switch, or an admin, can read every room, including gift rooms.
 - **A pre-handshake gate** reads `hello` as an unknown command.
@@ -592,8 +590,7 @@ entry; request a fresh ref and yes. Bulk refs run in the order supplied and stop
 at the first refusal; earlier successful changes remain recorded. Preserve review
 order and review again after changing an audience. Declined, expired or already
 approved refs cannot apply. Concurrent local edits use a per-person file lock.
-Profile, request state and ledger are separate writes; crash recovery across all
-three files is not transactional.
+Profile and ledger are projections of durable accepted approval decisions; recovery replays unfinished materialization after a restart.
 
 Values are plain strings or YAML lists/maps when they start with `[` or `{`.
 Keys match `[a-z][a-z0-9_-]{0,63}`; values are at most 16,384 characters and must
@@ -603,3 +600,21 @@ be JSON-compatible. Reasons and suggested person names are limited to 280 and
 With via-agent consent, a fully fooled agent could create and approve its own
 F or T ref. This is the same trust granted for plan consent. Use `direct` owner
 mode to require the person's own CLI or Switch user for approval.
+
+
+## Durable decisions and revisions
+
+A gate persists accepted votes and pending deliveries together before sending
+consent. Startup and periodic recovery replay unfinished work. Each owner runs
+one gate process. Existing coordination JSON is imported into owner-local SQLite
+once; JSON remains a readable projection, not an editing interface.
+
+Two yeses automatically enqueue the owner's ICS event with a stable UID. Calendar
+writes and approval ledger entries are idempotent. Switch messages and documents
+may be delivered more than once after an interrupted acknowledgment.
+
+A counter is `counter P<old> P<new> <start> <duration> "<title>" @ "<place>"`.
+It must reference a pending plan in the same room, use a fresh ID, and come from
+an initiator who has not voted on the old plan. The old plan becomes superseded;
+its votes cannot confirm the replacement. Both people approve the new plan.
+The peer gate must advertise `counter` capability.

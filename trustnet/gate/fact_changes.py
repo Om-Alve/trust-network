@@ -7,7 +7,7 @@ import re
 import time
 from contextlib import contextmanager
 
-from trustnet.gate import ledger
+from trustnet.gate import ledger, storage
 from trustnet.gate.dm import main_agent
 from trustnet.gate.facts import (
     FACTS_FILENAME,
@@ -32,20 +32,55 @@ def editing(person):
     directory.mkdir(parents=True, exist_ok=True)
     with (directory / "fact-changes.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
+        _recover(person, _load(person))
         yield
 
 
 def _load(person):
-    path = resolve_data_dir(person) / "fact-changes.json"
-    return json.loads(path.read_text()) if path.exists() else {}
+    return storage.load(person, "fact-changes")
 
 
 def _save(person, state):
-    path = resolve_data_dir(person) / "fact-changes.json"
-    tmp = path.with_suffix(".tmp")
-    tmp.touch(mode=0o600)
-    tmp.write_text(json.dumps(state))
-    tmp.replace(path)
+    storage.save(person, "fact-changes", state)
+
+
+def _recover(person, state):
+    for ref, item in state.items():
+        if item["status"] != "applying":
+            continue
+        key, after = item["key"], Level(item["after"])
+        if ref.startswith("F"):
+            profile = load_profile(person)
+            fact = profile.facts.get(key)
+            if (
+                fact is None
+                or _fingerprint(fact) != item["fingerprint"]
+                or fact.level.value not in {item["before"], item["after"]}
+            ):
+                raise FactsError(f"{ref} conflicts with an interrupted approval")
+            fact.level = after
+            save_profile(profile, resolve_data_dir(person) / FACTS_FILENAME)
+        else:
+            trust = load_trust(person)
+            before = trust.level_for(key)
+            if (before.value if before else "unlisted") not in {item["before"], item["after"]}:
+                raise FactsError(f"{ref} conflicts with an interrupted approval")
+            trust.people[key] = after
+            save_trust(trust, resolve_data_dir(person) / "trust.yaml")
+        _record(person, ref, key, item["before"], item["after"])
+        item["status"] = "approved"
+        _save(person, state)
+
+
+def recover(person):
+    directory = resolve_data_dir(person)
+    if (
+        not (directory / "decisions.sqlite3").exists()
+        and not (directory / "fact-changes.json").exists()
+    ):
+        return
+    with editing(person):
+        pass
 
 
 def _key(key):
@@ -158,6 +193,7 @@ def suggest(person, key, level, reason="", *, trust=False):
 def review(person):
     with editing(person):
         state = _load(person)
+        _recover(person, state)
         changed = False
         for item in state.values():
             if item["status"] == "pending" and item["expires"] <= _now():
@@ -180,6 +216,7 @@ def _record(person, ref, key, before, after):
         "local-review",
         "trust-change" if ref.startswith("T") else "fact-visibility",
         person=person,
+        operation_id=f"review:{ref}" if ref else None,
     )
 
 
@@ -197,6 +234,7 @@ def decide(person, refs, approve, *, sender=None):
         if not decision:
             raise FactsError(decision.reason)
         state = _load(person)
+        _recover(person, state)
         for ref in refs:
             item = state.get(ref)
             if not item or item["status"] != "pending":
@@ -217,18 +255,14 @@ def decide(person, refs, approve, *, sender=None):
                         or _audience(person, after) != item["audience"]
                     ):
                         raise FactsError(f"{ref} changed; request a fresh review")
-                    fact.level = after
-                    save_profile(profile, resolve_data_dir(person) / FACTS_FILENAME)
                 else:
                     trust = load_trust(person)
                     before = trust.level_for(key)
                     if (before.value if before else "unlisted") != item["before"]:
                         raise FactsError(f"{ref} changed; request a fresh review")
-                    trust.people[key] = after
-                    save_trust(trust, resolve_data_dir(person) / "trust.yaml")
-                _record(person, ref, key, item["before"], item["after"])
-            item["status"] = "approved" if approve else "declined"
+            item["status"] = "applying" if approve else "declined"
             item["via"] = decision.mode
             _save(person, state)
+            _recover(person, state)
             results.append({"ref": ref, **item})
     return {"results": results}

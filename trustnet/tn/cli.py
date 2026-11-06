@@ -397,6 +397,9 @@ def _cmd_trust_locked(context: Context, args: argparse.Namespace) -> int:
 
 
 def _cmd_fact_get(context: Context, args: argparse.Namespace) -> int:
+    from trustnet.gate import fact_changes
+
+    fact_changes.recover(context.owner())
     owner = context.owner()
     profile = load_profile(owner)
     from trustnet.gate.surprise import owner_value
@@ -626,6 +629,9 @@ def _parse_event_id(value: str) -> str:
 
 
 def _cmd_view_as(context: Context, args: argparse.Namespace) -> int:
+    from trustnet.gate import fact_changes
+
+    fact_changes.recover(context.owner())
     owner = context.owner()
     profile = load_profile(owner)
     trust = load_trust(owner)

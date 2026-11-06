@@ -195,7 +195,9 @@ def _read_yaml(path: Path) -> dict[str, Any]:
 def _write_yaml(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     text = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
-    path.write_text(text, encoding="utf-8")
+    from trustnet.gate.storage import atomic_write
+
+    atomic_write(path, text)
 
 
 def _check_keys(mapping: dict[Any, Any], allowed: frozenset[str], where: str) -> None:
