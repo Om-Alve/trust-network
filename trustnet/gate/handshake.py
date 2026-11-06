@@ -3,9 +3,9 @@
 Before two gates plan anything, each tells the other which protocol version it
 speaks and which gate-to-gate commands it accepts. The opening gate says hello in
 the gates' connection room right before ``join-dm``; the other records it and says
-hello back once. A gate refuses to open a planning room for, or take a forwarded
-proposal from, a peer gate that hasn't said a compatible hello (same major
-version). Peers are remembered per person in ``peers.json``.
+hello back once. A gate refuses to join a planning room opened by, or take a
+forwarded proposal from, a peer gate that hasn't said a compatible hello (same
+major version). Peers are remembered per person in ``peers.json``.
 
 Who may say hello is policy (``authorize("hello", …)``): only the friend's own gate,
 and only in their ``conn-<pair>`` room.

@@ -31,7 +31,10 @@ from trustnet.gate.policy import (
 from trustnet.gate.view_as import view_as
 
 LOG = logging.getLogger(__name__)
-COMMAND_LIST = "Commands: free, ask, view-as, ledger, trust. Other coordination commands arrive in later phases."
+COMMAND_LIST = (
+    "Commands: free, ask, ask-owner, propose, answer, yes, no, dm, ask-around, gift-ideas,"
+    " claim, view-as, ledger, trust. See PROTOCOL.md for the forms."
+)
 
 #: What an asker outside the owner's side ever hears about a hidden fact.
 NOT_SHARED = "not shared with you"

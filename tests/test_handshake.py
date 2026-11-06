@@ -132,7 +132,7 @@ def test_hello_parses_to_a_fixed_form():
     assert isinstance(command, c.Hello)
     assert (command.protocol, command.major) == ("trust-network/1", 1)
     assert command.capabilities == ("free", "ask", "propose")
-    # Anything else is a greeting, not a malformed handshake (no overreach alert).
+    # Anything else stays what it was before the handshake: an unknown command.
     for other in ("@om-gate hello", "@om-gate hello there", "@om-gate hello trust-network/x"):
         assert isinstance(c.parse(other), c.Unknown)
 

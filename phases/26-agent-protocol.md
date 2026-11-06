@@ -1,7 +1,7 @@
 ---
 id: "26"
 title: Agent protocol — spec, gate handshake, any-agent runner
-status: in-progress
+status: done
 priority: P1
 owner: agent
 depends_on: ["18"]
@@ -20,7 +20,7 @@ Added 2026-11-06 at Om's request ("turn it into a complete agent-to-agent commun
 solution"); scope chosen: spec + handshake + a second framework.
 
 ## Tasks
-- [ ] `PROTOCOL.md`: roles (person, agent, gate), transport (Switch rooms), identity, rooms,
+- [x] `PROTOCOL.md`: roles (person, agent, gate), transport (Switch rooms), identity, rooms,
   the full message grammar, flows (plan, consent, questions, gifts, ask-around), security
   properties, versioning, and how to bring a new agent framework.
 - [x] Gate handshake: `hello trust-network/<major> <capabilities>` exchanged in the gates'
@@ -33,7 +33,7 @@ solution"); scope chosen: spec + handshake + a second framework.
   sides; artifact in `data/`.
 
 ## Done when
-- [ ] `make check` passes.
+- [x] `make check` passes.
 - [x] A Hermes ↔ Codex plan is confirmed end to end, with both people's yes; transcript saved.
 - [x] A gate without a compatible hello is refused (test).
 
@@ -74,9 +74,18 @@ solution"); scope chosen: spec + handshake + a second framework.
   `join-dm` without a hello, or with `trust-network/2`, is refused with a plain-text line in the
   connection room and a home notice; hello is accepted only from the friend's gate in their
   `conn-<pair>` room; a forwarded proposal from a peer without a hello isn't recorded. A
-  `hello` that isn't the handshake form ("hello there") stays an unknown command, not a
-  malformed one (no overreach alert for a greeting). Peers live in `peers.json` (cleared by
+  `hello` that isn't the handshake form ("hello there") stays an unknown command, as it
+  was before the handshake, rather than becoming a malformed one. Peers live in `peers.json` (cleared by
   `demo_reset`). Live, laptop: om-gate and priya-gate recorded each other's
   `trust-network/1` hello in `conn-om-priya`. A pre-handshake gate (the VM before deploy) reads
   hello as an unknown command and notes it as overreach, then accepts `join-dm`: rollout
   needs both gates on the same commit.
+- `PROTOCOL.md` (v1 spec, drafted by a Sonnet docs agent from the code, reviewed here): roles,
+  transport, rooms, grammar, handshake/versioning, five flows, security properties, how to bring
+  a framework, known limits. `tests/test_skill_doc.py` now parses every command line in it
+  (code blocks and inline) so the spec can't drift from the parser. The review also found the
+  gate's unknown-command reply listed five commands ("others arrive in later phases"); it now
+  lists them all and points to PROTOCOL.md.
+- Known v1 limits are listed in PROTOCOL.md §10 (e.g. `counter` parses but has no handler;
+  ask-around and gift rooms don't check the handshake; capabilities are recorded, never read).
+- `make check`: 474 passed.

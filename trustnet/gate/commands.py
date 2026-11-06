@@ -1017,7 +1017,7 @@ def _handle_hello(args: str, *, target: str | None, now: datetime, raw: str) -> 
         args.strip(),
     )
     if not match:
-        # A greeting ("@om-gate hello there") is not a malformed handshake.
+        # "@om-gate hello there" stays an unknown command, as before the handshake.
         return Unknown(raw=raw.strip(), target=target)
     return Hello(
         protocol=match["protocol"],
