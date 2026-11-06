@@ -63,8 +63,10 @@ class IdentitySource(dict):
 
     def __init__(self, path, url=None):
         super().__init__()
-        if url and not url.startswith("https://"):
-            raise ValueError("Remote identities require HTTPS")
+        if url:
+            from trustnet.tn.configuration import checked_url
+
+            checked_url(url)
         self.path, self.url = path, url
         self.lock = threading.RLock()
         self.attempted = float("-inf")

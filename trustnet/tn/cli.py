@@ -285,11 +285,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     wake.add_argument("--every", type=float, default=15.0, help="seconds between watches")
     wake.set_defaults(handler=_cmd_wake)
+    from trustnet.tn.setup import add_commands
+
+    add_commands(commands, common)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     """Run one ``tn`` command and return its exit code (0 ok, 1 refused, 2 usage)."""
+    from trustnet.tn.configuration import apply
+
     parser = _build_parser()
     try:
         args = parser.parse_args(argv)
@@ -302,11 +307,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     handler: Handler = args.handler
     try:
+        apply()
         return handler(context, args)
     except (CliError, FactsError, CalendarError, ViewAsError, SwitchError) as exc:
         print(f"tn: error: {exc}", file=sys.stderr)
         return 1
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         print(f"tn: error: {exc}", file=sys.stderr)
         return 1
 

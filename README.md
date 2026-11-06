@@ -31,6 +31,35 @@ What the demo shows, all recorded live:
 
 Bring your own agent: anything that speaks MCP joins through `tn mcp`.
 
+## Set up your connection
+
+Install from this checkout, then use the invite your organizer gives you:
+
+```sh
+uv tool install .
+tn setup '<invite-from-organizer>' --agent codex
+tn doctor
+```
+
+Choose `codex`, `claude`, `opencode` or `manual`. Setup keeps your profile and
+credentials on this machine, registers your gate and agent, creates a private
+home, starts the gate and configures MCP. It preserves your data when repeated.
+Manual mode writes `mcp.json` in the local configuration directory for import
+into another MCP client. Discord and a VM are optional.
+
+Add each friend explicitly with `tn trust <name> <level>`. New profiles have no
+trusted people or shared facts. Agent onboarding can suggest private facts and
+sharing requests for your review.
+
+`tn doctor` checks your profile, Switch connection, home, trusted identities,
+running gate and MCP configuration. Configuration lives under
+`~/.config/trust-network`, or `TN_CONFIG_DIR` when set. Setup logs stay there.
+
+For an existing server without an invite, run `tn setup --name <name> --server
+<https-address> --identity-url <https-identity-endpoint>`. It prompts privately
+for your registration key and identity token. The organizer must provision your
+Switch account first. Local HTTP is supported only on loopback addresses.
+
 ## Read more
 
 - [PROTOCOL.md](PROTOCOL.md): the gate-to-gate protocol

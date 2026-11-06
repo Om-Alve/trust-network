@@ -270,7 +270,13 @@ def _cli_error(stderr: str, argv: tuple[str, ...]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the stdio server for ``--as <person>`` (default ``$TN_PERSON``)."""
+    from trustnet.tn.configuration import apply
+
+    try:
+        apply()
+    except (ValueError, OSError):
+        print("tn mcp: configuration is invalid; run tn setup", file=sys.stderr)
+        return 1
     parser = argparse.ArgumentParser(
         prog="tn mcp",
         description="MCP server (stdio) that lets a person's own agent act in Switch.",
