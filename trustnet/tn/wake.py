@@ -7,6 +7,7 @@ a reply, and (b) call the ``tn mcp`` tools: it polls ``tn watch`` and wakes the
 agent on news, and it lets the person talk to their agent by typing.
 
     tn --as priya wake --agent codex
+    tn --as om wake --agent opencode                # DeepSeek through OpenCode
     tn --as priya wake --cmd "my-agent --stdin"     # any other framework
 
 Each turn's prompt carries the person's persona (``examples/<person>/agent.md``
@@ -22,7 +23,10 @@ Ways this can go wrong, and what the runner does:
 - two runners for one person would answer twice → a per-person lock file refuses
   the second;
 - the agent has nothing for the person → it replies ``[SILENT]`` and nothing is
-  printed.
+  printed;
+- the agent could reach its person's files or the shell and act outside the gate
+  → the presets run Codex without its shell tool and OpenCode on a private config
+  that denies its shell, file and web tools; only the ``tn mcp`` tools remain.
 """
 
 from __future__ import annotations
@@ -49,8 +53,8 @@ TRANSCRIPT_LINES = 16
 DIM, BOLD, CYAN, RESET = "\033[2m", "\033[1m", "\033[1;35m", "\033[0m"
 
 
-def codex_command(person: str, model: str, workdir: Path, reply: Path) -> list[str]:
-    """``codex exec`` with only the trust-network MCP server, tools pre-approved."""
+def _mcp_env() -> dict[str, str]:
+    """What the ``tn mcp`` server needs, with data paths made absolute."""
     env = {
         key: os.environ[key]
         for key in ("SWITCH_URL", "TN_DATA_DIR", "TN_STATE_DIR")
@@ -59,17 +63,76 @@ def codex_command(person: str, model: str, workdir: Path, reply: Path) -> list[s
     for key in ("TN_DATA_DIR", "TN_STATE_DIR"):
         if key in env:
             env[key] = str(Path(env[key]).expanduser().resolve())
-    tn = Path(sys.executable).with_name("tn")
-    table = ",".join(f"{k}={json.dumps(v)}" for k, v in env.items())
+    return env
+
+
+def _tn() -> str:
+    return str(Path(sys.executable).with_name("tn"))
+
+
+def codex_command(person: str, model: str, workdir: Path, reply: Path) -> list[str]:
+    """``codex exec`` with only the trust-network MCP server, tools pre-approved, no shell."""
+    table = ",".join(f"{k}={json.dumps(v)}" for k, v in _mcp_env().items())
     return [
         "codex", "exec", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
         "-m", model, "-s", "read-only", "-C", str(workdir),
-        "-c", f"mcp_servers.trustnet.command={json.dumps(str(tn))}",
+        "-c", "features.shell_tool=false", "-c", 'web_search="disabled"',
+        "-c", f"mcp_servers.trustnet.command={json.dumps(_tn())}",
         "-c", f'mcp_servers.trustnet.args=["--as","{person}","mcp"]',
         "-c", 'mcp_servers.trustnet.default_tools_approval_mode="approve"',
         "-c", f"mcp_servers.trustnet.env={{{table}}}",
         "-o", str(reply), "-",
     ]  # fmt: skip
+
+
+#: OpenCode's own tools an agent here must not have: it reaches its person only
+#: through the gate, never through the shell, files or the web.
+OPENCODE_DENY = (
+    "shell", "bash", "read", "edit", "write", "glob", "grep", "list", "patch",
+    "webfetch", "websearch", "task", "external_directory", "skill", "lsp",
+)  # fmt: skip
+
+
+def opencode_command(person: str, model: str, workdir: Path) -> tuple[list[str], dict]:
+    """``opencode run`` on a private config holding only the trust-network MCP server.
+
+    ``XDG_CONFIG_HOME`` points at that config, so the user's global OpenCode config
+    (other MCP servers, instructions) is not loaded; credentials stay where they are.
+    """
+    config = workdir / "config" / "opencode"
+    config.mkdir(parents=True, exist_ok=True)
+    (config / "opencode.json").write_text(
+        json.dumps(
+            {
+                "$schema": "https://opencode.ai/config.json",
+                "permission": {"*": "allow", **{tool: "deny" for tool in OPENCODE_DENY}},
+                "mcp": {
+                    "trustnet": {
+                        "type": "local",
+                        "command": [_tn(), "--as", person, "mcp"],
+                        "environment": _mcp_env(),
+                        "enabled": True,
+                    }
+                },
+            }
+        )
+    )
+    argv = ["opencode", "run", "--standalone", "--format", "json", "-m", model]
+    return argv, {"XDG_CONFIG_HOME": str(workdir / "config")}
+
+
+def opencode_reply(stdout: str) -> str:
+    """The text of the last assistant message in ``opencode run --format json`` output."""
+    parts: dict[str, list[str]] = {}
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        part = event.get("part") or {}
+        if event.get("type") == "text" and part.get("text"):
+            parts.setdefault(part.get("messageID", ""), []).append(part["text"])
+    return "".join(list(parts.values())[-1]) if parts else ""
 
 
 def describe(report: dict) -> str:
@@ -86,8 +149,12 @@ def describe(report: dict) -> str:
 
 
 class Runner:
-    def __init__(self, person: str, argv_for, label: str, every: float):
-        self.person, self.argv_for, self.label, self.every = person, argv_for, label, every
+    def __init__(self, person: str, invoke, label: str, every: float, on_reply=None):
+        """``invoke(reply_path)`` returns ``(argv, extra_env, read)``, where
+        ``read(stdout)`` gives the agent's reply. ``on_reply(text)`` (optional) is
+        called with each reply shown to the person."""
+        self.person, self.invoke, self.label, self.every = person, invoke, label, every
+        self.on_reply = on_reply
         self.name = person.title()
         self.transcript: list[str] = []
         self.carry: list[str] = []
@@ -115,7 +182,8 @@ class Runner:
                 self.carry = []
             reply = self.workdir / "reply.txt"
             reply.unlink(missing_ok=True)
-            argv, via_file = self.argv_for(reply)
+            argv, extra_env, read = self.invoke(reply)
+            process = None
             try:
                 process = await asyncio.create_subprocess_exec(
                     *argv,
@@ -123,11 +191,14 @@ class Runner:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=self.workdir,
+                    env={**os.environ, **extra_env},
                 )
                 out, err = await asyncio.wait_for(
                     process.communicate(self.prompt(now).encode()), TURN_TIMEOUT
                 )
             except (OSError, TimeoutError) as exc:
+                if process is not None and process.returncode is None:
+                    process.kill()  # a timed-out turn must not keep acting
                 self.carry.append(now)
                 self.note(
                     f"agent turn failed ({type(exc).__name__}); will retry with the next turn"
@@ -138,11 +209,18 @@ class Runner:
                 tail = err.decode(errors="replace").strip().splitlines()[-1:] or ["no output"]
                 self.note(f"agent exited {process.returncode}: {tail[0][:160]}")
                 return
-            text = (reply.read_text() if via_file and reply.exists() else out.decode()).strip()
+            text = read(out.decode(errors="replace")).strip()
             if not text or text == "[SILENT]":
                 return
             self.transcript.append(f"{self.label}: {text}")
             print(f"\n{CYAN}{self.label} ›{RESET} {text}\n", flush=True)
+        if self.on_reply is not None:
+            await self.on_reply(text)
+
+    async def say(self, line: str) -> None:
+        """The person says ``line`` to their agent (typed, or from a test harness)."""
+        self.transcript.append(f"{self.name}: {line}")
+        await self.turn(f"{self.name} says: {line}")
 
     def note(self, text: str) -> None:
         print(f"{DIM}  · {text}{RESET}", flush=True)
@@ -171,10 +249,8 @@ class Runner:
 
         threading.Thread(target=read, daemon=True).start()
         while (line := await lines.get()) is not None:
-            if not line.strip():
-                continue
-            self.transcript.append(f"{self.name}: {line.strip()}")
-            await self.turn(f"{self.name} says: {line.strip()}")
+            if line.strip():
+                await self.say(line.strip())
         await asyncio.Event().wait()  # stdin closed: keep polling
 
     async def run(self) -> None:
@@ -197,22 +273,40 @@ def lock(person: str):
     return handle
 
 
+MODELS = {"codex": "gpt-6.1-sol", "opencode": "opencode-go/deepseek-v4.1-flash"}
+
+
+def invoker(person: str, agent: str | None, model: str | None = None, cmd: str | None = None):
+    """``(invoke, label)`` for a known agent CLI (``codex``, ``opencode``) or any ``cmd``."""
+    if agent == "codex":
+        model = model or MODELS[agent]
+
+        def invoke(reply):
+            argv = codex_command(person, model, reply.parent, reply)
+            return argv, {}, lambda _out: reply.read_text() if reply.exists() else ""
+
+        return invoke, f"{person.title()}'s agent (Codex)"
+    if agent == "opencode":
+        model = model or MODELS[agent]
+
+        def invoke(reply):
+            argv, env = opencode_command(person, model, reply.parent)
+            return argv, env, opencode_reply
+
+        return invoke, f"{person.title()}'s agent (OpenCode)"
+
+    def invoke(reply):
+        return shlex.split(cmd), {}, lambda out: out
+
+    return invoke, f"{person.title()}'s agent"
+
+
 def main(person: str, args) -> int:
     """Run the agent for ``person``; ``args`` has ``agent``/``cmd``, ``model``, ``every``."""
     handle = lock(person)  # noqa: F841 — held for the process lifetime
-    if args.agent == "codex":
-        label = f"{person.title()}'s agent (Codex)"
-
-        def argv_for(reply):
-            return codex_command(person, args.model, reply.parent, reply), True
-    else:
-        label = f"{person.title()}'s agent"
-
-        def argv_for(reply):
-            return shlex.split(args.cmd), False
-
+    invoke, label = invoker(person, args.agent, args.model, args.cmd)
     try:
-        asyncio.run(Runner(person, argv_for, label, args.every).run())
+        asyncio.run(Runner(person, invoke, label, args.every).run())
     except KeyboardInterrupt:
         pass
     return 0

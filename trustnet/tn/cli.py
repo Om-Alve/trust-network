@@ -273,9 +273,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "wake", parents=[common], help="run any CLI agent as this person's agent"
     )
     agent = wake.add_mutually_exclusive_group(required=True)
-    agent.add_argument("--agent", choices=["codex"], help="a known agent CLI")
+    agent.add_argument("--agent", choices=["codex", "opencode"], help="a known agent CLI")
     agent.add_argument("--cmd", help="any agent command: prompt on stdin, reply on stdout")
-    wake.add_argument("--model", default="gpt-6.1-sol", help="model for --agent codex")
+    wake.add_argument(
+        "--model",
+        help="model for --agent (codex: gpt-6.1-sol, opencode: opencode-go/deepseek-v4.1-flash)",
+    )
     wake.add_argument("--every", type=float, default=15.0, help="seconds between watches")
     wake.set_defaults(handler=_cmd_wake)
     return parser

@@ -89,3 +89,7 @@ solution"); scope chosen: spec + handshake + a second framework.
 - Known v1 limits are listed in PROTOCOL.md §10 (e.g. `counter` parses but has no handler;
   ask-around and gift rooms don't check the handshake; capabilities are recorded, never read).
 - `make check`: 474 passed.
+- Follow-up: `tn wake --agent opencode` (DeepSeek, `opencode-go/deepseek-v4.1-flash`) runs OpenCode on a private
+  `XDG_CONFIG_HOME` config with only the `tn mcp` server and its shell/file/web tools denied
+  (checked: `ls /` and reading `/etc/hosts` both refused, trustnet tools work). The Codex
+  preset now runs without its shell tool and web search.
