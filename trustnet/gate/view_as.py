@@ -1,19 +1,7 @@
-"""``view-as``: exactly what one person's side can learn, field by field.
+"""Policy-filtered facts and calendar rows for one viewer.
 
-The owner types ``view-as rahul`` and sees the table their own gate would
-answer Rahul's side with. This module is a view over the policy, not a second
-policy: every ✅ comes from :func:`trustnet.gate.policy.visible_facts` and every
-calendar row from :func:`trustnet.gate.policy.calendar_view`, so the two can
-never disagree. It reads the owner's facts and calendar and returns a result
-that renders as text; it calls no Switch and no network.
-
-A person who is not on the owner's trust list gets the whole thing: nothing is
-shared with them, so the result has no rows and says ``not on your list →
-nothing``.
-
-Gift claims (phase 19) are a hook here: pass the claims the owner must not see
-yet and any claimed wishlist item is dropped from the rendered value until its
-``reveal_after`` day. With the default empty claims set nothing is hidden.
+Pending gift claims are omitted until their reveal date. This module does not
+contact Switch.
 """
 
 from __future__ import annotations
@@ -245,11 +233,7 @@ def _hide_claimed(value: Any, hidden: frozenset[str]) -> Any:
 
 
 def format_value(value: Any) -> str:
-    """Render one fact value as the short line people read.
-
-    ``ask``, ask-around replies and ``view-as`` all use this, so a value never
-    reads as a Python list in one place and prose in another.
-    """
+    """Render a fact value for human-readable gate and tool responses."""
     if isinstance(value, str):
         return value
     if isinstance(value, list | tuple):

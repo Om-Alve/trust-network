@@ -1,27 +1,7 @@
-"""The offline ``tn`` command: one person's own data, no Switch connection.
+"""Local data commands and Switch-connected personal-agent operations.
 
-``tn`` is what a person, or their main agent, runs on their own machine. Every
-command reads and writes the data directory from :mod:`trustnet.gate.facts`
-(``TN_DATA_DIR/<person>/`` or ``examples/<person>/``). Nothing here talks to
-Switch; the Switch-connected commands (``inbox``, ``answer``, ``dm``, ...) are
-added in phase 15 and reuse the same parser and handler structure.
-
-Commands:
-
-- ``tn init [<person>]`` creates an empty profile (``trust.yaml``,
-  ``facts.yaml``, ``calendar.ics``).
-- ``tn trust <person> <level>`` edits the owner's trust list.
-- ``tn fact get [<key> ...]`` is the owner's own view of every fact.
-- ``tn fact set <key> --level <level> [--value ...]`` can only **tighten** a
-  fact (PLAN.md §3 Rule 3); loosening needs an approved F ref.
-- ``tn cal add <start> <duration> "<title>" @ "<place>" [--id P1]`` appends an
-  accepted plan to the owner's calendar, idempotent on ``--id``.
-- ``tn view-as <person>`` prints the phase 08 table: exactly what that person's
-  side can learn.
-
-Every command prints plain text, which people read, and ``--json``, which
-agents parse. ``--as <person>`` (default ``$TN_PERSON``) selects whose data the
-command acts on. Naive times are read as Asia/Kolkata.
+TN_PERSON or --as selects the owner. Commands emit text or --json output.
+Naive calendar times use Asia/Kolkata.
 """
 
 from __future__ import annotations
@@ -56,7 +36,7 @@ from trustnet.gate.facts import (
     save_trust,
 )
 from trustnet.gate.policy import Actor, can_set_level
-from trustnet.gate.view_as import ViewAsError, view_as
+from trustnet.gate.view_as import ViewAsError, format_value, view_as
 from trustnet.switch_client import SwitchError
 
 __all__ = ["main"]
@@ -435,7 +415,7 @@ def _cmd_fact_get(context: Context, args: argparse.Namespace) -> int:
         "facts": {
             name: {
                 "value": _jsonable(owner_value(owner, name, profile.facts[name].value)),
-                "level": _level_name(name, profile),
+                "level": profile.facts[name].level.value,
             }
             for name in names
         },
@@ -450,7 +430,7 @@ def _cmd_fact_get(context: Context, args: argparse.Namespace) -> int:
     for name in names:
         fact = profile.facts[name]
         lines.append(
-            f"  {name:<{width}}  {fact.level.value:<{level_width}}  {_format_value(owner_value(owner, name, fact.value))}"
+            f"  {name:<{width}}  {fact.level.value:<{level_width}}  {format_value(owner_value(owner, name, fact.value))}"
         )
     return context.emit(payload, "\n".join(lines))
 
@@ -517,11 +497,11 @@ def _cmd_fact_set_locked(context: Context, args: argparse.Namespace) -> int:
         "created": previous is None,
     }
     if previous is None:
-        text = f"created {key} at {fact.level.value}: {_format_value(fact.value)}"
+        text = f"created {key} at {fact.level.value}: {format_value(fact.value)}"
     elif previous is fact.level:
-        text = f"{key}: {fact.level.value} ({_format_value(fact.value)})"
+        text = f"{key}: {fact.level.value} ({format_value(fact.value)})"
     else:
-        text = f"{key}: {previous.value} → {fact.level.value} ({_format_value(fact.value)})"
+        text = f"{key}: {previous.value} → {fact.level.value} ({format_value(fact.value)})"
     return context.emit(payload, text)
 
 
@@ -546,10 +526,6 @@ def _parse_value(text: str) -> Any:
         except yaml.YAMLError as exc:
             raise CliError(f"--value is not valid YAML: {exc}") from None
     return text
-
-
-def _level_name(name: str, profile: Profile) -> str:
-    return profile.facts[name].level.value
 
 
 # ---------------------------------------------------------------------------
@@ -686,25 +662,6 @@ def _cmd_view_as(context: Context, args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _format_value(value: Any) -> str:
-    """Render a fact value the way the fixtures read (prices as ``≈₹2,500``)."""
-    if isinstance(value, str):
-        return value
-    if isinstance(value, list | tuple):
-        return ", ".join(_format_value(item) for item in value)
-    if isinstance(value, dict):
-        if "item" in value:
-            item = str(value["item"])
-            price = value.get("price")
-            if isinstance(price, int | float) and not isinstance(price, bool):
-                return f"{item} (≈₹{price:,})"
-            return item
-        return ", ".join(f"{key}: {_format_value(item)}" for key, item in value.items())
-    if isinstance(value, bool):
-        return "yes" if value else "no"
-    return str(value)
-
-
 def _jsonable(value: Any) -> Any:
     """Turn a YAML value into something ``json`` accepts, keeping its shape."""
     if value is None or isinstance(value, str | int | float | bool):
@@ -719,9 +676,9 @@ def _jsonable(value: Any) -> Any:
 def _cmd_dm(context, args):
     import asyncio
 
-    from trustnet.tn.dm import operate
+    from trustnet.tn.personal import dm_operate
 
-    result = asyncio.run(operate(context.owner(), args.room, getattr(args, "text", None)))
+    result = asyncio.run(dm_operate(context.owner(), args.room, getattr(args, "text", None)))
     return context.emit(result, json.dumps(result, ensure_ascii=False))
 
 

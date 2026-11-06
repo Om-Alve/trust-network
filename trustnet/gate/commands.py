@@ -1,61 +1,8 @@
-"""Typed commands and a forgiving parser for the trust-network gates.
+"""Typed gate commands and fixed-form parsing.
 
-Everything that crosses a gate boundary is a fixed form (:data:`PLAN.md` §3
-Rule 4): the parser turns message text into one of the dataclasses in this
-module, validates the parts that the rule pins down, and wraps every free-text
-question or goal in :class:`Quoted` so a handler can never mistake text for an
-instruction.
-
-The grammar (``<gate>`` is the leading ``@om-gate``, optional in this module):
-
-Cross-boundary commands
-    free <date|range>
-        ``@om-gate free 2026-11-08..2026-11-09``
-    ask <fact> [<fact> ...]
-        ``@om-gate ask diet interests``
-    ask-owner Q<n> "<question>"
-        ``@om-gate ask-owner Q3 "Is ₹1,500 per person okay?"``
-    propose P<n> <start> <duration> "<title>" @ "<place>"
-        ``@om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"``
-    counter P<n> P<n> <start> <duration> "<title>" @ "<place>"
-        ``@om-gate counter P1 P2 2026-11-09T19:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"``
-    gift-ideas <occasion> <date> [budget <amount> | ₹<amount>]
-        ``@om-gate gift-ideas birthday 2026-11-20 budget<=3000``
-    claim "<item>"
-        ``@om-gate claim "Lego Millennium Falcon"``
-    ask-around "<question>"
-        ``@om-gate ask-around "tent to borrow, Nov 14-16"``
-
-Owner-only commands
-    dm <person> "<goal>"
-        ``@om-gate dm rahul "something fun Sunday evening, not pricey"``
-    yes P<n> | no P<n>
-        ``@om-gate yes P1``
-    answer <Q<n>|P<n>> "<text>"
-        ``@om-gate answer Q3 "yes, up to ₹1,500"``
-    trust <person> <level>
-        ``@om-gate trust priya close``
-    view-as <person>
-        ``@om-gate view-as rahul``
-    ledger
-        ``@om-gate ledger``
-
-Gate-to-gate commands (not in the plan; needed by phase 14)
-    join-dm <room> "<goal>"
-        ``@rahul-gate join-dm dm-om-rahul-sun "something fun Sunday evening"``
-    consent P<n> yes|no via-agent|direct
-        ``@rahul-gate consent P1 yes via-agent``
-    hello trust-network/<major>[.<minor>] <capability,...>
-        ``@rahul-gate hello trust-network/1 free,ask,propose,consent,join-dm``
-
-Dates go through :mod:`dateparser` with ``Asia/Kolkata`` and
-``PREFER_DATES_FROM: future``. Time is injectable through ``parse(..., now=)``
-so tests do not depend on the day they run; the demo's outing day,
-2026-11-08, is a Sunday.
-
-Malformed commands raise :class:`ParseError` carrying a correct example, which
-the gate posts back. Unrecognised text becomes :class:`Unknown` so the gate can
-answer with the command list (and phase 21 can add an overreach note).
+Free-text fields become Quoted values. Known malformed commands raise ParseError
+with a usable example; unknown text becomes Unknown. Dates use Asia/Kolkata and
+an injectable clock. See PROTOCOL.md for the grammar.
 """
 
 from __future__ import annotations

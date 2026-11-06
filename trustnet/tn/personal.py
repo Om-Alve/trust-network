@@ -191,16 +191,26 @@ async def dm(person, friend, goal):
         return await client.post_message(f"@{person}-gate dm {command.person} {command.goal}")
 
 
-async def dm_read(person, room):
-    from trustnet.tn.dm import operate
+async def dm_operate(person, room, text=None):
+    async with session(person) as client:
+        detail = await client.get_agent_detail(client.agent_id)
+        rooms = [r for r in detail["rooms"] if room in (r["room_id"], r["room_name"])]
+        if not rooms or not rooms[0]["room_name"].startswith("dm-") or rooms[0].get("archived"):
+            raise SwitchError("An active DM membership is required")
+        rid = rooms[0]["room_id"]
+        await client.connect_to_room(rid)
+        if text is not None:
+            await wait_until_live(client, rid, text)
+            return await client.post_message(text)
+        return await client.read_context(room_id=rid)
 
-    return await operate(person, room)
+
+async def dm_read(person, room):
+    return await dm_operate(person, room)
 
 
 async def dm_post(person, room, text):
-    from trustnet.tn.dm import operate
-
-    return await operate(person, room, text)
+    return await dm_operate(person, room, text)
 
 
 async def ask_around(person: str, question: str):

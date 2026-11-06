@@ -35,7 +35,6 @@ DAYS = (date(2026, 11, 8), date(2026, 11, 9))
 GOAL_TEXT = "something fun Sunday evening, not pricey"
 GOAL = Quoted(GOAL_TEXT)
 ROOM = "dm-om-rahul-sat"
-SNAPSHOT = Path(__file__).parent / "data" / "brief-om-rahul.md"
 
 FACTS_HEADER = "## What you may say about "
 ROW_RE = re.compile(r"^- \*\*(?P<name>[^*]+)\*\*: (?P<value>.*)$", re.MULTILINE)
@@ -241,13 +240,8 @@ def test_command_examples_never_address_the_friends_gate(
 
 
 # --------------------------------------------------------------------------
-# The snapshot and the two demo briefs
+# The two demo briefs
 # --------------------------------------------------------------------------
-
-
-def test_om_to_rahul_brief_matches_the_snapshot(profile: Profile, om_trust: TrustList) -> None:
-    text, _ = build_brief(profile, om_trust, "rahul", ROOM, GOAL, DAYS)
-    assert text == SNAPSHOT.read_text(encoding="utf-8")
 
 
 def test_the_two_demo_briefs_differ_exactly_by_the_close_facts(

@@ -60,6 +60,7 @@ Front matter is the single source of truth for status. The index table below has
 | 27 | [Scenario hardening (Codex + DeepSeek)](27-scenario-hardening.md) | P1 | agent | 26 | Nov 6 evening |
 
 | 28 | [Agent facts and memory onboarding](28-agent-facts.md) | P1 | agent | 27 | Nov 6 |
+| 29 | [Code cleanup](29-code-cleanup.md) | P1 | agent | 28 | Nov 6 |
 
 ## Dependency graph
 

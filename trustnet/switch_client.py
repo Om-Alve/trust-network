@@ -6,7 +6,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
 from urllib.parse import urlencode
 from uuid import uuid4
 
@@ -43,120 +43,6 @@ def parse_event(frame: dict[str, Any]) -> Event | None:
         payload["body"],
         payload["addressed"],
     )
-
-
-class SwitchAPI(Protocol):
-    async def post_message(self, body: str, thread_id: str | None = None) -> Any: ...
-
-    async def create_room(
-        self,
-        name: str,
-        description: str,
-        agent_names: list[str],
-        user_names: list[str] | None = None,
-        channel_type: str | None = None,
-        bridge_id: str | None = None,
-        internal_only: bool = False,
-        admin_mode: bool = False,
-        security_config: dict[str, Any] | None = None,
-        instructions: str | None = None,
-        reference_ids: list[str] | None = None,
-        package_ids: list[str] | None = None,
-        linked_rooms: list[dict[str, str]] | None = None,
-        read_visibility: str = "public",
-        write_visibility: str = "public",
-        group_name: str | None = None,
-        roles: list[dict[str, Any]] | None = None,
-        include_subagents_for: list[str] | None = None,
-        join_event_listeners: list[str] | None = None,
-        aliases: dict[str, str] | None = None,
-    ) -> Any: ...
-
-    async def invite_agent_to_room(
-        self, room_id: str, agent_name: str, include_subagents: bool = False
-    ) -> Any: ...
-
-    async def connect_to_room(
-        self, room_id: str, include_general_instructions: bool = True
-    ) -> Any: ...
-
-    async def list_participants(self) -> Any: ...
-
-    async def get_agent_detail(self, agent_id: str) -> Any: ...
-
-    async def get_room_detail(self, room_id: str) -> Any: ...
-
-    async def archive_room(self, room_id: str) -> Any: ...
-
-    async def create_agent(
-        self,
-        name: str,
-        description: str,
-        machine: str,
-        provider: str,
-        model: str | None = None,
-        advanced_config: dict[str, Any] | None = None,
-        instructions: str = "",
-        directory: str | None = None,
-        auto_mode: bool = True,
-        auto_approve: bool = False,
-        display_name: str | None = None,
-        icon_url: str | None = None,
-        start: bool = True,
-    ) -> Any: ...
-
-    async def update_agent_detail(
-        self,
-        agent_id: str,
-        name: str | None = None,
-        description: str | None = None,
-        display_name: str | None = None,
-        icon_url: str | None = None,
-        addressing: str | None = None,
-        provider: str | None = None,
-        model: str | None = None,
-        advanced_config: dict[str, Any] | None = None,
-        instructions: str | None = None,
-        auto_mode: bool | None = None,
-        auto_approve: bool | None = None,
-        directory: str | None = None,
-        isolation: str | None = None,
-        machine: str | None = None,
-        desired_state: str | None = None,
-    ) -> Any: ...
-
-    async def list_machines(self) -> Any: ...
-
-    async def create_room_document(
-        self, name: str, description: str, instructions: str, content: str
-    ) -> Any: ...
-
-    async def update_room_document(
-        self,
-        document_id: str,
-        name: str | None = None,
-        description: str | None = None,
-        instructions: str | None = None,
-        content: str | None = None,
-    ) -> Any: ...
-
-    async def read_context(
-        self,
-        limit: int = 50,
-        since: str | None = None,
-        before: str | None = None,
-        room_id: str | None = None,
-    ) -> Any: ...
-
-    async def send_targeted_message(
-        self,
-        body: str,
-        target_names: list[str] | None = None,
-        target_roles: list[str] | None = None,
-        thread_id: str | None = None,
-    ) -> Any: ...
-
-    def events(self) -> AsyncIterator[Event]: ...
 
 
 class Operations:
@@ -319,9 +205,6 @@ class Operations:
             },
         )
 
-    async def list_machines(self) -> Any:
-        return await self._op("list_machines", {})
-
     async def create_room_document(
         self, name: str, description: str, instructions: str, content: str
     ) -> Any:
@@ -363,23 +246,6 @@ class Operations:
     ) -> Any:
         return await self._op(
             "read_context", {"limit": limit, "since": since, "before": before, "room_id": room_id}
-        )
-
-    async def send_targeted_message(
-        self,
-        body: str,
-        target_names: list[str] | None = None,
-        target_roles: list[str] | None = None,
-        thread_id: str | None = None,
-    ) -> Any:
-        return await self._op(
-            "send_targeted_message",
-            {
-                "body": body,
-                "target_names": target_names,
-                "target_roles": target_roles,
-                "thread_id": thread_id,
-            },
         )
 
 

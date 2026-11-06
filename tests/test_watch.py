@@ -13,9 +13,6 @@ class Client:
     async def connect_to_room(self, room):
         self.room = room
 
-    async def send_targeted_message(self, text, **kwargs):
-        self.messages.append((self.room, text))
-
     async def get_agent_detail(self, agent):
         return {"rooms": [{"room_name": "om-home", "room_id": "home"}]}
 

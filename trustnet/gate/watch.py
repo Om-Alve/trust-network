@@ -63,8 +63,3 @@ class ConversationWatch:
             await self.client.archive_room(self.room)
             self.closed = True
             self.save()
-
-    async def run(self):
-        while not self.closed:
-            await asyncio.sleep(1)
-            await self.check()

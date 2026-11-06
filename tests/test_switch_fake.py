@@ -1,8 +1,6 @@
 import pytest
 from fakes.fake_switch import FakeSwitch
 
-from trustnet.switch_client import SwitchAPI
-
 
 async def test_visibility_addressing_archive():
     server = FakeSwitch()
@@ -10,9 +8,8 @@ async def test_visibility_addressing_archive():
     friend = server.client("friend", "rahul")
     outsider = server.client("outsider", "priya")
     human = server.client("om", "om", kind="user")
-    api: SwitchAPI = gate
     rid = (
-        await api.create_room(
+        await gate.create_room(
             "gift", "", ["gate", "friend"], internal_only=True, read_visibility="private"
         )
     )["room_id"]

@@ -266,7 +266,7 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 
 | Component | What it is | Size |
 |---|---|---|
-| `switch_client.py` | Agent protocol client: register with a person's key, WebSocket events (`addressed`, sender), ops (`post_message`, `create_room`, `invite_agent_to_room`, `list_participants`, `get_agent_detail`, `archive_room`, `create_agent`, `update_agent_detail`, `list_machines`) | ~200 lines |
+| `switch_client.py` | Agent protocol client: register with a person's key, WebSocket events (`addressed`, sender), ops (`post_message`, `create_room`, `invite_agent_to_room`, `list_participants`, `get_agent_detail`, `archive_room`, `create_agent`, `update_agent_detail`) | ~200 lines |
 | `gate/` | Policy (levels, room level, consent, tighten-only), facts, `.ics` reader, command parser, relays, surprise mode, ledger, `view-as` | ~600 lines + tests |
 | `gate/watch.py` | `ConversationWatch`: closes a DM room between main agents after 20 turns or 30 minutes, with a summary home, then archives it. (The rest of the phase 13b envoy code was removed after envoys were dropped on Nov 5.) | ~80 lines |
 | `tn` CLI | `init`, `trust`, `fact set/get`, `cal add`, `view-as`, `--as <person>` for the demo | ~200 lines |

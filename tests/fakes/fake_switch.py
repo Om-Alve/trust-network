@@ -19,7 +19,6 @@ class FakeSwitch:
         self.agents: dict[str, dict] = {}
         self.rooms: dict[str, dict] = {}
         self.clients: list[FakeSwitchClient] = []
-        self.machines: list[dict] = []
         self.message_seq = 0  # messages carry increasing Switch-style timestamps
 
     def client(self, name: str, owner_id: str, *, kind: str = "agent") -> FakeSwitchClient:
@@ -85,8 +84,6 @@ class FakeSwitchClient(Operations):
             if agent["owner_id"] != self.owner_id:
                 result.pop("instructions", None)
             return result
-        if name == "list_machines":
-            return deepcopy([m for m in self.server.machines if m["owner_id"] == self.owner_id])
         if name == "connect_to_room":
             room = self._room(a["room_id"])
             if self.name not in room["members"]:
@@ -98,7 +95,6 @@ class FakeSwitchClient(Operations):
             write=name
             in {
                 "post_message",
-                "send_targeted_message",
                 "archive_room",
                 "invite_agent_to_room",
                 "create_room_document",
@@ -123,7 +119,7 @@ class FakeSwitchClient(Operations):
                 )
                 for n in sorted(room["members"])
             ]
-        if name in {"post_message", "send_targeted_message"}:
+        if name == "post_message":
             mid = str(uuid4())
             self.server.message_seq += 1
             room["messages"].append(

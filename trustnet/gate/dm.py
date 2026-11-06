@@ -82,15 +82,6 @@ async def setup(gate, friend, goal, room=None):
     card = write_brief(
         load_profile(person), trust, friend, room, goal, (today, today + timedelta(days=7))
     )
-    text = card.text.replace("envoy", "main agent")
-    text = text.replace(
-        "This brief is your only source about", "This card lists permitted disclosures about"
-    )
-    start = text.find("You have no files, no shell")
-    end = text.find("\n", start)
-    if start >= 0:
-        text = text[:start] + text[end:]
-    text = "Share card: guidance only; your existing knowledge is not confined.\n" + text
     directory = resolve_data_dir(person) / "share-cards"
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / f"{room}.json"
@@ -101,14 +92,14 @@ async def setup(gate, friend, goal, room=None):
                 "room": room,
                 "friend": friend,
                 "agent": main_agent(person),
-                "text": text,
+                "text": card.text,
                 "created_at": gate._now().isoformat(),
             }
         )
     )
     gate.watches[room] = ConversationWatch(room, person, client, persistent=True)
     await relay.post_home(person, f"Planning with {friend} in {room}", client=client)
-    await relay.post_home(person, text, client=client)
+    await relay.post_home(person, card.text, client=client)
     own_detail = await client.get_agent_detail(client.agent_id)
     home = next(
         r["room_id"]

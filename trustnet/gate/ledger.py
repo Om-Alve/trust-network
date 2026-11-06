@@ -1,19 +1,7 @@
-"""The disclosure ledger: one append-only JSON line per fact shared.
+"""Append-only JSONL records of disclosures and approved visibility changes.
 
-PLAN.md Rule 6: everything a gate discloses is logged, with the field, the
-value, who it went to, which room, and when. Writing a brief counts as
-disclosing every fact in it, so :func:`record_brief` writes one entry per fact.
-
-The file is ``<data dir>/ledger.jsonl`` (see
-:func:`trustnet.gate.facts.resolve_data_dir`) and is **append-only**: every
-write opens it with mode ``"a"`` and appends one line. Nothing here rewrites,
-truncates or deletes it. Reading tolerates a missing file and raises on a bad
-line rather than repairing it, so a damaged ledger is never silently lost.
-
-Gift entries carry ``sealed_until`` (the day the surprise ends). The owner's
-view (:func:`owner_view`, :func:`format_ledger`) collapses still-sealed entries
-into a count and the earliest open date, so Scene 2's ledger shows
-``1 sealed entry, opens Nov 21`` until the occasion passes.
+Malformed lines raise rather than silently dropping history. Owner views hide
+sealed gift entries until their reveal date.
 """
 
 from __future__ import annotations

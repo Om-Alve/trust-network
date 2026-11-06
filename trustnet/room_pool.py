@@ -82,8 +82,6 @@ class RoomPool:
         self._locks: dict[str, asyncio.Lock] = {}
         self._tasks: list[asyncio.Task] = []
 
-    # --- connections ----------------------------------------------------------
-
     async def _pump(self, client: SwitchClient, room: str | None) -> None:
         try:
             async for event in client.events():
@@ -184,8 +182,6 @@ class RoomPool:
             await self._drop(room)
         await self.main.aclose()
 
-    # --- the SwitchAPI surface the gate uses ------------------------------------
-
     async def events(self) -> AsyncIterator[Event]:
         while True:
             item = await self.queue.get()
@@ -217,9 +213,6 @@ class RoomPool:
 
     async def update_room_document(self, *args, **kwargs) -> Any:
         return await self._here().update_room_document(*args, **kwargs)
-
-    async def send_targeted_message(self, *args, **kwargs) -> Any:
-        return await self._here().send_targeted_message(*args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
         # Room-independent operations (create/invite/archive/detail/read_context).
