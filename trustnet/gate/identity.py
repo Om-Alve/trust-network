@@ -4,11 +4,13 @@ import json
 import logging
 import os
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.request
 from pathlib import Path
 
+from trustnet import resources
 from trustnet.gate.policy import Identity, SenderKind
 
 
@@ -23,22 +25,36 @@ def decode(raw):
     }
 
 
+def identity_export_script() -> str:
+    """The exporter source that ships inside the wheel."""
+    return resources.read_text(resources.IDENTITY_EXPORT)
+
+
+def write_identity_export(directory: Path) -> Path:
+    """Write the exporter into ``directory`` and return its path."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / resources.IDENTITY_EXPORT
+    path.write_text(identity_export_script(), encoding="utf-8")
+    path.chmod(0o700)
+    return path
+
+
 def export_local(path):
     core = (
         Path.home()
         / "Library/Application Support/switchdash/local-switch-server/native/switch-core/0.31.0"
     )
-    subprocess.run(
-        [
-            str(core / "venv/bin/python"),
-            str(Path(__file__).resolve().parents[2] / "scripts/gate_identity_export.py"),
-        ],
-        check=True,
-        timeout=15,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env={**os.environ, "TN_IDENTITY_MAP": str(path)},
-    )
+    with tempfile.TemporaryDirectory(prefix="tn-identity-export-") as temporary:
+        script = write_identity_export(Path(temporary))
+        subprocess.run(
+            [str(core / "venv/bin/python"), str(script)],
+            check=True,
+            timeout=15,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env={**os.environ, "TN_IDENTITY_MAP": str(path)},
+        )
     return path.read_bytes()
 
 

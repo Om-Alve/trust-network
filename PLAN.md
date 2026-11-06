@@ -282,13 +282,14 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 ```
 trust-network/
 ├── trustnet/
+│   ├── resources/ (SKILL.md, envoy-brief.md.j2 [repurposed: share card],
+│   │              tn-watch-prompt.md, gate_identity_export.py)
 │   ├── switch_client.py
 │   ├── gate/  (policy.py, facts.py, calendar.py, commands.py, relay.py, surprise.py, ledger.py,
 │   │           brief.py [repurposed: share card], runtime.py, view_as.py,
 │   │           watch.py, __main__.py)
 │   └── tn/    (cli.py, mcp.py)
-├── skills/trust-network/SKILL.md
-├── templates/ (home.template.yaml, envoy-brief.md.j2 [repurposed: share card])
+├── templates/ (home.template.yaml)
 ├── examples/ (om/, rahul/, priya/)
 ├── scripts/ (demo_up.py, vm_up.sh)
 ├── tests/ (test_policy.py, test_commands.py, test_surprise.py, test_brief.py)
@@ -450,7 +451,7 @@ visibility does not protect gifts against the workspace administrator.
 
 ## 12. Code with Wispr
 
-- [ ] Dictate the Claude Code prompts, `SKILL.md`, the share-card template (`envoy-brief.md.j2`, repurposed), the README and the video script.
+- [ ] Dictate the Claude Code prompts, `SKILL.md`, the share-card template (`trustnet/resources/envoy-brief.md.j2`, repurposed), the README and the video script.
 - [ ] Screenshot the Wispr Flow **Insights** tab right before submitting, and attach it.
 
 ## Sources

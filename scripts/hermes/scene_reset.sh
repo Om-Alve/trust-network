@@ -23,8 +23,11 @@ if [[ "${1:-}" == "--deploy" ]]; then
   # second run succeeds. Retry once, and show the first failure's tail.
   ./scripts/vm_up.sh "$VM" > data/vm_up.log 2>&1 || { tail -3 data/vm_up.log; ./scripts/vm_up.sh "$VM" | tail -1; }
   tail -1 data/vm_up.log
-  scp -q skills/trust-network/SKILL.md "$VM":.hermes/profiles/rahul/skills/trust-network/SKILL.md
-  cp skills/trust-network/SKILL.md ~/.hermes/profiles/om/skills/trust-network/SKILL.md
+  skill_md=$(mktemp)
+  uv run python -c 'from trustnet import resources; print(resources.read_text(resources.SKILL), end="")' > "$skill_md"
+  scp -q "$skill_md" "$VM":.hermes/profiles/rahul/skills/trust-network/SKILL.md
+  cp "$skill_md" ~/.hermes/profiles/om/skills/trust-network/SKILL.md
+  rm -f "$skill_md"
   # Each Hermes gateway keeps its `tn mcp` server running for days: restart the two
   # demo profiles so their tools load the code just deployed (default profile untouched).
   hermes -p om gateway restart >/dev/null

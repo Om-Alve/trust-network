@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from trustnet.gate import facts
 from trustnet.gate.facts import (
     EXAMPLES_DIR,
     Fact,
@@ -253,6 +254,16 @@ def test_tn_data_dir_overrides_the_examples(
     assert resolve_data_dir("om") == (tmp_path / "om").resolve()
     assert profile.owner == "om"
     assert profile.calendar_path == (tmp_path / "om" / "calendar.ics").resolve()
+
+
+def test_an_installed_copy_without_a_data_dir_asks_for_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("TN_DATA_DIR", raising=False)
+    monkeypatch.setattr(facts, "EXAMPLES_DIR", tmp_path / "not-a-checkout")
+
+    with pytest.raises(FactsError, match="TN_DATA_DIR"):
+        resolve_data_dir("om")
 
 
 def test_person_names_cannot_escape_the_data_dir() -> None:

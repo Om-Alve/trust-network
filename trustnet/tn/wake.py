@@ -10,10 +10,10 @@ agent on news, and it lets the person talk to their agent by typing.
     tn --as om wake --agent opencode                # DeepSeek through OpenCode
     tn --as priya wake --cmd "my-agent --stdin"     # any other framework
 
-Each turn's prompt carries the person's persona (``examples/<person>/agent.md``
-if present), the trust-network skill, the recent conversation with the person,
-and what just happened. Agent sessions are not resumed, so a turn never depends
-on a framework's own memory.
+Each turn's prompt carries the person's persona (``agent.md`` in their data
+directory, if present), the trust-network skill, the recent conversation with the
+person, and what just happened. Agent sessions are not resumed, so a turn never
+depends on a framework's own memory.
 
 Ways this can go wrong, and what the runner does:
 - an agent turn fails or times out → the error is shown, and that turn's news is
@@ -41,12 +41,12 @@ import tempfile
 import threading
 from pathlib import Path
 
+from trustnet import resources
 from trustnet.gate.facts import resolve_data_dir
 from trustnet.tn import personal
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILL = REPO_ROOT / "skills" / "trust-network" / "SKILL.md"
-WATCH_PROMPT = REPO_ROOT / "scripts" / "hermes" / "tn-watch-prompt.md"
+SKILL_TEXT = resources.read_text(resources.SKILL)
+WATCH_PROMPT_TEXT = resources.read_text(resources.WATCH_PROMPT)
 TURN_TIMEOUT = 300
 TRANSCRIPT_LINES = 16
 
@@ -168,9 +168,9 @@ class Runner:
         self.transcript: list[str] = []
         self.carry: list[str] = []
         self.turns = asyncio.Lock()
-        persona = REPO_ROOT / "examples" / person / "agent.md"
+        persona = resolve_data_dir(person) / "agent.md"
         self.persona = persona.read_text() if persona.exists() else ""
-        self.skill = SKILL.read_text()
+        self.skill = SKILL_TEXT
         self.workdir = Path(tempfile.mkdtemp(prefix=f"tn-{person}-agent-"))
 
     def prompt(self, now: str) -> str:
@@ -244,7 +244,7 @@ class Runner:
                 news = describe(report)
                 if news:
                     self.note("news from trust-network; waking the agent")
-                    await self.turn(news + "\n\n" + WATCH_PROMPT.read_text())
+                    await self.turn(news + "\n\n" + WATCH_PROMPT_TEXT)
             await asyncio.sleep(self.every)
 
     async def listen(self) -> None:

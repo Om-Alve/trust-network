@@ -15,15 +15,11 @@ from pathlib import Path
 
 from scripts.switch_users import read_env
 from trustnet.gate.__main__ import read_identities
+from trustnet.gate.identity import export_local
 from trustnet.gate.relay import post_home
 from trustnet.gate.runtime import Gate
 from trustnet.switch_client import SwitchClient
 from trustnet.tn.personal import session
-
-CORE = (
-    Path.home()
-    / "Library/Application Support/switchdash/local-switch-server/native/switch-core/0.31.0"
-)
 
 
 async def main():
@@ -44,12 +40,9 @@ async def main():
     }
 
     def identities():
-        subprocess.run(
-            [str(CORE / "venv/bin/python"), "scripts/gate_identity_export.py"],
-            check=True,
-            capture_output=True,
-        )
-        return read_identities(Path("data/gate-identities.json"))
+        map_path = Path("data/gate-identities.json")
+        export_local(map_path)
+        return read_identities(map_path)
 
     gates = {p: Gate(p, c, identities) for p, c in clients.items()}
     tasks = [asyncio.create_task(g.run()) for g in gates.values()]

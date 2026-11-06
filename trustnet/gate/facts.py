@@ -166,13 +166,21 @@ def _person_key(person: str) -> str:
 def resolve_data_dir(person: str) -> Path:
     """Return the directory holding a person's files.
 
-    ``TN_DATA_DIR/<person>/`` when the variable is set, otherwise
-    ``examples/<person>/`` under the repository root.
+    ``TN_DATA_DIR/<person>/`` when the variable is set; otherwise
+    ``examples/<person>/`` under the repository root. An installed wheel has no
+    repository, so it asks for ``TN_DATA_DIR`` instead of reporting a missing
+    file under the virtualenv.
     """
     key = _person_key(person)
     base = os.environ.get("TN_DATA_DIR")
     if base:
         return Path(base).expanduser().resolve() / key
+    if not EXAMPLES_DIR.is_dir():
+        raise FactsError(
+            "no data directory: set TN_DATA_DIR to the directory holding each person's "
+            "trust.yaml, facts.yaml and calendar.ics (create a profile with "
+            "`TN_DATA_DIR=... tn --as om init`), or run inside a trust-network checkout"
+        )
     return EXAMPLES_DIR / key
 
 

@@ -27,6 +27,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["trustnet*"]
 
+[tool.setuptools.package-data]
+"trustnet.resources" = ["*.j2", "*.md"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

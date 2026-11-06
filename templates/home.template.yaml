@@ -30,4 +30,4 @@ resources:
           Ask @om-gate free 2026-11-08..2026-11-09 or @om-gate ask diet wishlist.
           Owner user commands: view-as <person>, ledger, trust <person> <level>.
           Reserved gate relays: join-dm <room> "goal"; consent P1 yes|no via-agent|direct.
-          Full skill: skills/trust-network/SKILL.md in the trust-network repository.
+          Full skill: trustnet/resources/SKILL.md in an installed trust-network package.

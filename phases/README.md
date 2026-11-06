@@ -61,6 +61,7 @@ Front matter is the single source of truth for status. The index table below has
 
 | 28 | [Agent facts and memory onboarding](28-agent-facts.md) | P1 | agent | 27 | Nov 6 |
 | 29 | [Code cleanup](29-code-cleanup.md) | P1 | agent | 28 | Nov 6 |
+| 30 | [Install outside the checkout](30-install-outside-checkout.md) | P1 | agent | 29 | Nov 6 |
 
 | 32 | [Durable planning and approvals](32-durable-planning.md) | P1 | agent | 29 | Nov 6 |
 

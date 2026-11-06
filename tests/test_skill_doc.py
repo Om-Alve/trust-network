@@ -13,10 +13,11 @@ import re
 
 import yaml
 
+from trustnet import resources
 from trustnet.gate.commands import Unknown, parse
 from trustnet.gate.facts import REPO_ROOT
 
-SKILL = REPO_ROOT / "skills" / "trust-network" / "SKILL.md"
+SKILL_TEXT = resources.read_text(resources.SKILL)
 PROTOCOL = REPO_ROOT / "PROTOCOL.md"
 
 
@@ -37,13 +38,13 @@ def _gate_lines(text: str) -> list[str]:
 
 
 def test_skill_front_matter_is_loadable() -> None:
-    meta = _front_matter(SKILL.read_text(encoding="utf-8"))
+    meta = _front_matter(SKILL_TEXT)
     assert meta["name"] == "trust-network"
     assert meta["description"].strip()
 
 
 def test_every_gate_example_parses() -> None:
-    lines = _gate_lines(SKILL.read_text(encoding="utf-8"))
+    lines = _gate_lines(SKILL_TEXT)
     assert len(lines) >= 5
     for line in lines:
         command = parse(line)

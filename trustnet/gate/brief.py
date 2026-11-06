@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from pathlib import Path
 from typing import Any, Final
 
-from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateError
+from jinja2 import DictLoader, Environment, StrictUndefined, TemplateError
 
+from trustnet import resources
 from trustnet.gate import ledger
 from trustnet.gate.calendar import TIME_ZONE, Block, CalendarError, busy
 from trustnet.gate.commands import Quoted
@@ -19,18 +19,17 @@ from trustnet.gate.facts import FactsError, Level, Profile, TrustList
 from trustnet.gate.policy import calendar_view, visible_facts
 from trustnet.gate.view_as import format_value
 
-__all__ = ["Brief", "BriefError", "TEMPLATE_PATH", "build_brief", "write_brief"]
+__all__ = ["Brief", "BriefError", "build_brief", "write_brief"]
 
-REPO_ROOT: Final = Path(__file__).resolve().parents[2]
-TEMPLATE_PATH: Final = REPO_ROOT / "templates" / "envoy-brief.md.j2"
-
-# Command examples are parsed by the behavioral checks.
+#: Command examples are parsed by the behavioral checks.
 ASK_OWNER_EXAMPLE: Final = '@{gate} ask-owner Q1 "Is ₹1,500 per person okay?"'
 PROPOSE_EXAMPLE: Final = (
     '@{gate} propose P1 2026-11-08T21:00 2h "Dinner and a walk" @ "The Park, MG Road"'
 )
 _ENVIRONMENT: Final = Environment(
-    loader=FileSystemLoader(str(TEMPLATE_PATH.parent)),
+    loader=DictLoader(
+        {resources.SHARE_CARD_TEMPLATE: resources.read_text(resources.SHARE_CARD_TEMPLATE)}
+    ),
     undefined=StrictUndefined,
     autoescape=False,
     keep_trailing_newline=True,
@@ -176,9 +175,9 @@ def _compose(
         "propose_own": PROPOSE_EXAMPLE.format(gate=owner_gate),
     }
     try:
-        text = _ENVIRONMENT.get_template(TEMPLATE_PATH.name).render(**context)
+        text = _ENVIRONMENT.get_template(resources.SHARE_CARD_TEMPLATE).render(**context)
     except TemplateError as exc:
-        raise BriefError(f"{TEMPLATE_PATH}: {exc}") from None
+        raise BriefError(f"{resources.SHARE_CARD_TEMPLATE}: {exc}") from None
     return text, facts, level, blocks
 
 

@@ -475,7 +475,7 @@ You need two things.
    environment, and registers `<person>-hermes` on first use. Tools:
    `inbox`, `answer`, `dm`, `dm_read`, `dm_post`, `ask_around`, `cal_add`,
    `fact_set`, `ask`, `gift_ideas`, `claim`. The tool descriptions are the
-   agent's instructions; the skill text is `skills/trust-network/SKILL.md`.
+   agent's instructions; the skill text is `trustnet/resources/SKILL.md`.
    A tool that names a friend (`dm`, `ask`, `gift_ideas`, `claim`) refuses a
    name that is not on the person's trust list, instead of posting a command
    the gate would silently ignore. `answer` refuses a `P<n>` text other than
@@ -490,7 +490,7 @@ You need two things.
 **Hermes** does this with a cron job every minute whose pre-check script
 (`scripts/hermes/tn-inbox-watch.sh`) runs `tn --json watch`. It wakes the agent
 only when there is news, and passes it the prompt in
-`scripts/hermes/tn-watch-prompt.md`.
+`trustnet/resources/tn-watch-prompt.md`.
 
 **Any other CLI agent** can be run with `tn wake`. It polls `watch`, wakes the
 agent with a prompt on stdin, reads the reply on stdout, and lets the person type

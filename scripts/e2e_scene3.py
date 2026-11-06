@@ -18,7 +18,7 @@ from pathlib import Path
 
 from scripts.switch_users import read_env
 from trustnet.gate import ledger
-from trustnet.gate.identity import read_identities
+from trustnet.gate.identity import export_local, read_identities
 from trustnet.gate.policy import Identity
 from trustnet.gate.runtime import Gate
 from trustnet.switch_client import Event, SwitchClient
@@ -71,16 +71,11 @@ async def run(live=False):
             )
             for p in people
         }
-        core = (
-            Path.home()
-            / "Library/Application Support/switchdash/local-switch-server/native/switch-core/0.31.0/venv/bin/python"
-        )
 
         def identities():
-            subprocess.run(
-                [str(core), "scripts/gate_identity_export.py"], check=True, capture_output=True
-            )
-            return read_identities(Path("data/gate-identities.json"))
+            map_path = Path("data/gate-identities.json")
+            export_local(map_path)
+            return read_identities(map_path)
     else:
         sys.path.insert(0, str(Path("tests").resolve()))
         from fakes.fake_switch import FakeSwitch
