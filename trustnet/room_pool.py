@@ -16,7 +16,10 @@ events. Ways this can go wrong, and what the pool does about each:
   addressed to ``@x-gate`` waits (up to ``LIVE_WAIT`` s) until Switch reports that
   gate ``live`` in the room;
 - an anchor's stream fails → it's dropped and re-created on the next sync;
-- archived rooms keep connections open → the sync closes their anchors.
+- archived rooms keep connections open → the sync closes their anchors;
+- Switch refuses a 33rd connection per agent, and a gate can be in many open
+  rooms → only the newest ``MAX_ANCHORS`` open rooms are anchored (older ones are
+  released), so a new room never loses out to stale ones.
 """
 
 from __future__ import annotations
@@ -32,6 +35,9 @@ from trustnet.switch_client import Event, SwitchClient
 LOG = logging.getLogger(__name__)
 LIVE_WAIT = 10.0
 SYNC_EVERY = 2.0
+#: Switch allows 32 connections per agent; leave room for the main one and for
+#: short-lived tool sessions (``tn`` runs under the gate key only to register).
+MAX_ANCHORS = 24
 _ADDRESSED_GATE = re.compile(r"@([a-z0-9][a-z0-9_-]*-gate)\b")
 
 
@@ -116,15 +122,16 @@ class RoomPool:
 
     async def sync(self) -> None:
         rooms = (await self.main.get_agent_detail(self.agent_id))["rooms"]
-        for room in rooms:
-            if room.get("archived"):
-                if room["room_id"] in self.anchors:
-                    await self._drop(room["room_id"])
-            else:
-                try:
-                    await self.anchor(room["room_id"])
-                except Exception as exc:
-                    LOG.warning("could not anchor %s: %s", room["room_id"], type(exc).__name__)
+        # Switch lists rooms oldest first; keep the newest open ones.
+        keep = [r["room_id"] for r in rooms if not r.get("archived")][-MAX_ANCHORS:]
+        for room in list(self.anchors):
+            if room not in keep:
+                await self._drop(room)
+        for room in reversed(keep):
+            try:
+                await self.anchor(room)
+            except Exception as exc:
+                LOG.warning("could not anchor %s: %s", room, type(exc).__name__)
 
     async def _sync_forever(self) -> None:
         while True:

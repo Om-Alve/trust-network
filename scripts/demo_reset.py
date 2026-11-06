@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 from scripts.demo_up import PEOPLE, configure, options
-from trustnet.switch_client import SwitchClient
+from trustnet.switch_client import SwitchClient, SwitchError
 
 STATE_FILES = (
     "ledger.jsonl",
@@ -64,7 +64,11 @@ async def archive(dry_run):
                 ) and not room.get("archived"):
                     print("Archive", room["room_name"])
                     if not dry_run:
-                        await client.archive_room(room["room_id"])
+                        try:
+                            await client.archive_room(room["room_id"])
+                        except SwitchError as exc:
+                            # One refused room must not leave the rest open.
+                            print("  not archived:", exc)
         finally:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
