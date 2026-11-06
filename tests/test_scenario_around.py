@@ -71,6 +71,13 @@ async def test_fanout_collects_one_answer_per_friend_and_the_own_words_reply(tmp
         await personal.inbox("rahul")
         opened = (await personal.inbox("rahul"))["open"]
         assert opened == [{"ref": "A1", "kind": "ask-around", "from": "om", "question": QUESTION}]
+        # An answer to a reference that isn't open (an old one still in the home
+        # room's history) is refused out loud, naming what is open, so the agent
+        # can retry instead of reporting an answer that went nowhere.
+        await world.say(world.homes["rahul"], "rahul-hermes", '@rahul-gate answer A7 "no, sorry"')
+        assert world.home_bodies("rahul")[-1] == (
+            "A7 not sent: it isn't open (answered, expired or unknown). Open: A1 from om."
+        )
         await world.say(
             world.homes["rahul"],
             "rahul-hermes",

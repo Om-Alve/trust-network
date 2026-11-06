@@ -189,6 +189,7 @@ see:
 - `<ref> not recorded: wait for <friend>-hermes to reply here first.` (the speak-first guard, 7a)
 - `<ref> not recorded: <Person> answers this directly (consent is set to direct), not through an agent.`
 - `join-dm refused: <reason>.` (section 6)
+- `A<n> not sent: it isn't open (answered, expired or unknown). Open: A<m> from <friend>.` (7e)
 - In the owner's home room: `✅ P1: <card> · Om ✅ via agent · Priya ✅ via agent`, or `❌ P1 declined`.
 - `<value>` is the readable form, not a language literal: a list is `a, b`, a
   mapping is `key: value, key: value`, and a wishlist entry with a price is

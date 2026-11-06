@@ -408,18 +408,28 @@ class Gate:
             if level != Level.SELF:
                 return
             key = next((k for k, v in state.items() if v.get("local") == ref), None)
-            if key:
-                pending = state[key]
-                # Membership and trust must still permit disclosure at answer time.
-                await self.client.connect_to_room(pending["room"])
-                ids = self.identities()
-                members = [ids.get(p["id"]) for p in await self.client.list_participants()]
-                if (
-                    None in members
-                    or room_level(self.person, members, load_trust(self.person)) is None
-                ):
-                    return
-                await self._around_send(state, key, command.text)
+            now = self._now().timestamp()
+            if key is None or state[key]["answered"] or state[key]["expires"] < now:
+                # Say so: an agent answering an old reference (still in the home
+                # room's history) would otherwise report an answer that went nowhere.
+                still = [
+                    f"{v['local']} from {v['peer']}"
+                    for v in state.values()
+                    if v.get("local") and v.get("answered") is False and v["expires"] >= now
+                ]
+                listed = f"Open: {', '.join(still)}." if still else "Nothing is open."
+                await self.client.post_message(
+                    f"{ref} not sent: it isn't open (answered, expired or unknown). {listed}"
+                )
+                return
+            pending = state[key]
+            # Membership and trust must still permit disclosure at answer time.
+            await self.client.connect_to_room(pending["room"])
+            ids = self.identities()
+            members = [ids.get(p["id"]) for p in await self.client.list_participants()]
+            if None in members or room_level(self.person, members, load_trust(self.person)) is None:
+                return
+            await self._around_send(state, key, command.text)
             return
         entry = state.get(ref)
         if not entry or entry.get("expires", 0) < self._now().timestamp():
