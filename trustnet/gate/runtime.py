@@ -28,7 +28,7 @@ from trustnet.gate.policy import (
     room_level,
     visible_facts,
 )
-from trustnet.gate.view_as import view_as
+from trustnet.gate.view_as import format_value, view_as
 
 LOG = logging.getLogger(__name__)
 COMMAND_LIST = (
@@ -233,7 +233,7 @@ class Gate:
             lines = []
             for key in fields:
                 if key in values:
-                    lines.append(f"{key}: {values[key]}")
+                    lines.append(f"{key}: {format_value(values[key])}")
                     continue
                 lines.append(f"{key}: {NOT_SHARED}")
                 if own_side:
@@ -369,17 +369,13 @@ class Gate:
             self._save_around(state)
             # Return permitted facts verbatim. No inference about intent or willingness to lend.
             values = visible_facts(load_profile(self.person), level)
-            facts = {k: values[k] for k in ("has", "recommends") if values.get(k)}
-            text = (
+            facts = {k: format_value(values[k]) for k in ("has", "recommends") if values.get(k)}
+            quoted = _quoted_reply(
                 "Profile lists, no lending promise: "
                 + "; ".join(f"{k}: {v}" for k, v in facts.items())
                 if facts
                 else ""
             )
-            try:
-                quoted = c.Quoted(text)
-            except ValueError:
-                quoted = None
             if quoted:
                 await self._around_send(state, key, quoted)
             if not any(
@@ -538,6 +534,22 @@ class Gate:
             except Exception as exc:
                 # Exception messages can contain transport payloads or private values.
                 LOG.error("gate dispatch failed: %s", type(exc).__name__)
+
+
+def _quoted_reply(text: str) -> c.Quoted | None:
+    """Fit a gate reply into one quoted line.
+
+    A profile list can exceed the 140-character command limit. The reply is cut
+    short instead of dropped: the asker still learns something, and the person's
+    own-words answer path is unaffected.
+    """
+    text = " ".join(text.split()).replace('"', "'")
+    if len(text) > c.MAX_QUESTION:
+        text = text[: c.MAX_QUESTION - 1].rstrip() + "…"
+    try:
+        return c.Quoted(text)
+    except ValueError:
+        return None
 
 
 def _is_own_side(person: str, sender) -> bool:

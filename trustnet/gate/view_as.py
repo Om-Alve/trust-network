@@ -35,6 +35,7 @@ __all__ = [
     "NOT_SHARED",
     "ViewAsError",
     "ViewAsResult",
+    "format_value",
     "view_as",
 ]
 
@@ -126,7 +127,7 @@ class ViewAsResult:
         width = max((len(row.name) for row in self.rows), default=0)
         for row in self.rows:
             mark = "✅" if row.visible else "❌"
-            text = _format_value(row.value) if row.visible else NOT_SHARED
+            text = format_value(row.value) if row.visible else NOT_SHARED
             lines.append(f"  {mark} {row.name:<{width}}  {text}")
 
         start, end = self.window
@@ -243,11 +244,16 @@ def _hide_claimed(value: Any, hidden: frozenset[str]) -> Any:
     return kept
 
 
-def _format_value(value: Any) -> str:
+def format_value(value: Any) -> str:
+    """Render one fact value as the short line people read.
+
+    ``ask``, ask-around replies and ``view-as`` all use this, so a value never
+    reads as a Python list in one place and prose in another.
+    """
     if isinstance(value, str):
         return value
     if isinstance(value, list | tuple):
-        return ", ".join(_format_value(item) for item in value)
+        return ", ".join(format_value(item) for item in value)
     if isinstance(value, Mapping):
         if "item" in value:
             item = str(value["item"])
@@ -255,7 +261,7 @@ def _format_value(value: Any) -> str:
             if isinstance(price, int | float) and not isinstance(price, bool):
                 return f"{item} (≈₹{price:,})"
             return item
-        return ", ".join(f"{key}: {_format_value(item)}" for key, item in value.items())
+        return ", ".join(f"{key}: {format_value(item)}" for key, item in value.items())
     if isinstance(value, bool):
         return "yes" if value else "no"
     return str(value)

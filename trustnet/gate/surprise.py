@@ -32,6 +32,15 @@ def claims(person):
     ]
 
 
+def _json_object(text):
+    """A JSON object from a gift envelope, or ``None`` for anything else."""
+    try:
+        value = json.loads(text)
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def owner_value(person, name, value, now=None):
     if name != "wishlist":
         return value
@@ -49,9 +58,12 @@ async def handle(gate, event, sender, level, detail):
     if body.startswith("gift-request "):
         if level != Level.SELF or sender.id != person + "-hermes" or name != person + "-home":
             return True
-        request = json.loads(body[len("gift-request ") :])
-        friend, token = request["friend"], request["token"]
-        c.Dm(person=friend, goal=c.Quoted("Gift request"))
+        try:
+            request = json.loads(body[len("gift-request ") :])
+            friend, token = request["friend"], request["token"]
+            c.Dm(person=friend, goal=c.Quoted("Gift request"))  # validates the name
+        except (ValueError, KeyError, TypeError):
+            return True  # malformed request from our own agent: nothing to answer
         if (
             not isinstance(token, str)
             or len(token) != 32
@@ -65,10 +77,14 @@ async def handle(gate, event, sender, level, detail):
                 client=client,
             )
             return True
-        if request["action"] == "ideas":
-            command = c.parse(
-                f"gift-ideas {request['occasion']} {request['date']} budget<={request['budget']}"
-            )
+        if request.get("action") == "ideas":
+            try:
+                command = c.parse(
+                    f"gift-ideas {request.get('occasion')} {request.get('date')}"
+                    f" budget<={request.get('budget')}"
+                )
+            except c.ParseError:
+                return True
             if not isinstance(command, c.GiftIdeas):
                 return True
             room_name = f"gift-{person}-{friend}-{uuid.uuid4().hex[:12]}"
@@ -93,7 +109,7 @@ async def handle(gate, event, sender, level, detail):
             await client.post_message(
                 f"@{friend}-gate gift-ideas {command.occasion} {command.on.isoformat()} budget<={command.budget}"
             )
-        elif request["action"] == "claim":
+        elif request.get("action") == "claim":
             active = [
                 (r, v)
                 for r, v in sessions.items()
@@ -110,7 +126,10 @@ async def handle(gate, event, sender, level, detail):
                 )
                 return True
             room, entry = active[-1]
-            command = c.Claim(item=request["item"])
+            try:
+                command = c.Claim(item=request.get("item", ""))
+            except ValueError:
+                return True
             entry["token"] = token
             save(person, "gift-sessions.json", sessions)
             await client.connect_to_room(room)
@@ -119,8 +138,11 @@ async def handle(gate, event, sender, level, detail):
     if not relay.is_gift_room(detail or {}):
         return False
     # Refuse ordinary fact requests without falling through to owner relays.
-    if body.startswith("ask "):
-        command = c.parse(event.text)
+    if body == "ask" or body.startswith("ask "):
+        try:
+            command = c.parse(event.text)
+        except c.ParseError:
+            return True  # malformed in surprise mode: no reply, no home note
         if isinstance(command, c.Ask):
             await client.post_message(
                 "\n".join(f"{field}: not shared with you" for field in command.facts)
@@ -140,7 +162,9 @@ async def handle(gate, event, sender, level, detail):
             or entry.get("closed")
         ):
             return True
-        payload = json.loads(body[len("gift-result ") :])
+        payload = _json_object(body[len("gift-result ") :])
+        if payload is None:
+            return True  # a peer's malformed result must not raise out of dispatch
         await relay.post_home(
             person, f"gift-result {entry['token']} " + json.dumps(payload), client=client
         )
@@ -151,7 +175,10 @@ async def handle(gate, event, sender, level, detail):
         return True
     if not name.startswith(f"gift-{sender.person}-{person}-"):
         return True
-    command = c.parse(event.text, now=gate._now())
+    try:
+        command = c.parse(event.text, now=gate._now())
+    except c.ParseError:
+        return True  # no general handler and no owner note in a gift room
     values = visible_facts(load_profile(person), level)
     taken = read(person, "claims.json")
     if isinstance(command, c.GiftIdeas):
