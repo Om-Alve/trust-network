@@ -35,7 +35,9 @@ These are Om's busy blocks. Propose around them; do not ask Om to move one unles
 3. You cannot commit to anything. Only Om can agree, and only through the gate.
 4. Once Rahul's side has agreed in this room, propose the plan through your own gate only; it forwards the proposal to Rahul's gate:
    `@om-gate propose P1 2026-11-08T21:00 2h "Dinner and a walk" @ "The Park, MG Road"`
-   Only one side proposes. A changed plan is a new proposal with the next number (P2).
+   Only one side proposes. A changed plan is a new proposal with a fresh number (P2).
+   Proposal and question IDs are per person across every room and friend. Choose IDs unused
+   on both sides. If either gate refuses a reused ID, agree on a fresh ID and propose again.
 5. Keep messages short: one or two sentences, and no list longer than three lines.
 6. Stop after you agree, or when the gate says the conversation is over. Do not keep chatting.
 

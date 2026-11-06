@@ -53,6 +53,11 @@ def digest(card):
 async def handle(gate, event, command, sender, mode):
     person, client = gate.person, gate.client
     state = load(person)
+
+    async def refuse(reason):
+        await client.connect_to_room(event.room_id)
+        await client.post_message(f"Not recorded: {reason}.")
+
     if isinstance(command, (c.AskOwner, c.Propose)):
         detail = await client.get_room_detail(event.room_id)
         name = detail.get("name", detail.get("room_name", ""))
@@ -62,14 +67,20 @@ async def handle(gate, event, command, sender, mode):
         friend = friends[0] if name.startswith("dm-") and len(friends) == 1 else person
         if isinstance(command, c.AskOwner):
             if sender.id != main_agent(person):
+                await refuse("send ask-owner through your own gate")
                 return
             ref, card = command.question_id, str(command.question)
         else:
             if sender.id not in {main_agent(person), friend + "-gate"}:
+                await refuse("send proposals through your own gate")
                 return
             ref = command.proposal_id
             if sender.id == friend + "-gate" and handshake.problem(person, friend):
-                return  # a forwarded proposal needs the peer gate's handshake
+                await refuse(handshake.problem(person, friend))
+                return
+            if command.start <= gate._now():
+                await refuse("the proposal starts in the past; choose a future time")
+                return
             if sender.id == main_agent(person) and not await _friend_spoke(
                 client, event.room_id, main_agent(friend)
             ):
@@ -84,6 +95,7 @@ async def handle(gate, event, command, sender, mode):
                 f'"{command.title}" @ "{command.place}"'
             )
         if ref in state:
+            await refuse(f"{ref} is already used for this person; choose a fresh ID in both gates")
             return  # IDs are never rebound to a different plan or room.
         state[ref] = {
             "room": event.room_id,
@@ -105,14 +117,21 @@ async def handle(gate, event, command, sender, mode):
     ref = command.reference if isinstance(command, c.Answer) else command.proposal_id
     item = state.get(ref)
     if not item or item["status"] != "pending":
+        await refuse(f"{ref} is not pending")
         return
     room, friend = item["room"], item["friend"]
+    if not isinstance(command, c.Consent):
+        detail = await client.get_room_detail(room)
+        if detail.get("archived") or (room in gate.watches and gate.watches[room].closed):
+            await refuse(f"{ref}'s planning room is closed; open a new room")
+            return
     if isinstance(command, c.Consent):
         if (
             event.room_id != room
             or sender.id != friend + "-gate"
             or command.fingerprint != digest(item["card"])
         ):
+            await refuse("consent must match the proposal room, friend gate and fingerprint")
             return
         who, vote, via = friend, command.agreed, command.via
     elif ref.startswith("Q"):
@@ -133,6 +152,7 @@ async def handle(gate, event, command, sender, mode):
             vote = isinstance(command, c.Yes)
         who, via = person, mode
     if who in item["votes"]:
+        await refuse(f"{ref} already has {who}'s vote")
         return
     item["votes"][who] = [vote, via]
     save(person, state)
@@ -161,4 +181,5 @@ async def handle(gate, event, command, sender, mode):
             await client.archive_room(room)
         if room in gate.watches:
             gate.watches[room].closed = True
+            gate.watches[room].save()
     save(person, state)

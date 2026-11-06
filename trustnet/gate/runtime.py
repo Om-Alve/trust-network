@@ -19,6 +19,7 @@ from typing import Any
 from trustnet.gate import commands as c
 from trustnet.gate import consent, dm, handshake, ledger, relay, surprise
 from trustnet.gate.calendar import TIME_ZONE, busy
+from trustnet.gate.envoy import ConversationWatch
 from trustnet.gate.facts import Level, load_profile, load_trust, resolve_data_dir, save_trust
 from trustnet.gate.policy import (
     DenialCode,
@@ -51,7 +52,10 @@ class Gate:
         self.person, self.client, self.identities = person, client, identities
         self._clock: Callable[[], datetime] = clock or (lambda: datetime.now(TIME_ZONE))
         self._gift_room = gift_room or relay.is_gift_room
-        self.watches = {}
+        self.watches = {
+            path.stem: ConversationWatch(path.stem, person, client, persistent=True)
+            for path in (resolve_data_dir(person) / "room-watches").glob("*.json")
+        }
         self.hellos: set[str] = set()  # rooms this gate has said hello in since it started
         self._dispatch_lock = asyncio.Lock()
         self._notes: dict[tuple[str, str], datetime] = {}
@@ -116,7 +120,7 @@ class Gate:
             return
         own_side = _is_own_side(self.person, sender)
         try:
-            command = c.parse(event.text)
+            command = c.parse(event.text, now=self._now())
         except c.ParseError:
             await self.client.post_message("Invalid command. " + COMMAND_LIST)
             if not own_side:

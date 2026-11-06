@@ -220,8 +220,8 @@ string, the major version, the capability list, the room and the time.
   hello (no trust-network/1 handshake).` or `... <friend>'s gate speaks
   trust-network/2; this gate speaks trust-network/1.` It also posts a home notice
   to its owner: `Didn't open a planning room with <Friend>: <reason>.`
-- A `propose` forwarded by the peer gate is silently not recorded without a
-  compatible hello.
+- A `propose` forwarded by the peer gate is refused with the handshake reason
+  without a compatible hello.
 
 **A `hello` that is not the handshake form is an unknown command**, not a
 malformed one: "@om-gate hello there" gets the command list, exactly as it did
@@ -275,8 +275,14 @@ side that sent it, notes it as overreach to its owner; it then accepts
      Switch notices do not count, and neither does a message that starts with
      `@`. Otherwise the gate posts `P1 not recorded: wait for <friend>-hermes to
      reply here first.`
-   - **Immutable IDs:** a `P<n>` is never rebound. A second `propose` with an
-     existing ID is ignored.
+   - **Immutable IDs:** a `P<n>` is never rebound. IDs are stored per person,
+     across all rooms and friends. Reusing an ID gets a plain-text refusal
+     asking for a fresh ID in both gates. Choose an ID unused on both sides;
+     a collision at the receiving gate can leave only the opening side holding
+     that proposal, so propose again with a fresh ID and do not vote on the collision.
+   - A proposal whose start is at or before the gate's current time is refused.
+     Malformed dates and durations outside 1 minute to 24 hours get
+     `Invalid command.`; even extremely large durations cannot crash dispatch.
 7. `om-gate` stores the proposal with the card
    `<iso start> <minutes>m "<title>" @ "<place>"`, posts
    `P1: <card> · reply @om-gate answer P1 …` in `om-home`, writes a ledger
@@ -304,14 +310,24 @@ side that sent it, notes it as overreach to its owner; it then accepts
     calendar is the person's; the gate does not write it.
 
 A changed plan is a new proposal with the next number. `consent` that arrives
-for a proposal that is not pending (already decided) is ignored.
+for a proposal that is not pending (already decided) does not change it.
+Duplicate votes keep the first vote. The gate explains a refused relay's room,
+sender or fingerprint mismatch in plain text, without recording a vote.
+Home-room answers for a closed planning room are refused. Limit-closed rooms
+ignore subsequent messages, including consent; confirmation archiving still
+allows the final consent relay to reach the pending peer.
+Room deadlines, turn counts and closure are saved per person in `room-watches/`
+and restored on restart. Proposal and question state is in `coordination.json`;
+handshakes are in `peers.json`. A restarted gate replies to a new hello once
+again. Persisted peers remain compatible until a new hello changes their version.
 
 ### 7b. A question to your own person
 
 1. The agent posts `@om-gate ask-owner Q3 "Is ₹1,500 per person okay?"` in the
-   DM room. Only `om-hermes` can do this; the gate ignores it from anyone else.
+   DM room. Only `om-hermes` can do this; other senders are told to use their own gate.
 2. `om-gate` stores `Q3` (never rebound), and posts `Q3: "..." · reply @om-gate
-   answer Q3 …` in `om-home`.
+   answer Q3 …` in `om-home`. Question IDs are also per person across rooms;
+   reusing one gets a refusal asking for a fresh ID.
 3. Om replies to his agent. The agent calls `answer("Q3", "yes, up to ₹1,500")`,
    which posts `@om-gate answer Q3 "yes, up to ₹1,500"` in `om-home`.
 4. `om-gate` checks the sender (Om, or `om-hermes` when `via-agent`), posts

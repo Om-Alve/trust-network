@@ -559,10 +559,13 @@ def _parse_duration_text(text: str, *, command: str, raw: str) -> timedelta:
     match = _DURATION_RE.fullmatch(text.strip())
     if not match or (not match["hours"] and not match["minutes"]):
         raise _err(command, f"could not read the duration {text!r} (try 2h or 90m)", raw)
-    total = timedelta(
-        hours=int(match["hours"] or 0),
-        minutes=int(match["minutes"] or 0),
-    )
+    try:
+        total = timedelta(
+            hours=int(match["hours"] or 0),
+            minutes=int(match["minutes"] or 0),
+        )
+    except (OverflowError, ValueError):
+        raise _err(command, "a duration must be between 1 minute and 24 hours", raw) from None
     if total < timedelta(minutes=1) or total > MAX_DURATION:
         raise _err(command, "a duration must be between 1 minute and 24 hours", raw)
     return total

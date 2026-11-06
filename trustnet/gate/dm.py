@@ -106,7 +106,7 @@ async def setup(gate, friend, goal, room=None):
             }
         )
     )
-    gate.watches[room] = ConversationWatch(room, person, client)
+    gate.watches[room] = ConversationWatch(room, person, client, persistent=True)
     await relay.post_home(person, f"Planning with {friend} in {room}", client=client)
     await relay.post_home(person, text, client=client)
     own_detail = await client.get_agent_detail(client.agent_id)
