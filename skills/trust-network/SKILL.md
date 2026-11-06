@@ -31,7 +31,7 @@ and no files; these tools are all you need.
 | `ask(friend, fields)` | Ask a friend's gate for named facts (`diet`, `interests`, …) at the room's level. |
 | `gift_ideas(friend, occasion, date, budget)` / `claim(friend, item)` | Surprise-safe gift ideas from stored facts; the friend is never asked. |
 | `ask_around(question)` | One short question (≤140 chars) to all your person's friends. |
-| `cal_add(...)` | Add a confirmed plan to your person's calendar. |
+| `cal_add(...)` | Add a separate event to your person's calendar. Confirmed proposals are automatic. |
 | `fact_set(key, level)` | Make one of your person's facts *more* private. Use an F ref and explicit consent to loosen one. |
 
 ## Remember facts and onboard from memory
@@ -109,13 +109,16 @@ F1` or `tn review --approve F1 T1`, or their own Switch user says
 @om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"
 ```
 
-   A changed plan is a new proposal with the next number (P2), never an edit of P1.
+   To revise a pending plan before you vote, use `counter P1 P2 ...` through your
+   own gate. P2 needs fresh votes from both people. You cannot counter after
+   casting your vote or after confirmation.
 
 6. Tell your person the proposal in one line and wait for **their** yes or no.
    Then call `answer("P1", "yes")`. Never say yes for them, and never reuse an
    earlier yes for a new proposal.
-7. When the gate posts ✅ confirmed, call `cal_add` with the agreed time, title
-   and place, and tell your person it's on their calendar.
+7. When the gate posts ✅ confirmed, it automatically queues the ICS event.
+   Do not call `cal_add` again for that proposal. Delivery retries after an
+   interruption with the same event UID.
 
 Use your own gate's name: Rahul's agent writes `@rahul-gate …`, Om's writes
 `@om-gate …`.

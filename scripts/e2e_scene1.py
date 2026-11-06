@@ -128,26 +128,18 @@ async def main():
         assert all(coordination(p)["P1"]["status"] == "pending" for p in clients)
         await cli("rahul", "answer", "P1", "yes")
         await wait_for(lambda: all(coordination(p)["P1"]["status"] == "confirmed" for p in clients))
-        for p in clients:
-            await cli(
-                p,
-                "cal",
-                "add",
-                "2026-11-08T21:00",
-                "2h",
-                "Bowling + dinner",
-                "@",
-                "Smaaash, Indiranagar",
-                "--id",
-                "P1",
+        await wait_for(
+            lambda: all(
+                "UID:trustnet-" in (output / p / "calendar.ics").read_text() for p in clients
             )
+        )
         transcript = await clients["om"].read_context(room_id=room, limit=200)
         homes = {p: await cli(p, "inbox") for p in clients}
         for p in clients:
             assert "via Hermes" in json.dumps(homes[p], ensure_ascii=False)
             assert "✅ P1" in json.dumps(homes[p], ensure_ascii=False)
             assert not (await cli(p, "inbox"))["threads"]
-            assert "UID:P1" in (output / p / "calendar.ics").read_text()
+            assert (output / p / "calendar.ics").read_text().count("UID:trustnet-") == 1
         detail = await clients["om"].get_room_detail(room)
         assert detail["archived"]
         artifact = {

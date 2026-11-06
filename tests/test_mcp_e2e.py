@@ -389,14 +389,14 @@ async def test_mcp_stdio_end_to_end(tmp_path, monkeypatch):
                     {
                         "start": "2026-11-08T21:00",
                         "duration": "2h",
-                        "title": "Bowling + dinner",
+                        "title": "Personal reminder",
                         "place": "Smaaash, Indiranagar",
-                        "id": "P1",
+                        "id": "manual-reminder",
                     },
                 )
-                assert ok and event["id"] == "P1"
+                assert ok and event["id"] == "manual-reminder"
                 calendar = (tmp_path / "om" / "calendar.ics").read_text()
-                assert "UID:P1" in calendar and "Bowling + dinner" in calendar
+                assert "UID:manual-reminder" in calendar and "Personal reminder" in calendar
 
                 ok, _ = await _call(
                     session,
@@ -515,6 +515,44 @@ async def test_mcp_stdio_end_to_end(tmp_path, monkeypatch):
                         assert ok and other["taken"] == [
                             {"item": "Lego Millennium Falcon", "status": "taken"}
                         ]
+                        ok, _ = await _call(
+                            rahul,
+                            artifact["calls"],
+                            "dm_post",
+                            {"room": room["id"], "text": "Sunday bowling works for me."},
+                        )
+                        assert ok
+                        ok, _ = await _call(
+                            session,
+                            artifact["calls"],
+                            "dm_post",
+                            {
+                                "room": room["id"],
+                                "text": '@om-gate propose P1 2026-11-09T21:00 2h "Bowling" @ "Smaaash"',
+                            },
+                        )
+                        assert ok
+                        await _wait_for(
+                            lambda: all("P1" in _coordination(tmp_path, p) for p in PERSONS),
+                            what="both proposals",
+                        )
+                        ok, _ = await _call(
+                            session, artifact["calls"], "answer", {"id": "P1", "text": "yes"}
+                        )
+                        assert ok
+                        ok, _ = await _call(
+                            rahul, artifact["calls"], "answer", {"id": "P1", "text": "yes"}
+                        )
+                        assert ok
+                        await _wait_for(
+                            lambda: all(
+                                (tmp_path / p / "calendar.ics").read_text().count("UID:trustnet-")
+                                == 1
+                                for p in PERSONS
+                            ),
+                            what="automatic calendar delivery for both people",
+                        )
+                        calendar = (tmp_path / "om" / "calendar.ics").read_text()
                         artifact["gift"] = {
                             "ideas": gifts,
                             "claim": claimed,

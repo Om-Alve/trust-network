@@ -58,3 +58,7 @@ The full check passed with 518 tests including final documentation cleanup.
 
 Final review also required original-offer delivery before a counter and a fresh
 trust read under the fact-edit lock. The extra E2Es verify both ordering cases.
+
+The agent guidance now describes automatic ICS delivery and the counter command.
+The live Scene 1 runner observes automatic calendar delivery. The stdio MCP E2E
+checks both automatic events and a separate manual reminder.
