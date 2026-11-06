@@ -371,7 +371,9 @@ Agents never put gift traffic in a planning room; they use `gift_ideas` and
    `interests` and `sizes` if the level allows. It replies in plain text:
    `@om-gate gift-result {...}`.
 3. The recipient's ledger entry is sealed until the day after the occasion.
-4. `claim "<item>"` in the same room marks an item taken. Claims are hidden from
+4. `claim "<item>"` in the same room marks an item taken. The item is matched to an
+   offered wishlist item ignoring case and spacing; anything else gets `Item unavailable;
+   claim one of: <items still free>`. Claims are hidden from
    the recipient's own view of their wishlist until after the occasion, and
    marked taken for other askers. The owner's own `ask` and `view-as` drop a
    claimed item until that day; a friend's `ask` returns the wishlist unchanged

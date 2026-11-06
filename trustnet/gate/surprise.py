@@ -241,7 +241,11 @@ async def handle(gate, event, sender, level, detail):
             (i for i in permitted if _item_key(i) == wanted and i in entry["offered"]), None
         )
         if item is None or item.casefold() in taken:
-            payload = {"error": "Item unavailable"}
+            # Name what can still be claimed (the asker was offered all of it), so
+            # an agent that used a casual name can retry with the exact one.
+            left = [i for i in entry["offered"] if i in permitted and i.casefold() not in taken]
+            hint = f"; claim one of: {', '.join(left)}" if left else "; nothing left to claim"
+            payload = {"error": "Item unavailable" + hint}
         else:
             taken[item.casefold()] = {
                 "item": item,
