@@ -174,6 +174,8 @@ class Gate:
                         f"{ref} not recorded: {_display(self.person)} answers this directly"
                         f" (consent is set to direct), not through an agent."
                     )
+                elif name in {"answer", "yes", "no", "consent", "join-dm", "hello"}:
+                    await self.client.post_message(f"Not allowed: {decision.reason}.")
                 return
             if decision.code is DenialCode.UNKNOWN_COMMAND:
                 await self.client.post_message(COMMAND_LIST)
@@ -185,7 +187,12 @@ class Gate:
                     f" ({_snippet(event.text)})",
                 )
             else:
-                await self.client.post_message("Not allowed.")
+                text = (
+                    f"Not allowed: {decision.reason}."
+                    if name in {"answer", "yes", "no", "consent", "join-dm", "hello"}
+                    else "Not allowed."
+                )
+                await self.client.post_message(text)
                 await self._overreach(
                     event,
                     sender,

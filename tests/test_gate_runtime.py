@@ -74,10 +74,13 @@ async def test_unknown_identity_and_unaddressed_are_silent(tmp_path, monkeypatch
     for sender, text, addressed in [
         ("forged", "@om-gate ask address", True),
         ("om", "@om-gate ask address", False),
-        ("om", "@om-gate consent P1 yes direct", True),
     ]:
         await gate.handle(Event(rid, sender, "user", text, addressed))
     assert switch.rooms[rid]["messages"] == []
+    await gate.handle(Event(rid, "om", "user", "@om-gate consent P1 yes direct", True))
+    assert [m["body"] for m in switch.rooms[rid]["messages"]] == [
+        "Not allowed: gate relay requires the matching connection."
+    ]
     await gate.handle(Event(rid, "om", "unknown", "@om-gate nonsense", True))
     assert "Commands:" in switch.rooms[rid]["messages"][-1]["body"]
 

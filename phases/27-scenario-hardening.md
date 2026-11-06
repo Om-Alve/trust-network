@@ -26,7 +26,7 @@ Two areas, worked in parallel on separate branches, then merged:
   `tn wake`, `PROTOCOL.md` §7c–§7e.
 
 ## Tasks
-- [ ] A: scenarios written down (failure modes first), run in-process on `FakeSwitch` with the
+- [x] A: scenarios written down (failure modes first), run in-process on `FakeSwitch` with the
   real gate code, bugs fixed, `PROTOCOL.md` kept true.
 - [ ] B: the same for its area.
 - [ ] Merged; live re-check of Scene 1 on the real Switch.
@@ -63,7 +63,6 @@ Scenario inventory and failure modes, before implementation:
 - RoomPool beyond MAX_ANCHORS and failed stream: connection exhaustion,
   newest rooms starved, duplicate events or failed recovery.
 
-
 Implementation evidence:
 - Added eight grouped FakeSwitch flows in `tests/planning_flows.py`, driven by
   `tests/test_planning_scenarios.py`. The same flows power the artifact runner.
@@ -89,5 +88,30 @@ Deviations and limits:
   opening side. Refusals and share cards now explain choosing a fresh ID on both.
 - Persistence covers completed event dispatch across restart. Crash recovery
   between a state write and transport side effects remains outside this phase.
+
+Final validation and artifact:
+- A further failing-before authority assertion showed that a friend's `answer`
+  only got `Not allowed.`. Planning policy refusals now include the actual reason.
+- Updated the existing brief snapshot for the deliberate ID guidance change.
+- Both direct and via-agent votes are exercised, including both local yeses
+  queued before either peer relay and the final relay after confirmation archive.
+- `make check`: ruff format and lint passed; **482 passed**.
+- `uv run python scripts/e2e_planning_scenarios.py` writes each scenario's
+  input/output room transcript, steps, final coordination and failure traceback.
+  Run from the repository root. The injected anchor ConnectionError is expected.
+- Artifact: `data/scenarios-planning-20261106T104712880463Z/`.
+  Summary quoted from `summary.txt`:
+
+```text
+PASS three_people
+PASS collisions_and_decline
+PASS consent_replays_and_restart
+PASS authority_and_questions
+PASS malformed_plans
+PASS limits_and_restart
+PASS handshake_restart
+PASS pool_capacity_and_failure
+8 PASS / 0 FAIL
+```
 
 ### B

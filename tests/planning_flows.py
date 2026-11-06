@@ -113,8 +113,9 @@ async def three_people(h):
         ref = f"P{index}"
         await h.propose(room, ref, p)
         assert consent.load(p)[ref]["friend"] == "om"
-        await h.vote("om", ref)
+        await h.send(h.homes["om"], "om-hermes", f'@om-gate answer {ref} "yes"')
         await h.vote(p, ref)
+        assert consent.load(p)[ref]["votes"]["om"] == [True, "via-agent"]
         for person in ("om", p):
             assert consent.load(person)[ref]["status"] == "confirmed"
             assert sum(b.startswith(f"✅ {ref}:") for b in h.bodies(h.homes[person])) == 1
@@ -183,6 +184,7 @@ async def authority_and_questions(h):
     await h.propose(room)
     await h.send(room, "rahul-hermes", '@om-gate answer P1 "yes"')
     assert consent.load("om")["P1"]["votes"] == {}
+    assert any("answer is an owner command" in b for b in h.bodies(room))
     path = h.root / "om" / "trust.yaml"
     trust = yaml.safe_load(path.read_text())
     trust["consent"]["default"] = "direct"

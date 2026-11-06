@@ -183,7 +183,9 @@ see:
 - `<fact>: <value>` or `<fact>: not shared with you`.
 - `<iso start> .. <iso end> <title or busy>` per block, or `Nothing busy in this range.`
 - `Invalid command. Commands: ...` for a malformed command.
-- `Not allowed.` when the other side sends an owner-only command.
+- `Not allowed.` when the other side sends an owner-only command. Planning
+  consent commands append the policy reason, for example that `answer` is an
+  owner command and cannot be accepted across the boundary.
 - `<ref> not recorded: wait for <friend>-hermes to reply here first.` (the speak-first guard, 7a)
 - `<ref> not recorded: <Person> answers this directly (consent is set to direct), not through an agent.`
 - `join-dm refused: <reason>.` (section 6)
