@@ -18,7 +18,7 @@
 | **Both on Hermes, on Discord (decided Nov 5)** | Om's main agent is his existing Hermes (Agent v0.22.5, already running on the Azure VM, host `hermes`, user `om`), acting in Switch as `om-hermes`; Rahul's main agent is a second Hermes profile on the same VM, with its own Discord bot, acting as `rahul-hermes` — both talked to on Discord, not Telegram, and Rahul is played from a different Discord account Om records from. History in one line: earlier the same day Om had briefly swapped to Hermes/Telegram for himself while planning a Switch-managed Codex agent (`rahul-agent`) for Rahul; this decision drops `rahul-agent` and settles both people on Hermes via Discord instead. `om-agent` (managed Codex, Discord `#om-home`) stays as Om's optional secondary surface only — `view-as`, `ledger`, overreach notes, or typing `yes P1` directly. |
 | Who holds private data | Each person's **gate**: our code, no LLM, running on the person's own machine |
 | Machines | **Om's side on the laptop**: Switch server (Docker, run by Console), Console, `om-gate`, `priya-gate`, Om's own Hermes (`om` profile → `om-hermes`, with its `tn mcp` and Discord bot) and (optional, secondary) `om-agent`. **Rahul's side on the Azure VM:** his Hermes (`rahul` profile → `rahul-hermes`, with its own `tn mcp` and Discord bot) and `rahul-gate`. *(Nov 5: Om's Hermes moved from the VM to the laptop so `tn mcp --as om` sits next to `om-gate`'s files — `cal_add`/`fact_set` write those files directly.)* The `rahul-vm` `switch-agent-controller` enrollment (phase 02/03) is no longer needed by any flow now that no managed agent runs through it — it's optional, left enrolled. Joined by **Tailscale**: `tailscale serve` gives the laptop's Switch server an https address only tailnet devices can reach. |
-| Custom envoy runner | **Unused after Nov 5.** Phase 13b built it (native tool denial, isolated state; macOS Seatbelt adds read confinement, Linux needs a separate OS user/container); the code stays in the repo but nothing calls it now that main agents talk directly. |
+| Custom envoy runner | **Unused after Nov 5.** Phase 13b built it (native tool denial, isolated state; macOS Seatbelt adds read confinement, Linux needs a separate OS user/container); removed after submission prep, since nothing called it once main agents talked directly (see git history). |
 | Planner agent | None. Your main agent plans directly with your friend's main agent. |
 | Tally / group secrets | Dropped. When an agent lacks a fact, it **asks its person**. |
 | Trust levels | **close / friend / acquaintance**, per person, in each owner's own list. Mutual: each side sets its own level. |
@@ -268,7 +268,7 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 |---|---|---|
 | `switch_client.py` | Agent protocol client: register with a person's key, WebSocket events (`addressed`, sender), ops (`post_message`, `create_room`, `invite_agent_to_room`, `list_participants`, `get_agent_detail`, `archive_room`, `create_agent`, `update_agent_detail`, `list_machines`) | ~200 lines |
 | `gate/` | Policy (levels, room level, consent, tighten-only), facts, `.ics` reader, command parser, relays, surprise mode, ledger, `view-as` | ~600 lines + tests |
-| `gate/envoy.py` *(partly unused since Nov 5)* | Built in phase 13b for the dropped envoy design. Its envoy creation, brief handoff and registration parts are unused; its `ConversationWatch` (20 turns / 30 minutes, then a summary home and archive) is what `gate/dm.py` uses for DM rooms between main agents. | ~80 lines |
+| `gate/watch.py` | `ConversationWatch`: closes a DM room between main agents after 20 turns or 30 minutes, with a summary home, then archives it. (The rest of the phase 13b envoy code was removed after envoys were dropped on Nov 5.) | ~80 lines |
 | `tn` CLI | `init`, `trust`, `fact set/get`, `cal add`, `view-as`, `--as <person>` for the demo | ~200 lines |
 | `tn mcp` | MCP server (stdio) for personal agents, generic across who runs it. **Now runs twice in the demo** (`--as om`, acting as `om-hermes`; `--as rahul`, acting as `rahul-hermes`), one instance per Hermes profile: `inbox`, `dm`, `dm_read`, `dm_post`, `ask`, `gift_ideas`, `claim`, `ask_around`, `answer`, `cal_add`, `fact_set`. `dm_read`/`dm_post` (new, Nov 5) let a Hermes-style agent read and post plain-language text in a DM room it's already a member of, since the main agent now carries that conversation itself. | ~180 lines |
 | `SKILL.md` | The manual for every agent, in Agent Skill format. Attached to rooms as a doc, and loaded by both Hermes profiles and (optionally) `om-agent`. **Dictated with Wispr.** | 1 page |
@@ -278,16 +278,14 @@ Anything else gets the list of commands back, plus an **overreach note** to the 
 | `scripts/demo_up.py` | Registers gates from keys, writes example data, sets addressing, prints the remaining clicks (enroll the VM if used, run the home template for Om's optional `om-agent`) | ~100 lines |
 | `scripts/vm_up.sh` | Sets up the Azure VM, now shared by both Hermes profiles: Node 22, `uv`, the controller (enroll with a one-time code, kept but unused), `rahul-gate` as a service, both Hermes's `tn mcp` entries (acting as `om-hermes` and `rahul-hermes`) and their two Discord bot configs | ~40 lines |
 | `examples/{om,rahul,priya}/` | `trust.yaml`, `facts.yaml`, `calendar.ics` | fixtures |
-| *(unused since Nov 5)* `envoy_runner.py` | Built in phase 13b for the dropped envoy design: registered an envoy under its person's key and ran their agent CLI headless, tools off (`opencode run -m opencode-go/deepseek-v4.1-flash` for Om, `codex exec` for Rahul). Nothing calls it now. | ~200 lines |
 
 ```
 trust-network/
 ├── trustnet/
 │   ├── switch_client.py
-│   ├── envoy_runner.py        # unused since Nov 5 (built for the dropped envoy design)
 │   ├── gate/  (policy.py, facts.py, calendar.py, commands.py, relay.py, surprise.py, ledger.py,
 │   │           brief.py [repurposed: share card], runtime.py, view_as.py,
-│   │           envoy.py [unused since Nov 5], __main__.py)
+│   │           watch.py, __main__.py)
 │   └── tn/    (cli.py, mcp.py)
 ├── skills/trust-network/SKILL.md
 ├── templates/ (home.template.yaml, envoy-brief.md.j2 [repurposed: share card])

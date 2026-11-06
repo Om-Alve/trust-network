@@ -19,7 +19,7 @@ import pytest
         "trustnet.gate.relay",
         "trustnet.gate.surprise",
         "trustnet.gate.ledger",
-        "trustnet.gate.envoy",
+        "trustnet.gate.watch",
         "trustnet.tn.__init__",
         "trustnet.tn.cli",
         "trustnet.tn.mcp",

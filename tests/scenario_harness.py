@@ -226,16 +226,16 @@ async def build_world(
     )
     if monkeypatch is not None:
         monkeypatch.setattr(relay, "post_home", post_home)
-        monkeypatch.setattr("trustnet.gate.envoy.post_home", post_home)
+        monkeypatch.setattr("trustnet.gate.watch.post_home", post_home)
     else:
-        import trustnet.gate.envoy as envoy
+        import trustnet.gate.watch as watch
 
         world._restore = [
             (relay, "post_home", relay.post_home),
-            (envoy, "post_home", envoy.post_home),
+            (watch, "post_home", watch.post_home),
         ]
         relay.post_home = post_home
-        envoy.post_home = post_home
+        watch.post_home = post_home
 
     world.gates = {
         person: Gate(person, client, lambda: identities, clock=world.clock)

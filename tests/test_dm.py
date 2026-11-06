@@ -4,9 +4,9 @@ import pytest
 from fakes.fake_switch import FakeSwitch
 
 from trustnet.gate import dm, relay
-from trustnet.gate.envoy import MAX_TURNS
 from trustnet.gate.policy import Identity, authorize
 from trustnet.gate.runtime import Gate
+from trustnet.gate.watch import MAX_TURNS
 from trustnet.switch_client import Event
 
 
@@ -43,7 +43,7 @@ async def test_dm_setup_private_cards_and_limits(tmp_path, monkeypatch):
 
     monkeypatch.setattr(relay, "post_home", home)
     # ConversationWatch imports the relay function directly.
-    monkeypatch.setattr("trustnet.gate.envoy.post_home", home)
+    monkeypatch.setattr("trustnet.gate.watch.post_home", home)
     gates = {p: Gate(p, c, lambda: ids) for p, c in clients.items()}
     await gates["om"].handle(
         Event(homes["om"], "om", "user", '@om-gate dm rahul "Sunday bowling"', True)

@@ -24,8 +24,7 @@ if host.startswith('-'):
 processes = subprocess.check_output(['ps', '-axo', 'command='], text=True)
 for line in processes.splitlines():
     if ('trustnet.gate' in line and '--person rahul' in line) or ('python' in line and any(name in line for name in
-            ('scripts.dm_live_probe', 'scripts.gate_live_probe',
-             'scripts.e2e_scene1'))):
+            ('scripts.e2e_scene1', 'scripts.e2e_scene2', 'scripts.e2e_scene3'))):
         raise SystemExit('Stop the local gate/probe before deploying Rahul')
 env = read_env(Path('.env'))
 for key in ('SWITCH_URL', 'RAHUL_GATE_KEY', 'TN_IDENTITY_URL', 'TN_IDENTITY_TOKEN'):

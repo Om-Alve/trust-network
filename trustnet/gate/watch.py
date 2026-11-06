@@ -1,49 +1,11 @@
-"""Gate-side registration, brief handoff, and bounded conversation lifecycle."""
+"""Bounded lifecycle for agent-only DM rooms: close after too many turns or too long."""
 
 import asyncio
 import json
 import time
-from pathlib import Path
 
 from trustnet.gate.facts import resolve_data_dir
 from trustnet.gate.relay import post_home
-from trustnet.switch_client import SwitchClient
-
-
-async def ensure_envoy(owner, friend, *, url, key, state_dir):
-    state_dir = Path(state_dir)
-    state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path = state_dir / "credentials.json"
-    if path.exists():
-        data = json.loads(path.read_text())
-        return SwitchClient(url, data["id"], data["api_key"])
-    client = await SwitchClient.register(url, key, f"{owner}-envoy-{friend}", agent_type="codex")
-    path.write_text(json.dumps({"id": client.agent_id, "api_key": client.api_key}))
-    path.chmod(0o600)
-    return client
-
-
-def brief_envoy(envoy, brief_text, *, state_dir, room, allowed_senders, peer):
-    """Call write_brief in the gate first, then hand off its text here."""
-    path = Path(state_dir) / f"{room}.json"
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(
-        json.dumps(
-            {
-                "brief": brief_text,
-                "allowed_senders": allowed_senders,
-                "peer": peer,
-                "expires_at": time.time() + 600,
-            }
-        )
-    )
-    temporary.chmod(0o600)
-    temporary.replace(path)
-
-
-async def start_conversation(room, envoy, *, client):
-    await client.invite_agent_to_room(room, envoy)
-
 
 # A DM room closes after this many main-agent turns or seconds, whichever comes first.
 # Both Hermes wake on a 1-minute watcher and wait on their people, so 10 minutes was

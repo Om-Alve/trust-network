@@ -6,9 +6,9 @@ from datetime import timedelta
 
 from trustnet.gate import handshake, relay
 from trustnet.gate.brief import write_brief
-from trustnet.gate.envoy import ConversationWatch
 from trustnet.gate.facts import load_profile, load_trust, resolve_data_dir
 from trustnet.gate.policy import room_level
+from trustnet.gate.watch import ConversationWatch
 
 
 def main_agent(person):

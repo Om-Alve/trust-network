@@ -10,9 +10,9 @@ from fakes.fake_switch import FakeSwitch, FakeSwitchClient
 from trustnet import room_pool
 from trustnet.gate import consent, dm, handshake, relay
 from trustnet.gate.calendar import TIME_ZONE
-from trustnet.gate.envoy import MAX_SECONDS, MAX_TURNS
 from trustnet.gate.policy import Identity
 from trustnet.gate.runtime import Gate
+from trustnet.gate.watch import MAX_SECONDS, MAX_TURNS
 
 NOW = datetime(2026, 11, 6, 12, tzinfo=TIME_ZONE)
 CARD = '2026-11-09T19:00 2h "Games ☕" @ "Dialogues"'
@@ -48,7 +48,7 @@ class Planning:
             await client.post_message(text)
 
         self.patch.setattr(relay, "post_home", home)
-        self.patch.setattr("trustnet.gate.envoy.post_home", home)
+        self.patch.setattr("trustnet.gate.watch.post_home", home)
         self.restart()
 
     def restart(self):

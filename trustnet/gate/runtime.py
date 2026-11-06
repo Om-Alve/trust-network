@@ -18,7 +18,6 @@ from typing import Any
 from trustnet.gate import commands as c
 from trustnet.gate import consent, dm, handshake, ledger, relay, surprise
 from trustnet.gate.calendar import TIME_ZONE, busy
-from trustnet.gate.envoy import ConversationWatch
 from trustnet.gate.facts import Level, load_profile, load_trust, resolve_data_dir, save_trust
 from trustnet.gate.policy import (
     DenialCode,
@@ -29,6 +28,7 @@ from trustnet.gate.policy import (
     visible_facts,
 )
 from trustnet.gate.view_as import format_value, view_as
+from trustnet.gate.watch import ConversationWatch
 
 LOG = logging.getLogger(__name__)
 COMMAND_LIST = (

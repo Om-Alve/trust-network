@@ -42,7 +42,7 @@ async def two_gates(tmp_path, monkeypatch):
         await client.post_message(text)
 
     monkeypatch.setattr(relay, "post_home", home)
-    monkeypatch.setattr("trustnet.gate.envoy.post_home", home)
+    monkeypatch.setattr("trustnet.gate.watch.post_home", home)
     gates = {p: Gate(p, cl, lambda: ids) for p, cl in clients.items()}
     return switch, gates, homes
 
