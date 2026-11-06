@@ -11,7 +11,6 @@ mode): there the gate logs the overreach and posts nothing home.
 import asyncio
 import json
 import logging
-import time as wall_time
 from collections.abc import Callable, Mapping
 from datetime import datetime, time, timedelta
 from typing import Any
@@ -312,7 +311,7 @@ class Gate:
         if isinstance(command, c.AskAround) and own_side:
             if level != Level.SELF or command.reference:
                 return
-            ref = "A" + str(wall_time.time_ns())
+            ref = _next_around_ref(state)
             entry = {
                 "question": command.question.text,
                 "expires": self._now().timestamp() + 300,
@@ -395,7 +394,7 @@ class Gate:
             ):
                 return
             state[key]["answered"] = False
-            local = "A" + str(wall_time.time_ns())
+            local = _next_around_ref(state)
             state[key]["local"] = local
             self._save_around(state)
             await relay.post_home(
@@ -545,6 +544,20 @@ class Gate:
             except Exception as exc:
                 # Exception messages can contain transport payloads or private values.
                 LOG.error("gate dispatch failed: %s", type(exc).__name__)
+
+
+def _next_around_ref(state: dict) -> str:
+    """The next free ``A<n>`` for this person: short, because people see and say it.
+
+    Refs this gate assigns (its own ask-arounds, and the local question it puts to
+    its person for a friend's ask-around) share one counter, so they never collide.
+    A friend's ref is stored under ``<friend>:<ref>`` and doesn't take a number here.
+    """
+    used = {k for k in state if ":" not in k} | {v.get("local") for v in state.values()}
+    n = 1
+    while f"A{n}" in used:
+        n += 1
+    return f"A{n}"
 
 
 def _quoted_reply(text: str) -> c.Quoted | None:

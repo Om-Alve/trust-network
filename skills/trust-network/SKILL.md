@@ -24,7 +24,7 @@ and no files; these tools are all you need.
 
 | Tool | Use it to |
 | --- | --- |
-| `inbox` | Read what's new in your person's home room: questions (Q1), proposals (P1), ask-around answers (A1), share cards, DM invites. Each call consumes what it returns. |
+| `inbox` | Read what's new in your person's home room: questions (Q1), proposals (P1), ask-around answers (A1), share cards, DM invites. Each call consumes the threads it returns. `open` lists what still waits for your person's answer (an ask-around A1 from a friend, your Q1, a P1 without their vote), even if already read: when your person replies without a reference, match the reply to one of these. |
 | `answer(id, text)` | Send your person's own answer. For a proposal the text is `yes` or `no`. |
 | `dm(friend, goal)` | Start planning with a friend. Your gate makes an agent-only room and gives you a share card. |
 | `dm_read(room)` / `dm_post(room, text)` | Talk with the friend's agent in that room. |

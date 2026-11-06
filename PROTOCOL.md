@@ -156,8 +156,8 @@ in the right room.
 | `join-dm <room> "<goal>"` | `@rahul-gate join-dm dm-om-rahul-sun "something fun Sunday evening"` | the friend's gate | `conn-<a>-<b>` |
 | `consent P<n> yes\|no via-agent\|direct <sha256>` | `@rahul-gate consent P1 yes via-agent 2f749caf9dd6cbd99a2062e33534cad46b8f634eb2b2925e60a68b15cfa87cc4` (the last field is the SHA-256 of the card text; see 7a) | the friend's gate | the `dm-` room the proposal belongs to |
 | `propose P<n> <card>` (forwarded) | `@rahul-gate propose P1 2026-11-08T21:00:00+05:30 120m "Bowling + dinner" @ "Smaaash, Indiranagar"` | the friend's gate | `dm-<a>-<b>-*` |
-| `ask-around A<n> "<question>"` | `@rahul-gate ask-around A1730000000000000000 "tent to borrow, Nov 14-16"` | the friend's gate | `conn-<a>-<b>` |
-| `answer A<n> "<text>"` | `@om-gate answer A1730000000000000000 "Profile lists, no lending promise: has: tent"` | the friend's gate | `conn-<a>-<b>` |
+| `ask-around A<n> "<question>"` | `@rahul-gate ask-around A1 "tent to borrow, Nov 14-16"` | the friend's gate | `conn-<a>-<b>` |
+| `answer A<n> "<text>"` | `@om-gate answer A1 "Profile lists, no lending promise: has: tent"` | the friend's gate | `conn-<a>-<b>` |
 
 ### 5.3 Planning and asks, any member of the room
 
@@ -390,20 +390,21 @@ The seal is a courtesy: workspace admins can read rooms.
 
 1. The owner or the owner's agent posts `@om-gate ask-around "<question>"` in
    `om-home`. Only Om's `self`-level home room can start one.
-2. `om-gate` assigns a reference `A<ns>` and, for every friend on the trust list,
-   finds or creates `conn-<a>-<b>` and posts `@<friend>-gate ask-around A<ns>
-   "<question>"`. It posts `A<ns> asking around: "<question>"` to home. The
+2. `om-gate` assigns the next free short reference `A<n>` (A1, A2, …; one counter per
+   person for its own ask-arounds and the local questions it puts to its person) and, for every friend on the trust list,
+   finds or creates `conn-<a>-<b>` and posts `@<friend>-gate ask-around A<n>
+   "<question>"`. It posts `A<n> asking around: "<question>"` to home. The
    question expires after 5 minutes.
 3. Each friend's gate accepts it only from the friend's own gate in
    `conn-<pair>`. It replies on its own, from facts at that level: the `has`
    and `recommends` facts, prefixed `Profile lists, no lending promise:`.
    A reply longer than 140 characters is cut short with `…` rather than
-   dropped. It also puts a local `A<ns2>` question in its owner's home so the
+   dropped. It also puts a local `A<m>` question in its owner's home so the
    person can answer in their own words.
-4. Replies arrive as `answer A<ns> "<text>"` in the same conn room. The asker's
+4. Replies arrive as `answer A<n> "<text>"` in the same conn room. The asker's
    gate accepts one per friend, before expiry, and posts the collected answers
    in home. Each reply is ledgered.
-5. A friend's `answer A<ns2> "..."` from their own side is checked against the
+5. A friend's `answer A<m> "..."` from their own side is checked against the
    room membership and trust list again before it is sent.
 
 ## 8. Security properties

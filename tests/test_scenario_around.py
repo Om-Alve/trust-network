@@ -26,6 +26,7 @@ def _complete_round(gate) -> tuple[str, dict]:
 async def _around_world(tmp_path, monkeypatch, **kwargs):
     world = await build_world(tmp_path, monkeypatch=monkeypatch, **kwargs)
     monkeypatch.setattr(personal, "session", personal_session(world))
+    monkeypatch.setattr(personal, "_now", lambda: world.clock().timestamp())
     await world.start()
     return world
 
@@ -61,14 +62,19 @@ async def test_fanout_collects_one_answer_per_friend_and_the_own_words_reply(tmp
         ]
         assert {record.to for record in asked} == {"rahul", "priya"}
 
-        # The friend's own words replace their automatic profile reply.
-        pending = next(
-            value for value in world.gates["rahul"]._around_state().values() if value.get("local")
-        )
+        # References are short enough to read out and type (they show in chat).
+        assert ref == "A1"
+
+        # The friend's own words replace their automatic profile reply. Rahul's
+        # watcher has already read his inbox when he replies, in a later turn and
+        # without the reference: his agent still finds the open question there.
+        await personal.inbox("rahul")
+        opened = (await personal.inbox("rahul"))["open"]
+        assert opened == [{"ref": "A1", "kind": "ask-around", "from": "om", "question": QUESTION}]
         await world.say(
             world.homes["rahul"],
             "rahul-hermes",
-            f'@rahul-gate answer {pending["local"]} "no, sorry"',
+            f'@rahul-gate answer {opened[0]["ref"]} "no, sorry"',
         )
         await world.wait_for(
             lambda: world.gates["om"]._around_state()[ref]["answers"].get("rahul") == "no, sorry",
@@ -79,6 +85,12 @@ async def test_fanout_collects_one_answer_per_friend_and_the_own_words_reply(tmp
             record.field == "ask-around-answer" and record.value == "no, sorry"
             for record in ledger.read("rahul")
         )
+        # Once answered, it's no longer open.
+        await world.wait_for(
+            lambda: world.gates["rahul"]._around_state()["om:A1"]["answered"] is True,
+            what="Rahul's question marked answered",
+        )
+        assert (await personal.inbox("rahul"))["open"] == []
     finally:
         await world.stop()
 

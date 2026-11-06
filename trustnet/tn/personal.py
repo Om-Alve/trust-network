@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -69,13 +70,47 @@ async def inbox(person, consume=True):
         context = await client.read_context(room_id=room, limit=200)
     threads = context.get("threads", [])
     unread = [t for t in threads if t["root"]["id"] not in seen]
-    if not consume:
-        return {"room": room, "threads": unread}
-    seen.update(t["root"]["id"] for t in unread)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.touch(mode=0o600)
-    path.write_text(json.dumps(sorted(seen)))
-    return {"room": room, "threads": unread}
+    if consume:
+        seen.update(t["root"]["id"] for t in unread)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch(mode=0o600)
+        path.write_text(json.dumps(sorted(seen)))
+    return {"room": room, "threads": unread, "open": open_items(person)}
+
+
+#: Wall time, as the gate reads it live (tests point this at their gate clock).
+_now = time.time
+
+
+def open_items(person):
+    """What still waits for the person's answer, read or not.
+
+    A watcher reads the inbox to tell the person about a question; the person
+    replies later, often without the reference. Unread threads alone would be
+    empty by then, so the agent couldn't answer. These come from the gate's own
+    state: ask-around questions from friends not yet answered or expired, the
+    agent's own questions (Q#) not yet answered, and proposals (P#) still
+    waiting for this person's vote.
+    """
+    directory = resolve_data_dir(person)
+
+    def read(name):
+        path = directory / name
+        return json.loads(path.read_text()) if path.exists() else {}
+
+    items = [
+        {"ref": v["local"], "kind": "ask-around", "from": v["peer"], "question": v["question"]}
+        for v in read("ask-around.json").values()
+        if v.get("local") and v.get("answered") is False and v.get("expires", 0) > _now()
+    ]
+    for ref, v in read("coordination.json").items():
+        if v.get("status") != "pending":
+            continue
+        if ref.startswith("Q"):
+            items.append({"ref": ref, "kind": "question", "question": v["card"]})
+        elif person not in v.get("votes", {}):
+            items.append({"ref": ref, "kind": "proposal", "with": v["friend"], "plan": v["card"]})
+    return items
 
 
 async def watch(person):
