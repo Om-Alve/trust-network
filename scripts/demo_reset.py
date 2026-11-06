@@ -18,6 +18,7 @@ STATE_FILES = (
     "watch-state.json",
     "coordination.json",
     "ask-around.json",
+    "peers.json",
 )
 
 

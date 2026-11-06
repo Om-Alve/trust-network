@@ -49,9 +49,11 @@ async def test_dm_setup_private_cards_and_limits(tmp_path, monkeypatch):
         Event(homes["om"], "om", "user", '@om-gate dm rahul "Sunday bowling"', True)
     )
     conn = next(r for r in switch.rooms.values() if r["name"] == "conn-om-rahul")
-    await gates["rahul"].handle(
-        Event(conn["id"], "om-gate", "agent", conn["messages"][0]["body"], True)
-    )
+    for message in list(conn["messages"]):  # hello, then join-dm
+        if message["sender"] == "om-gate":
+            await gates["rahul"].handle(
+                Event(conn["id"], "om-gate", "agent", message["body"], True)
+            )
     room = next(r for r in switch.rooms.values() if r["name"].startswith("dm-"))
     assert {"om-gate", "rahul-gate", "om-hermes", "rahul-hermes"} <= room["members"]
     assert room["messages"] == []

@@ -17,7 +17,7 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from trustnet.gate import commands as c
-from trustnet.gate import consent, dm, ledger, relay, surprise
+from trustnet.gate import consent, dm, handshake, ledger, relay, surprise
 from trustnet.gate.calendar import TIME_ZONE, busy
 from trustnet.gate.facts import Level, load_profile, load_trust, resolve_data_dir, save_trust
 from trustnet.gate.policy import (
@@ -49,6 +49,7 @@ class Gate:
         self._clock: Callable[[], datetime] = clock or (lambda: datetime.now(TIME_ZONE))
         self._gift_room = gift_room or relay.is_gift_room
         self.watches = {}
+        self.hellos: set[str] = set()  # rooms this gate has said hello in since it started
         self._dispatch_lock = asyncio.Lock()
         self._notes: dict[tuple[str, str], datetime] = {}
 
@@ -192,6 +193,9 @@ class Gate:
         ):
             await self._around(event, command, sender, level, own_side, room_detail)
             return
+        if isinstance(command, c.Hello):
+            await handshake.handle(self, event, command, sender)
+            return
         # Consent is a gate relay, never an alias for the owner's yes command.
         if isinstance(command, (c.AskOwner, c.Answer, c.Propose, c.Yes, c.No, c.Consent)):
             await consent.handle(self, event, command, sender, decision.mode)
@@ -201,6 +205,16 @@ class Gate:
                 await dm.setup(self, command.person, command.goal)
             return
         if isinstance(command, c.JoinDm):
+            reason = handshake.problem(self.person, sender.person)
+            if reason:
+                # Plain text: addressing the peer gate would read as a malformed command.
+                await self.client.post_message(f"join-dm refused: {reason}.")
+                await relay.post_home(
+                    self.person,
+                    f"Didn't open a planning room with {_display(sender.person)}: {reason}.",
+                    client=self.client,
+                )
+                return
             await dm.setup(self, sender.person, command.goal, command.room)
             return
         profile = load_profile(self.person)

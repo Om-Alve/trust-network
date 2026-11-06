@@ -77,7 +77,7 @@ OWNER_COMMANDS: Final[frozenset[str]] = (
     OWNER_DIRECT_COMMANDS | OWNER_ONLY_COMMANDS | OWNER_AGENT_COMMANDS
 )
 KNOWN_COMMANDS: Final[frozenset[str]] = (
-    OWNER_COMMANDS | CROSS_BOUNDARY_COMMANDS | {"join-dm", "consent", "around-reply"}
+    OWNER_COMMANDS | CROSS_BOUNDARY_COMMANDS | {"join-dm", "consent", "around-reply", "hello"}
 )
 
 DecisionMode = Literal["direct", "via-agent", "cross-boundary"]
@@ -300,7 +300,7 @@ def authorize(
     if name not in KNOWN_COMMANDS:
         return Denied(DenialCode.UNKNOWN_COMMAND, f"unknown command {name!r}")
 
-    if name in {"join-dm", "consent", "around-reply"}:
+    if name in {"join-dm", "consent", "around-reply", "hello"}:
         pair = "-".join(sorted((owner_key, sender.person or "")))
         if (
             sender.kind is SenderKind.AGENT

@@ -4,7 +4,7 @@ import json
 import re
 from datetime import timedelta
 
-from trustnet.gate import relay
+from trustnet.gate import handshake, relay
 from trustnet.gate.brief import write_brief
 from trustnet.gate.envoy import ConversationWatch
 from trustnet.gate.facts import load_profile, load_trust, resolve_data_dir
@@ -51,6 +51,7 @@ async def setup(gate, friend, goal, room=None):
         room = result.get("room_id", result.get("id"))
         await client.connect_to_room(room)
         await client.invite_agent_to_room(room, friend + "-gate")
+        await handshake.say(gate, conn, friend)
         await client.connect_to_room(conn)
         await client.post_message(f"@{friend}-gate join-dm {room} {goal}")
     else:

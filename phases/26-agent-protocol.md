@@ -23,7 +23,7 @@ solution"); scope chosen: spec + handshake + a second framework.
 - [ ] `PROTOCOL.md`: roles (person, agent, gate), transport (Switch rooms), identity, rooms,
   the full message grammar, flows (plan, consent, questions, gifts, ask-around), security
   properties, versioning, and how to bring a new agent framework.
-- [ ] Gate handshake: `hello trust-network/<major> <capabilities>` exchanged in the gates'
+- [x] Gate handshake: `hello trust-network/<major> <capabilities>` exchanged in the gates'
   connection room; a gate refuses to open or join a planning room with a peer gate that hasn't
   said a compatible hello.
 - [x] `tn wake`: an agent-agnostic runner. Polls `tn watch`, wakes any CLI agent on news, and
@@ -35,7 +35,7 @@ solution"); scope chosen: spec + handshake + a second framework.
 ## Done when
 - [ ] `make check` passes.
 - [x] A Hermes ↔ Codex plan is confirmed end to end, with both people's yes; transcript saved.
-- [ ] A gate without a compatible hello is refused (test).
+- [x] A gate without a compatible hello is refused (test).
 
 ## Commit
 `phase 26: <item>`
@@ -70,3 +70,13 @@ solution"); scope chosen: spec + handshake + a second framework.
   - The confirmation said "via Hermes" for any agent; now "via agent".
 - Deviation: Priya's example consent default `direct` → `via-agent` (she now has an agent and
   no Switch user to answer directly from).
+- Handshake: `tests/test_handshake.py` (written first): hellos both ways open the room;
+  `join-dm` without a hello, or with `trust-network/2`, is refused with a plain-text line in the
+  connection room and a home notice; hello is accepted only from the friend's gate in their
+  `conn-<pair>` room; a forwarded proposal from a peer without a hello isn't recorded. A
+  `hello` that isn't the handshake form ("hello there") stays an unknown command, not a
+  malformed one (no overreach alert for a greeting). Peers live in `peers.json` (cleared by
+  `demo_reset`). Live, laptop: om-gate and priya-gate recorded each other's
+  `trust-network/1` hello in `conn-om-priya`. A pre-handshake gate (the VM before deploy) reads
+  hello as an unknown command and notes it as overreach, then accepts `join-dm`: rollout
+  needs both gates on the same commit.

@@ -45,6 +45,8 @@ Gate-to-gate commands (not in the plan; needed by phase 14)
         ``@rahul-gate join-dm dm-om-rahul-sun "something fun Sunday evening"``
     consent P<n> yes|no via-agent|direct
         ``@rahul-gate consent P1 yes via-agent``
+    hello trust-network/<major>[.<minor>] <capability,...>
+        ``@rahul-gate hello trust-network/1 free,ask,propose,consent,join-dm``
 
 Dates go through :mod:`dateparser` with ``Asia/Kolkata`` and
 ``PREFER_DATES_FROM: future``. Time is injectable through ``parse(..., now=)``
@@ -82,6 +84,7 @@ __all__ = [
     "Dm",
     "Free",
     "GiftIdeas",
+    "Hello",
     "JoinDm",
     "Ledger",
     "No",
@@ -137,6 +140,7 @@ EXAMPLES: Final[dict[str, str]] = {
     "ledger": "@om-gate ledger",
     "join-dm": '@rahul-gate join-dm dm-om-rahul-sun "something fun Sunday evening"',
     "consent": "@rahul-gate consent P1 yes via-agent",
+    "hello": "@rahul-gate hello trust-network/1 free,ask,propose,consent,join-dm",
 }
 
 
@@ -410,6 +414,15 @@ class Consent(_Addressed):
 
 
 @dataclass(frozen=True, slots=True)
+class Hello(_Addressed):
+    """``hello trust-network/<major>[.<minor>] <capability,...>``: the gate handshake."""
+
+    protocol: str
+    major: int
+    capabilities: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Unknown(_Addressed):
     """Text that is not a command; the gate replies with the command list."""
 
@@ -434,6 +447,7 @@ Command: TypeAlias = (
     | Ledger
     | JoinDm
     | Consent
+    | Hello
     | Unknown
 )
 
@@ -997,6 +1011,22 @@ def _handle_consent(args: str, *, target: str | None, now: datetime, raw: str) -
     )
 
 
+def _handle_hello(args: str, *, target: str | None, now: datetime, raw: str) -> Command:
+    match = re.fullmatch(
+        r"(?P<protocol>trust-network/(?P<major>\d+)(?:\.\d+)?)\s+(?P<caps>[a-z-]+(?:,[a-z-]+)*)",
+        args.strip(),
+    )
+    if not match:
+        # A greeting ("@om-gate hello there") is not a malformed handshake.
+        return Unknown(raw=raw.strip(), target=target)
+    return Hello(
+        protocol=match["protocol"],
+        major=int(match["major"]),
+        capabilities=tuple(match["caps"].split(",")),
+        target=target,
+    )
+
+
 _Handler: TypeAlias = Callable[..., Command]
 
 _HANDLERS: Final[dict[str, _Handler]] = {
@@ -1017,4 +1047,5 @@ _HANDLERS: Final[dict[str, _Handler]] = {
     "ledger": _handle_ledger,
     "join-dm": _handle_join_dm,
     "consent": _handle_consent,
+    "hello": _handle_hello,
 }

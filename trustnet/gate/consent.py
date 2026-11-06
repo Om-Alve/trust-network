@@ -4,7 +4,7 @@ import hashlib
 import json
 
 from trustnet.gate import commands as c
-from trustnet.gate import ledger, relay
+from trustnet.gate import handshake, ledger, relay
 from trustnet.gate.dm import main_agent
 from trustnet.gate.facts import resolve_data_dir
 
@@ -68,6 +68,8 @@ async def handle(gate, event, command, sender, mode):
             if sender.id not in {main_agent(person), friend + "-gate"}:
                 return
             ref = command.proposal_id
+            if sender.id == friend + "-gate" and handshake.problem(person, friend):
+                return  # a forwarded proposal needs the peer gate's handshake
             if sender.id == main_agent(person) and not await _friend_spoke(
                 client, event.room_id, main_agent(friend)
             ):
