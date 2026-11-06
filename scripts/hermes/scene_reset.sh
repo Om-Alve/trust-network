@@ -24,6 +24,10 @@ if [[ "${1:-}" == "--deploy" ]]; then
   tail -1 data/vm_up.log
   scp -q skills/trust-network/SKILL.md "$VM":.hermes/profiles/rahul/skills/trust-network/SKILL.md
   cp skills/trust-network/SKILL.md ~/.hermes/profiles/om/skills/trust-network/SKILL.md
+  # Each Hermes gateway keeps its `tn mcp` server running for days: restart the two
+  # demo profiles so their tools load the code just deployed (default profile untouched).
+  hermes -p om gateway restart >/dev/null
+  ssh "$VM" "export PATH=\$HOME/.local/bin:\$PATH; hermes -p rahul gateway restart >/dev/null 2>&1 || true"
 fi
 ssh "$VM" 'systemctl --user stop rahul-gate'
 sleep 1
