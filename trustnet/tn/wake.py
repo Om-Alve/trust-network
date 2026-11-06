@@ -122,16 +122,25 @@ def opencode_command(person: str, model: str, workdir: Path) -> tuple[list[str],
 
 
 def opencode_reply(stdout: str) -> str:
-    """The text of the last assistant message in ``opencode run --format json`` output."""
+    """The text of the last assistant message in ``opencode run --format json`` output.
+
+    A line that is not a JSON object, or a text event with no object part, is
+    skipped: a CLI that emits a log line or ``null`` must not crash a turn.
+    """
     parts: dict[str, list[str]] = {}
     for line in stdout.splitlines():
         try:
             event = json.loads(line)
         except ValueError:
             continue
-        part = event.get("part") or {}
-        if event.get("type") == "text" and part.get("text"):
-            parts.setdefault(part.get("messageID", ""), []).append(part["text"])
+        if not isinstance(event, dict) or event.get("type") != "text":
+            continue
+        part = event.get("part")
+        if not isinstance(part, dict):
+            continue
+        text = part.get("text")
+        if isinstance(text, str) and text:
+            parts.setdefault(str(part.get("messageID", "")), []).append(text)
     return "".join(list(parts.values())[-1]) if parts else ""
 
 
