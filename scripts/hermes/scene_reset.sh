@@ -18,7 +18,10 @@ ssh "$VM" "export PATH=\$HOME/.local/bin:\$PATH; hermes -p rahul cron pause $RAH
 pkill -f "trustnet.gate --person (om|priya)" || true
 if [[ "${1:-}" == "--deploy" ]]; then
   sleep 1
-  ./scripts/vm_up.sh "$VM" | tail -1
+  # The first deploy after a source change sometimes fails on the VM (exit 2); a
+  # second run succeeds. Retry once, and show the first failure's tail.
+  ./scripts/vm_up.sh "$VM" > data/vm_up.log 2>&1 || { tail -3 data/vm_up.log; ./scripts/vm_up.sh "$VM" | tail -1; }
+  tail -1 data/vm_up.log
   scp -q skills/trust-network/SKILL.md "$VM":.hermes/profiles/rahul/skills/trust-network/SKILL.md
   cp skills/trust-network/SKILL.md ~/.hermes/profiles/om/skills/trust-network/SKILL.md
 fi
