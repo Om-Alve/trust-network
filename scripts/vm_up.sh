@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 command -v uv >/dev/null
 command -v git >/dev/null
 command -v ssh >/dev/null
-uv run python - "${1:-om@hermes.<tailnet>.ts.net}" <<'PY'
+uv run python - "${1:-${TN_VM_HOST:-$(grep -s '^TN_VM_HOST=' "$(dirname "$0")/../.env" | cut -d= -f2-)}}" <<'PY'
 import io
 import json
 import os

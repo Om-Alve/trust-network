@@ -7,7 +7,8 @@
 #   scripts/hermes/scene_reset.sh --deploy   # also deploy HEAD to the VM first
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-VM=${VM:-om@hermes.<tailnet>.ts.net}
+TN_VM_HOST=${TN_VM_HOST:-$(grep -s '^TN_VM_HOST=' "$(dirname "$0")/../../.env" | cut -d= -f2-)}
+VM=${VM:-${TN_VM_HOST:-om@hermes.<tailnet>.ts.net}}
 OM_JOB=${OM_JOB:-7439654a54cb}
 RAHUL_JOB=${RAHUL_JOB:-6160bdf6868e}
 SU=$(grep -E '^SWITCH_URL=' .env | cut -d= -f2-)

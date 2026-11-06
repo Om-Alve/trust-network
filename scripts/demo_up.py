@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import os
+import pathlib
 import shlex
 import shutil
 import subprocess
@@ -13,6 +14,18 @@ from scripts.switch_users import CONSOLE_ENV, REPO, login, read_env
 from trustnet.gate.identity import export_local
 from trustnet.switch_client import SwitchClient
 from trustnet.tn.personal import session
+
+
+def _vm_host() -> str:
+    """The VM's ssh target: TN_VM_HOST from the environment or .env (gitignored)."""
+    if os.environ.get("TN_VM_HOST"):
+        return os.environ["TN_VM_HOST"]
+    env = pathlib.Path(__file__).resolve().parents[1] / ".env"
+    for line in env.read_text().splitlines() if env.exists() else []:
+        if line.startswith("TN_VM_HOST="):
+            return line.split("=", 1)[1].strip().strip("\"'")
+    return "om@hermes.<tailnet>.ts.net"
+
 
 PEOPLE = ("om", "rahul", "priya")
 
@@ -150,7 +163,7 @@ def main():
         print(
             "Laptop publisher: load .env securely, then uv run python -m scripts.identity_serve (127.0.0.1:8792; existing tailnet 8666 mapping)."
         )
-        print("VM: ssh om@hermes.<tailnet>.ts.net systemctl --user start rahul-gate.service")
+        print(f"VM: ssh {_vm_host()} systemctl --user start rahul-gate.service")
     print(
         "Local Hermes stand-ins: use tn --as om and tn --as rahul with the same SWITCH_URL, TN_DATA_DIR and TN_STATE_DIR="
         + os.environ["TN_STATE_DIR"]

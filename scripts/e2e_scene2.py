@@ -9,6 +9,7 @@ Artifacts retain public transcripts and copied profiles, never credentials.
 import asyncio
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 import time
@@ -24,6 +25,17 @@ from trustnet.switch_client import SwitchClient
 from trustnet.tn.personal import home, session
 
 
+def _vm_host() -> str:
+    """The VM's ssh target: TN_VM_HOST from the environment or .env (gitignored)."""
+    if os.environ.get("TN_VM_HOST"):
+        return os.environ["TN_VM_HOST"]
+    env = pathlib.Path(__file__).resolve().parents[1] / ".env"
+    for line in env.read_text().splitlines() if env.exists() else []:
+        if line.startswith("TN_VM_HOST="):
+            return line.split("=", 1)[1].strip().strip("\"'")
+    return "om@hermes.<tailnet>.ts.net"
+
+
 async def main():
     os.environ.update(read_env(Path(".env")))
     vm_check = await asyncio.to_thread(
@@ -32,7 +44,7 @@ async def main():
             "ssh",
             "-o",
             "BatchMode=yes",
-            "om@hermes.<tailnet>.ts.net",
+            _vm_host(),
             "systemctl --user is-active rahul-gate.service",
         ],
         capture_output=True,
