@@ -59,6 +59,8 @@ Front matter is the single source of truth for status. The index table below has
 | 26 | [Agent protocol: spec, gate handshake, any-agent runner](26-agent-protocol.md) | P1 | agent | 18 | Nov 6 afternoon |
 | 27 | [Scenario hardening (Codex + DeepSeek)](27-scenario-hardening.md) | P1 | agent | 26 | Nov 6 evening |
 
+| 28 | [Agent facts and memory onboarding](28-agent-facts.md) | P1 | agent | 27 | Nov 6 |
+
 ## Dependency graph
 
 Each layer can start once the phases it names are done. Phases in the same layer can run in parallel.

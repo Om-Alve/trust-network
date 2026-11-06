@@ -111,7 +111,7 @@ _PERSON_RE: Final = re.compile(r"[a-z0-9][a-z0-9_-]*")
 _FACT_RE: Final = re.compile(r"[a-z][a-z0-9_-]*")
 _ROOM_RE: Final = re.compile(r"[a-z0-9][a-z0-9_-]*")
 _PROPOSAL_ID_RE: Final = re.compile(r"P\d+", re.IGNORECASE)
-_REFERENCE_RE: Final = re.compile(r"[AQP]\d+", re.IGNORECASE)
+_REFERENCE_RE: Final = re.compile(r"[AQPFT]\d+", re.IGNORECASE)
 _PLACE_RE: Final = re.compile(r"[A-Za-z0-9 ,.'&-]+")
 _TITLE_FORBIDDEN: Final = frozenset('\n\r"@')
 _DURATION_RE: Final = re.compile(
@@ -335,7 +335,7 @@ class Yes(_Addressed):
     proposal_id: str
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "proposal_id", _proposal_id(self.proposal_id))
+        object.__setattr__(self, "proposal_id", _consent_ref(self.proposal_id))
 
 
 @dataclass(frozen=True, slots=True)
@@ -345,7 +345,7 @@ class No(_Addressed):
     proposal_id: str
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "proposal_id", _proposal_id(self.proposal_id))
+        object.__setattr__(self, "proposal_id", _consent_ref(self.proposal_id))
 
 
 @dataclass(frozen=True, slots=True)
@@ -499,6 +499,13 @@ def _proposal_id(value: str) -> str:
     return value
 
 
+def _consent_ref(value: str) -> str:
+    value = value.strip().upper()
+    if not re.fullmatch(r"[PFT]\d+", value):
+        raise ValueError("expected P<n>, F<n> or T<n>")
+    return value
+
+
 def _question_id(value: str) -> str:
     value = value.strip().upper()
     if not re.fullmatch(r"Q\d+", value):
@@ -509,7 +516,7 @@ def _question_id(value: str) -> str:
 def _reference(value: str) -> str:
     value = value.strip().upper()
     if not _REFERENCE_RE.fullmatch(value):
-        raise ValueError(f"invalid reference {value!r} (expected Q<n> or P<n>)")
+        raise ValueError(f"invalid reference {value!r} (expected A<n>, Q<n>, P<n>, F<n> or T<n>)")
     return value
 
 
@@ -935,7 +942,7 @@ def _handle_no(args: str, *, target: str | None, now: datetime, raw: str) -> Com
 
 
 def _handle_answer(args: str, *, target: str | None, now: datetime, raw: str) -> Command:
-    match = re.fullmatch(r"(?P<ref>[AQP]\d+)\s+(?P<text>.+)", args, re.IGNORECASE)
+    match = re.fullmatch(r"(?P<ref>[AQPFT]\d+)\s+(?P<text>.+)", args, re.IGNORECASE)
     if not match:
         raise _err("answer", "answer needs a question or proposal ID and a text", raw)
     return Answer(

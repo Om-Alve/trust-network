@@ -110,7 +110,9 @@ def open_items(person):
             items.append({"ref": ref, "kind": "question", "question": v["card"]})
         elif person not in v.get("votes", {}):
             items.append({"ref": ref, "kind": "proposal", "with": v["friend"], "plan": v["card"]})
-    return items
+    from trustnet.gate.fact_changes import review
+
+    return items + review(person)
 
 
 async def watch(person):

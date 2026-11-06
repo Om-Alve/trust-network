@@ -114,7 +114,7 @@ Rahul and Priya are separate Switch users with their own registration keys. Each
 ### Levels, facts and preferences
 
 ```yaml
-# examples/om/trust.yaml (only Om edits this: by hand, `tn trust`, or `@om-gate trust …` typed by Om)
+# examples/om/trust.yaml (owner edits directly; approved T refs also update it)
 people:
   rahul: close
   priya: friend
@@ -172,7 +172,7 @@ facts:
    - from the owner's registered personal agent, where the consent mode allows it. Those are recorded as `via-agent`.
 
    `trust`, `view-as` and `ledger` are owner-only.
-3. **Agents can only tighten.** `tn fact set` and the `fact_set` MCP tool can make a fact more private, never less.
+3. **Agents add privately and ask before sharing.** `fact_add` / `tn fact add` create only new private facts. `tn fact set` and `fact_set` only tighten visibility. Loosening requires a pending F ref approved under `consent.default`, the same rule as plans. `trust_suggest` creates a pending T ref instead of editing trust directly. The MCP `setup` prompt collects the person's own known facts and drafts suggestions for one `review`; F/T refs last seven days and support bulk approval or decline. In `direct` owner mode, only the owner's CLI or Switch user can approve. In `via-agent`, a fooled personal agent could create and approve its own suggestion, the same trust as plan consent.
 4. **Fixed forms across the boundary.** Proposals carry an ID, an ISO time, a duration, a title (≤60 characters) and a place (≤60 characters, from `[A-Za-z0-9 ,.'&-]`). Free-text questions (`ask-owner`, `ask-around`) are capped at 140 characters and always shown as quoted data.
 5. **Surprise mode.** In `gift-*` rooms, the gate:
    - never asks its owner anything and never relays to them;
@@ -308,8 +308,8 @@ An agent is unsafe when all three hold: it acts unwatched, can reach something t
 | Piece | Reads unvetted text | Reaches what matters | Unwatched | Why it's safe |
 |---|---|---|---|---|
 | **gate** | yes | yes (your facts) | yes | **No LLM.** It only matches a fixed set of commands, and its rules are tested in code. |
-| **Hermes via `tn mcp` (`om-hermes`)** | yes (Om's Discord chats, and the DM room's plain-language text through `dm_read`) | **little**: eleven purpose-built tools, can only tighten facts, can only read/post in DM rooms it's already a member of | yes | The worst a tricked Hermes can do: say too much in a DM room, say yes to a plan Om allowed it to answer, or make a fact more private |
-| **Hermes via `tn mcp` (`rahul-hermes`)** | yes (Rahul's Discord chats, and the DM room's plain-language text through `dm_read`) | **little**: the same eleven purpose-built tools, can only tighten facts, can only read/post in DM rooms it's already a member of | yes | Same limits as `om-hermes`, symmetric — the worst it can do: say too much in a DM room, say yes to a plan Rahul allowed it to answer, or make a fact more private |
+| **Hermes via `tn mcp` (`om-hermes`)** | yes (Om's Discord chats, and the DM room's plain-language text through `dm_read`) | **little**: purpose-built tools, add private facts and review F/T suggestions under consent.default, can only read/post in DM rooms it's already a member of | yes | The worst a tricked Hermes can do: say too much in a DM room, say yes to a plan Om allowed it to answer, make a fact more private, or approve F/T sharing in via-agent mode |
+| **Hermes via `tn mcp` (`rahul-hermes`)** | yes (Rahul's Discord chats, and the DM room's plain-language text through `dm_read`) | **little**: the same purpose-built tools, add private facts and review F/T suggestions under consent.default, can only read/post in DM rooms it's already a member of | yes | Same limits as `om-hermes`, symmetric — the worst it can do: say too much in a DM room, say yes to a plan Rahul allowed it to answer, make a fact more private, or approve F/T sharing in via-agent mode |
 | **`om-agent` (Codex, managed, optional)** | no: only `#om-home`, and only used for `view-as`/`ledger`/overreach/direct `yes` | yes | provider approvals | Secondary surface only; not party to any DM room in the demo |
 
 **Stronger on the VM (P2):** `install-service --separate-users` would run each Hermes process as its own Linux user that can't read the gate's files, the other person's credentials, or the cloud metadata address.

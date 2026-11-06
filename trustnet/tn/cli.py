@@ -13,7 +13,7 @@ Commands:
 - ``tn trust <person> <level>`` edits the owner's trust list.
 - ``tn fact get [<key> ...]`` is the owner's own view of every fact.
 - ``tn fact set <key> --level <level> [--value ...]`` can only **tighten** a
-  fact (PLAN.md §3 Rule 3); loosening needs a hand edit of ``facts.yaml``.
+  fact (PLAN.md §3 Rule 3); loosening needs an approved F ref.
 - ``tn cal add <start> <duration> "<title>" @ "<place>" [--id P1]`` appends an
   accepted plan to the owner's calendar, idempotent on ``--id``.
 - ``tn view-as <person>`` prints the phase 08 table: exactly what that person's
@@ -193,7 +193,7 @@ def _build_parser() -> argparse.ArgumentParser:
     fact_set = fact_commands.add_parser(
         "set",
         parents=[common],
-        help="tighten a fact (loosening needs a hand edit)",
+        help="tighten a fact (use share-request to ask for wider visibility)",
     )
     fact_set.add_argument("key", metavar="key")
     fact_set.add_argument("--level", required=True, metavar="level")
@@ -203,6 +203,30 @@ def _build_parser() -> argparse.ArgumentParser:
         help="new value; a value starting with [ or { is read as YAML",
     )
     fact_set.set_defaults(handler=_cmd_fact_set)
+
+    for name in ("add", "share-request", "approve", "decline"):
+        action = fact_commands.add_parser(name, parents=[common])
+        if name == "add":
+            action.add_argument("key")
+            action.add_argument("--value", required=True)
+        elif name == "share-request":
+            action.add_argument("key")
+            action.add_argument("level")
+            action.add_argument("--reason", default="")
+        else:
+            action.add_argument("refs", nargs="+")
+        action.set_defaults(handler=_cmd_fact_change, action=name)
+
+    suggestion = commands.add_parser("trust-suggest", parents=[common])
+    suggestion.add_argument("friend")
+    suggestion.add_argument("level")
+    suggestion.add_argument("reason")
+    suggestion.set_defaults(handler=_cmd_fact_change, action="trust-suggest")
+    review = commands.add_parser("review", parents=[common])
+    group = review.add_mutually_exclusive_group()
+    group.add_argument("--approve", nargs="+")
+    group.add_argument("--decline", nargs="+")
+    review.set_defaults(handler=_cmd_fact_change, action="review")
 
     cal = commands.add_parser(
         "cal",
@@ -357,6 +381,13 @@ def _write_empty_calendar(path: Path) -> None:
 
 
 def _cmd_trust(context: Context, args: argparse.Namespace) -> int:
+    from trustnet.gate.fact_changes import editing
+
+    with editing(context.owner()):
+        return _cmd_trust_locked(context, args)
+
+
+def _cmd_trust_locked(context: Context, args: argparse.Namespace) -> int:
     owner = context.owner()
     trust = load_trust(owner)
     previous = trust.level_for(args.person_name)  # validates the name
@@ -424,7 +455,33 @@ def _cmd_fact_get(context: Context, args: argparse.Namespace) -> int:
     return context.emit(payload, "\n".join(lines))
 
 
+def _cmd_fact_change(context: Context, args: argparse.Namespace) -> int:
+    from trustnet.gate import fact_changes as changes
+
+    owner = context.owner()
+    if args.action == "add":
+        result = changes.add(owner, args.key, args.value)
+    elif args.action == "share-request":
+        result = changes.suggest(owner, args.key, args.level, args.reason)
+    elif args.action == "trust-suggest":
+        result = changes.suggest(owner, args.friend, args.level, args.reason, trust=True)
+    elif args.action in {"approve", "decline"}:
+        result = changes.decide(owner, args.refs, args.action == "approve")
+    elif args.approve or args.decline:
+        result = changes.decide(owner, args.approve or args.decline, bool(args.approve))
+    else:
+        result = {"pending": changes.review(owner)}
+    return context.emit(result, json.dumps(result, ensure_ascii=False, indent=2))
+
+
 def _cmd_fact_set(context: Context, args: argparse.Namespace) -> int:
+    from trustnet.gate.fact_changes import editing
+
+    with editing(context.owner()):
+        return _cmd_fact_set_locked(context, args)
+
+
+def _cmd_fact_set_locked(context: Context, args: argparse.Namespace) -> int:
     owner = context.owner()
     profile = load_profile(owner)
     key = args.key.strip()

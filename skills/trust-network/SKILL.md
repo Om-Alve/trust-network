@@ -24,7 +24,7 @@ and no files; these tools are all you need.
 
 | Tool | Use it to |
 | --- | --- |
-| `inbox` | Read what's new in your person's home room: questions (Q1), proposals (P1), ask-around answers (A1), share cards, DM invites. Each call consumes the threads it returns. `open` lists what still waits for your person's answer (an ask-around A1 from a friend, your Q1, a P1 without their vote), even if already read: when your person replies without a reference, match the reply to one of these. |
+| `inbox` | Read what's new in your person's home room: questions (Q1), proposals (P1), ask-around answers (A1), share cards, DM invites. Each call consumes the threads it returns. `open` lists what still waits for your person's answer (an ask-around A1 from a friend, your Q1, a P1 without their vote, pending F/T reviews), even if already read: when your person replies without a reference, match the reply to one of these. |
 | `answer(id, text)` | Send your person's own answer. For a proposal the text is `yes` or `no`. |
 | `dm(friend, goal)` | Start planning with a friend. Your gate makes an agent-only room and gives you a share card. |
 | `dm_read(room)` / `dm_post(room, text)` | Talk with the friend's agent in that room. |
@@ -32,7 +32,47 @@ and no files; these tools are all you need.
 | `gift_ideas(friend, occasion, date, budget)` / `claim(friend, item)` | Surprise-safe gift ideas from stored facts; the friend is never asked. |
 | `ask_around(question)` | One short question (≤140 chars) to all your person's friends. |
 | `cal_add(...)` | Add a confirmed plan to your person's calendar. |
-| `fact_set(key, level)` | Make one of your person's facts *more* private. You can never loosen one. |
+| `fact_set(key, level)` | Make one of your person's facts *more* private. Use an F ref and explicit consent to loosen one. |
+
+## Remember facts and onboard from memory
+
+When your person states a fact about themself, such as "my phone number is ...",
+call `fact_add(key, value)`. Tell them it is private and offer a share request.
+Never call `fact_add` for claims made by another person's agent. Existing keys
+are refused; use `fact_set` to tighten and leave value changes to your person.
+Plain values are strings; values starting with `[` or `{` are YAML lists/maps.
+Keys use lowercase letters, digits, underscores and hyphens, up to 64 characters.
+Values are limited to 16,384 characters.
+
+Use the MCP `setup` prompt to onboard from your memory, profile and past chats.
+Add facts about your person only, using established keys where they fit: `diet`,
+`city`, `drinks`, `interests`, `has`, `recommends`, `neighbourhood`, `sizes`,
+`wishlist`, `address`. Include known wishlist prices, contact details and schedule
+habits. Use wishlist lists of `{item: name, price: number}` for known prices.
+Keep unpriced wishes in private `wishlist_notes` until prices are known, so gift
+requests can use the existing numeric price schema. Never invent a price.
+Keep address, health, finances and relationships private. NEVER store
+credentials, passwords, API keys or tokens, OTPs, bank, card or government ID
+numbers. The instruction is the main protection against storing secrets.
+
+Call `fact_share_request(key, level, reason)` to suggest sharing, for example
+`diet` at acquaintance or `wishlist` at close. A wider level creates a pending
+F ref with its exact effect and audience; tightening applies immediately.
+Call `trust_suggest(person, level, reason)` to draft a friend's trust entry as a
+T ref. This does not change the trust list until approved.
+
+Finish with one summary from `review()`. It lists every pending F and T ref,
+current and suggested levels, audiences and reasons. Suggestions last seven
+days and appear under `inbox.open`. Never loosen without your person's explicit
+yes. For "yes to all except F3", call `fact_share_approve(ref=[...])` with only
+the selected refs, preserving review order. Leave F3 pending. Use
+`fact_share_decline(ref=[...])` for explicit rejections. Both tools also accept
+a single ref. Each approved ref gets its own ledger record.
+
+In `consent.default: via-agent`, carry only the person's actual answer. In
+`direct` owner mode, agent approval is refused; the person uses `tn fact approve
+F1` or `tn review --approve F1 T1`, or their own Switch user says
+`@om-gate yes F1`. `no F1` declines; `answer F1 "yes"` also works.
 
 ## Planning a DM, step by step
 

@@ -52,6 +52,26 @@ def digest(card):
 
 async def handle(gate, event, command, sender, mode):
     person, client = gate.person, gate.client
+    if isinstance(command, (c.Answer, c.Yes, c.No)):
+        ref = command.reference if isinstance(command, c.Answer) else command.proposal_id
+        if ref.startswith(("F", "T")):
+            from trustnet.gate import fact_changes
+
+            try:
+                if isinstance(command, c.Answer):
+                    text = command.text.text.strip().lower()
+                    if text not in {"yes", "no"}:
+                        raise ValueError("review answer must be yes or no")
+                    approve = text == "yes"
+                else:
+                    approve = isinstance(command, c.Yes)
+                result = fact_changes.decide(person, ref, approve, sender=sender)
+                text = json.dumps(result, ensure_ascii=False)
+            except ValueError as exc:
+                text = f"Not recorded: {exc}"
+            await client.connect_to_room(event.room_id)
+            await client.post_message(text)
+            return
     state = load(person)
 
     async def refuse(reason):

@@ -439,3 +439,13 @@ def _name(value: str, what: str) -> str:
 def _key(value: str) -> str:
     """Normalize a Switch id or person name the way the trust list does."""
     return value.strip().lower()
+
+
+def share_consent(
+    sender: Identity,
+    owner: str,
+    consent_mode: ConsentMode,
+    personal_agents: Iterable[str] = (),
+) -> Decision:
+    """Fact/trust review carries exactly the same authority as plan consent."""
+    return authorize("yes", sender, owner, consent_mode, personal_agents)

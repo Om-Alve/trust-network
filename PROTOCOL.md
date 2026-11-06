@@ -442,8 +442,9 @@ The seal is a courtesy: workspace admins can read rooms.
   yes in `direct` mode is refused and the gate says so in the room.
 - **Speak-first guard.** An agent cannot propose a plan until the friend's agent
   has spoken in the room.
-- **Agents can only tighten.** The `fact_set` tool can only move a fact toward
-  `private`.
+- **Private additions and consented sharing.** `fact_add` creates new private facts;
+  `fact_set` only tightens. Wider visibility requires an approved F ref. Trust
+  suggestions require an approved T ref. Both use the plan consent rule.
 - **Overreach alerts.** A malformed command, a non-command, an owner-only
   command, or a request for a fact the room may not see, from the other side,
   becomes one note in the owner's home room: `<Person>'s side tried ...`, at
@@ -553,3 +554,52 @@ have the plan. (The confirmation text now says `via agent`.) The transcript is
 - **A pre-handshake gate** reads `hello` as an unknown command.
 - **Language.** The grammar is English and ASCII-punctuated. Smart quotes are
   normalised.
+
+
+## 11. Private facts, setup and review
+
+The local MCP `setup` prompt asks the agent to collect facts from its person's
+memory, profile and past conversations. It excludes secrets and other agents'
+claims, uses established fact keys, suggests levels and friends, then presents
+one review summary. Address and sensitive facts stay private with no F request.
+These are instructions to the agent; the gate does not classify secret content.
+
+| MCP operation | CLI equivalent | Effect |
+| --- | --- | --- |
+| `fact_add(key, value)` | `tn fact add phone --value '+91 ...'` | Creates a new private fact only. Existing keys refuse. |
+| `fact_share_request(key, level, reason)` | `tn fact share-request phone close --reason 'Contact me'` | Tightening applies; loosening creates F<n>. |
+| `trust_suggest(person, level, reason)` | `tn trust-suggest sam friend 'Board games'` | Creates T<n>; no trust edit yet. |
+| `review()` | `tn review` | Pending F/T refs, effects, audiences, reasons. |
+| `fact_share_approve(ref)` | `tn fact approve F1 T1` or `tn review --approve F1 T1` | Approves one ref or a list with one ledger entry per change. |
+| `fact_share_decline(ref)` | `tn fact decline F1 T1` or `tn review --decline F1 T1` | Declines one ref or a list. |
+
+Commands above use the CLI owner's identity. MCP approvals use the configured
+personal agent's identity and require `consent.default: via-agent`. In `direct`
+mode only the owner's CLI or authenticated Switch user can approve. In their
+home room, `yes F1`, `no T1`, and `answer F1 "yes"` use the same policy as plans.
+The generic MCP `answer` tool can send the same F/T answers through the gate.
+
+F and T refs are person-local, monotonically numbered and never rebound. They
+persist in `fact-changes.json`, expire after seven days and appear in `inbox.open`
+until resolved. The effect is, for example, `F1: phone private → close. Who could
+see it: rahul (close)`. Review includes a reason even when none was supplied.
+Approved changes are visible in the ledger as `fact-visibility` or `trust-change`
+entries with `before`, `after` and `ref`. `view-as` and subsequent gate `ask`
+commands read the updated profile and trust list.
+
+Approval refuses a changed fact value, level or audience, or a changed trust
+entry; request a fresh ref and yes. Bulk refs run in the order supplied and stop
+at the first refusal; earlier successful changes remain recorded. Preserve review
+order and review again after changing an audience. Declined, expired or already
+approved refs cannot apply. Concurrent local edits use a per-person file lock.
+Profile, request state and ledger are separate writes; crash recovery across all
+three files is not transactional.
+
+Values are plain strings or YAML lists/maps when they start with `[` or `{`.
+Keys match `[a-z][a-z0-9_-]{0,63}`; values are at most 16,384 characters and must
+be JSON-compatible. Reasons and suggested person names are limited to 280 and
+64 characters. These limits cannot recognize credentials or personal secrets.
+
+With via-agent consent, a fully fooled agent could create and approve its own
+F or T ref. This is the same trust granted for plan consent. Use `direct` owner
+mode to require the person's own CLI or Switch user for approval.

@@ -13,7 +13,7 @@ Failure modes the test is built around, before any happy path:
 - a registration key leaks into the artifact or the server log;
 - ``inbox``'s consumed cursor is not persisted, so a second poll re-delivers.
 
-The run ends in ``data/mcp-e2e/<timestamp>/transcript.json``: tool list and
+The run ends in the pytest temporary directory at ``mcp-e2e/<timestamp>/transcript.json``: tool list and
 descriptions, every call, the DM transcript, both inboxes, coordination, ledgers,
 calendars and share cards.
 """
@@ -56,6 +56,12 @@ TOOLS = {
     "ask_around",
     "cal_add",
     "fact_set",
+    "fact_add",
+    "fact_share_request",
+    "fact_share_approve",
+    "fact_share_decline",
+    "trust_suggest",
+    "review",
 }
 
 
@@ -185,7 +191,7 @@ def _fact_level(tmp_path, person, key):
 
 async def test_mcp_stdio_end_to_end(tmp_path, monkeypatch):
     root = Path.cwd()
-    artifact_dir = root / "data" / "mcp-e2e" / str(time.time_ns())
+    artifact_dir = tmp_path / "mcp-e2e" / str(time.time_ns())
     artifact = {
         "description": "tn mcp over real stdio against a loopback Switch and fake gates",
         "tools": [],

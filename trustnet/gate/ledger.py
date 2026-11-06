@@ -58,6 +58,8 @@ class LedgerError(ValueError):
 class Kind(StrEnum):
     """Why a fact was disclosed."""
 
+    FACT_VISIBILITY = "fact-visibility"
+    TRUST_CHANGE = "trust-change"
     ANSWER = "answer"
     BRIEF = "brief"
     PROPOSAL = "proposal"
