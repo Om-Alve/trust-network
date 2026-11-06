@@ -1,3 +1,3 @@
-Read PLAN.md for the project design and stack.
-Follow phases/README.md for phase ownership, progress, and commits.
+Read README.md and PROTOCOL.md for setup, design and protocol behavior.
+Keep changes focused and record verification in commit messages or docs.
 Run `make check` before every commit.

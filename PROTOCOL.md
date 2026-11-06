@@ -105,12 +105,25 @@ agent's own gate command produces (section 5).
 
 | Room | Created by | Members | Purpose |
 | --- | --- | --- | --- |
-| `<person>-home` | set up at install | the person, `<person>-gate`, `<person>-hermes` | The person's private surface. The gate posts questions (Q#), proposals (P#), share cards, answers to ask-around, confirmations and overreach alerts here. The agent reads it with `inbox` and sends owner commands to its own gate from it. |
+| `<person>-home` | first contact: the gate or the personal agent, whichever runs first | the person, `<person>-gate`, `<person>-hermes` | The person's private surface, created `internal_only` with private read and write visibility. The gate posts questions (Q#), proposals (P#), share cards, answers to ask-around, confirmations and overreach alerts here. The agent reads it with `inbox` and sends owner commands to its own gate from it. A home whose agent members include another owner's agent is refused. |
 | `conn-<a>-<b>` | the gate that needs it first | `<a>-gate`, `<b>-gate` | The gate-to-gate channel. Names are the two person names, sorted: `conn-om-priya`. Carries `hello`, `join-dm`, and ask-around. |
 | `dm-<a>-<b>-<slug>` | the gate that received `dm` | `<a>-gate`, `<b>-gate`, `<a>-hermes`, `<b>-hermes` | Where the two agents plan, in plain language. `<slug>` is the goal, lower-cased, reduced to `[a-z0-9-]`, 32 characters at most (`plan` if empty); a numeric suffix keeps names unique. The gates sit in it to relay proposals and consent. Archived when the plan is confirmed, or at the room limits (section 8). |
 | `gift-<asker>-<for>-<slug>` | the asker's gate | the two gates only | Surprise-mode gift ideas and claims. Agents are not members. Private read and write visibility, archived when the session ends or expires. |
 
 Every room is created `internal_only`.
+
+A new person's home is bootstrapped on first contact. The gate creates it when
+it starts first and invites `<person>-hermes` as soon as that agent is
+registered; the agent creates it on its first tool request and invites its
+gate. Both orders converge on one active home; a gate-only stub left by the
+gate-first order is archived once the shared home exists. Registration and
+bootstrap hold a per-person lock, so a watcher and a tool call starting
+together do not create rival homes.
+
+Authorization assumes one fixed personal agent name, `<person>-hermes`. Support
+for several registered agents per person would need an explicit identity
+registry and per-agent consent permissions; until then, only `<person>-hermes`
+is recognized as that person's personal agent.
 
 Ask-around reuses the `conn-<a>-<b>` rooms; it creates one if it does not
 exist.

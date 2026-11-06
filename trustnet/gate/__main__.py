@@ -7,6 +7,7 @@ import logging
 import os
 from pathlib import Path
 
+from trustnet.gate import relay
 from trustnet.gate.identity import IdentitySource, read_identities
 from trustnet.gate.runtime import Gate
 from trustnet.room_pool import RoomPool
@@ -47,6 +48,11 @@ async def run(args):
         try:
             await client.ready.wait()
             await pool.start_sync()
+            try:
+                await relay.ensure_home(args.person, client)
+            except Exception as exc:
+                # The gate can still serve its rooms; the next home post retries.
+                logging.getLogger(__name__).warning("home bootstrap failed: %s", type(exc).__name__)
             await gate_task
         finally:
             refresh_task.cancel()

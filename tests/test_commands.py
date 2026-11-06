@@ -1,4 +1,4 @@
-"""Tests for the gate command parser: PLAN.md §3 and §4, plus sloppy input."""
+"""Tests for the gate command parser: the original design §3 and §4, plus sloppy input."""
 
 from datetime import date, datetime, timedelta
 
@@ -44,7 +44,7 @@ def p(text: str) -> object:
     return parse(text, now=NOW)
 
 
-# Every literal command line in PLAN.md §3 (both lists).
+# Every literal command line in the original design §3 (both lists).
 PLAN_SECTION_3 = [
     (
         "@om-gate free 2026-11-08..2026-11-09",
@@ -110,7 +110,7 @@ PLAN_SECTION_3 = [
     ("@om-gate ledger", Ledger(target="om-gate")),
 ]
 
-# Every literal command line in PLAN.md §4 (the two propose lines end in "…"
+# Every literal command line in the original design §4 (the two propose lines end in "…"
 # there, so their full form is the §3 example above).
 PLAN_SECTION_4 = [
     (

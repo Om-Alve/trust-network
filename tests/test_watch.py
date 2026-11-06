@@ -14,7 +14,13 @@ class Client:
         self.room = room
 
     async def get_agent_detail(self, agent):
-        return {"rooms": [{"room_name": "om-home", "room_id": "home"}]}
+        return {"owner_id": "om", "rooms": [{"room_name": "om-home", "room_id": "home"}]}
+
+    async def list_participants(self):
+        return [
+            {"id": "om-gate", "name": "om-gate", "type": "agent"},
+            {"id": "om-hermes", "name": "om-hermes", "type": "agent"},
+        ]
 
     async def post_message(self, text):
         self.messages.append((self.room, text))

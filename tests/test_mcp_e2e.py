@@ -28,16 +28,12 @@ import time
 from pathlib import Path
 
 import pytest
-import uvicorn
 import yaml
-from fakes.fake_switch import FakeSwitch, FakeSwitchClient
+from fakes.fake_switch import FakeSwitch
+from fakes.loopback_switch import LoopbackSwitch, serve
 from mcp import StdioServerParameters
 from mcp.client.session import ClientSession
 from mcp.client.stdio import stdio_client
-from starlette.applications import Starlette
-from starlette.responses import Response
-from starlette.routing import Route, WebSocketRoute
-from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from trustnet.gate.dm import main_agent
 from trustnet.gate.policy import Identity
@@ -63,94 +59,6 @@ TOOLS = {
     "trust_suggest",
     "review",
 }
-
-
-class LoopbackSwitch:
-    """The Switch wire protocol over HTTP and one WebSocket, backed by a FakeSwitch.
-
-    Registration keys are the test's own tokens; every other operation is delegated
-    to a real ``FakeSwitchClient`` so the gates and the MCP subprocess share state.
-    """
-
-    def __init__(self, switch: FakeSwitch, keys: dict[str, str]):
-        self.switch, self.keys = switch, keys
-        self.clients: dict[str, FakeSwitchClient] = {}
-
-    def client(self, name: str, person: str) -> FakeSwitchClient:
-        if name not in self.clients:
-            self.clients[name] = self.switch.client(name, person)
-        return self.clients[name]
-
-    def app(self) -> Starlette:
-        async def register(request):
-            token = _bearer(request.headers.get("authorization", ""))
-            person = self.keys.get(token)
-            if person is None:
-                return Response('{"detail": "bad key"}', status_code=401)
-            body = await request.json()
-            client = self.client(str(body["name"]), person)
-            return _json({"id": client.agent_id, "api_key": token})
-
-        async def operate(request):
-            client = self.clients.get(request.path_params["agent_id"])
-            if client is None:
-                return Response('{"detail": "unknown agent"}', status_code=404)
-            try:
-                result = await client._op(request.path_params["op"], await request.json())
-            except (PermissionError, ValueError, KeyError, NotImplementedError) as exc:
-                return Response(json.dumps({"detail": type(exc).__name__}), status_code=400)
-            return _json({"result": result})
-
-        async def events(websocket: WebSocket):
-            token = _bearer(websocket.headers.get("authorization", ""))
-            if token not in self.keys or websocket.path_params["agent_id"] not in self.clients:
-                await websocket.close(code=1008)
-                return
-            await websocket.accept()
-            try:
-                await websocket.send_json(
-                    {"event": "connection_state", "data": {"rooms": [], "cursor": "head"}}
-                )
-                while True:
-                    await websocket.receive_text()
-            except WebSocketDisconnect:
-                return
-
-        return Starlette(
-            routes=[
-                Route("/agents/register-known", register, methods=["POST"]),
-                Route("/agents/{agent_id}/ops/{op}", operate, methods=["POST"]),
-                WebSocketRoute("/agents/{agent_id}/connection/ws", events),
-            ]
-        )
-
-
-def _bearer(header: str) -> str:
-    return header.removeprefix("Bearer ").strip()
-
-
-def _json(payload) -> Response:
-    return Response(json.dumps(payload, default=list), media_type="application/json")
-
-
-async def _serve(app: Starlette):
-    """Run uvicorn on a free port in this event loop; return (url, stop)."""
-    config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning", lifespan="off")
-    server = uvicorn.Server(config)
-    task = asyncio.create_task(server.serve())
-    for _ in range(500):
-        if server.started:
-            break
-        await asyncio.sleep(0.01)
-    else:  # pragma: no cover - a broken harness, not a product failure
-        raise AssertionError("loopback Switch did not start")
-    port = server.servers[0].sockets[0].getsockname()[1]
-
-    async def stop():
-        server.should_exit = True
-        await asyncio.wait_for(task, 10)
-
-    return f"http://127.0.0.1:{port}", stop
 
 
 async def _wait_for(predicate, *, timeout=10.0, what="gate state"):
@@ -231,7 +139,7 @@ async def test_mcp_stdio_end_to_end(tmp_path, monkeypatch):
     gate_tasks = [asyncio.create_task(gate.run()) for gate in gates.values()]
 
     keys = {f"canary-om-{time.time_ns()}": "om", f"canary-rahul-{time.time_ns()}": "rahul"}
-    url, stop = await _serve(LoopbackSwitch(switch, keys).app())
+    url, stop = await serve(LoopbackSwitch(switch, keys).app())
     token = {person: key for key, person in keys.items()}
     env = {
         **os.environ,

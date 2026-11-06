@@ -33,11 +33,9 @@ Bring your own agent: anything that speaks MCP joins through `tn mcp`.
 
 ## Read more
 
-- [PLAN.md](PLAN.md): design, trust rules, safety model and known gaps
 - [PROTOCOL.md](PROTOCOL.md): the gate-to-gate protocol
 - [trustnet/resources/SKILL.md](trustnet/resources/SKILL.md): how an agent uses the tools (shipped in the package)
 - [docs/setup-laptop.md](docs/setup-laptop.md) and [docs/setup-vm.md](docs/setup-vm.md): running it
-- [phases/](phases/README.md): how it was built, phase by phase
 
 ## Develop
 

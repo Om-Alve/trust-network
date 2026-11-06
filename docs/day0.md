@@ -1,6 +1,6 @@
 # Day-0 checks
 
-Every check in PLAN.md §8 is recorded here with its result, because each result
+Every check in the original design §8 is recorded here with its result, because each result
 picks a design branch. A check is `pending` until someone runs it and writes the
 date and evidence. Use `pass`, `fail` or `partial` in **Result**.
 
@@ -10,7 +10,7 @@ Rules for this file:
   (`.env`, Switch, Discord) and its variable name.
 - Evidence is a command output, a screenshot path, or a room/agent/machine name.
 - If a check fails, the prefilled **Decision taken** line is the fallback from
-  PLAN.md §8. Keep it, and add what was actually done.
+  the original design §8. Keep it, and add what was actually done.
 
 ## Who fills in what
 
@@ -41,7 +41,7 @@ Fill these in first. They are referenced by almost every later phase.
 | VM machine name (Switch) | `rahul-vm` (owner Rahul, id `3842f071-b122-4b22-b3f9-2b947ab74c43`) | `GET /gateway/management/controllers` as Rahul |
 | Switch Console | `0.40.1` | confirmed: app `CFBundleShortVersionString` |
 | switch-core | `0.31.0` | confirmed: install path `native/switch-core/0.31.0` |
-| `switch-agent-controller` | `0.31.0` | pinned by PLAN.md §11; check with `switch-agent-controller --version` |
+| `switch-agent-controller` | `0.31.0` | pinned by the original design §11; check with `switch-agent-controller --version` |
 
 ---
 
@@ -266,7 +266,7 @@ Phase 11: template passes installed core 0.31.0 compiler/schema validation; live
 run is blocked by pending 12a. Om's main agent is now managed Codex; the
 managed Codex stand-in home exchange passed (phase 11 log).
 Agent-only home substitution passed a direct Om Gateway calendar request; this
-does not establish Discord or managed-agent delivery. See phases/11-gate-runtime.md.
+does not establish Discord or managed-agent delivery. See the original build record.
 
 Notes: phase 11 runs `templates/home.template.yaml`. Record the channel ID or a
 screenshot path, and confirm it is private and lists Om, `om-agent` and `om-gate`.
@@ -328,7 +328,7 @@ The phase 04 probe was deliberately short, so two of its failures were weak on t
   `providers/advanced_fields.py`, only `CLAUDE_FIELDS` has `tools` / `disallowedTools`.
   OpenCode's fields are variant, temperature, topP, maxSteps, webSearch, smallModel; Codex has
   none for tools. A managed OpenCode or Codex envoy would keep shell and file tools, which
-  breaks the safety model (PLAN.md §6). Om doesn't want Claude Code in Switch.
+  breaks the safety model (the original design §6). Om doesn't want Claude Code in Switch.
 - **Check 10 fails partly because Om is the workspace admin** (`admin@switch.local`), and
   admins can read every room. Whether a non-admin owner can read another owner's private
   room is untested. A separate non-admin `om` user would make the gift-room test meaningful;
@@ -340,7 +340,7 @@ permission config) is the right branch for both envoys.
 
 ### No-envoy decision, 2026-11-05
 
-PLAN.md dropped envoys the same evening (and swapped main agents: Om's main agent is now
+the original design dropped envoys the same evening (and swapped main agents: Om's main agent is now
 Hermes, Rahul's is a managed Codex agent, `rahul-agent`). **Checks 4, 5 and 6 no longer drive
 the design** — they tested managed/fallback envoys, cross-envoy addressing and tool denial for
 envoys specifically, and none of that governs how the two main agents talk to each other now.

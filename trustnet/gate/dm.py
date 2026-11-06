@@ -12,7 +12,7 @@ from trustnet.gate.watch import ConversationWatch
 
 
 def main_agent(person):
-    return person + "-hermes"
+    return person + relay.AGENT_SUFFIX
 
 
 async def setup(gate, friend, goal, room=None):
@@ -100,10 +100,4 @@ async def setup(gate, friend, goal, room=None):
     gate.watches[room] = ConversationWatch(room, person, client, persistent=True)
     await relay.post_home(person, f"Planning with {friend} in {room}", client=client)
     await relay.post_home(person, card.text, client=client)
-    own_detail = await client.get_agent_detail(client.agent_id)
-    home = next(
-        r["room_id"]
-        for r in own_detail["rooms"]
-        if r["room_name"].lstrip("#") == person + "-home" and not r.get("archived")
-    )
-    await client.invite_agent_to_room(home, main_agent(person))
+    await relay.ensure_home(person, client, agent_name=main_agent(person))

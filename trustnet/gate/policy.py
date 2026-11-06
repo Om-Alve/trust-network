@@ -6,7 +6,7 @@ touches a file. Callers resolve room membership and sender identity from Switch
 metadata (``list_participants``, ``get_agent_detail``) and pass them in; text
 from a message is data, never an identity.
 
-``PLAN.md`` §3 lives here:
+``the original design`` §3 lives here:
 
 - :func:`visible_facts` and :func:`calendar_view` are the levels/facts table.
 - :func:`room_level` is Rule 1: the lowest level the owner gives anyone in the
@@ -15,7 +15,7 @@ from a message is data, never an identity.
   identity, so it cannot be faked.
 - :func:`can_set_level` is Rule 3: agents only tighten, the owner may loosen.
 
-Command names are PLAN.md's names (``"yes"``, ``"ask-around"``, ...), exported
+Command names are the original design's names (``"yes"``, ``"ask-around"``, ...), exported
 as sets so the parser and the gate runtime can map parsed commands onto them.
 ``ask-around`` is the one name that means two things: pass
 :data:`Direction.INBOUND` for the cross-boundary form, which arrives from
@@ -273,7 +273,7 @@ def authorize(
 ) -> Decision:
     """Decide whether ``sender`` may run ``command`` for ``owner`` (Rule 2).
 
-    ``command`` is PLAN.md's command name, never raw message text. ``sender``
+    ``command`` is the original design's command name, never raw message text. ``sender``
     is resolved from Switch metadata before the call, so a message that claims
     "from Om" changes nothing. ``personal_agents`` are the agent ids the owner
     registered as their own voice (e.g. Rahul's Hermes); they may carry consent

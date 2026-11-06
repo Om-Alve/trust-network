@@ -1,7 +1,7 @@
 """End-to-end facts scenarios over FakeSwitch: levels, mixed rooms, previews.
 
 Each test drives a real ``Gate`` object. The failure modes are listed in
-``phases/27-scenario-hardening.md`` under B; the ones already covered elsewhere
+`the original build record` under B; the ones already covered elsewhere
 (overreach cooldown, CLI/MCP loosen refusal) are not repeated here.
 """
 

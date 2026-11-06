@@ -7,11 +7,48 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - the demo runs on macOS and Linux
+    fcntl = None
+
 from trustnet.gate.commands import Answer, Dm, Quoted
 from trustnet.gate.dm import main_agent
 from trustnet.gate.facts import REPO_ROOT, load_trust, resolve_data_dir
+from trustnet.gate.relay import find_home, home_name
 from trustnet.room_pool import wait_until_live
 from trustnet.switch_client import SwitchClient, SwitchError
+
+#: How long one session waits for another's first contact to finish.
+BOOTSTRAP_WAIT = 10.0
+
+
+@asynccontextmanager
+async def _bootstrap_lock(directory, person):
+    """Serialize registration and home bootstrap for one person.
+
+    A watcher and a tool call can start together on a new person. Without the
+    lock both would register the same name and create rival homes.
+    """
+    if fcntl is None:
+        yield
+        return
+    path = directory / f"{person}.lock"
+    path.touch(mode=0o600, exist_ok=True)
+    with path.open("a") as handle:
+        deadline = asyncio.get_running_loop().time() + BOOTSTRAP_WAIT
+        while True:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if asyncio.get_running_loop().time() >= deadline:
+                    raise SwitchError(f"another session is still starting {person}") from None
+                await asyncio.sleep(0.05)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 @asynccontextmanager
@@ -23,23 +60,35 @@ async def session(person):
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / f"{person}.json"
     url = os.environ["SWITCH_URL"]
-    if path.exists():
-        state = json.loads(path.read_text())
-        client = SwitchClient(url, state["id"], state["api_key"])
-    else:
-        client = await SwitchClient.register(
-            url, os.environ[f"{person.upper()}_GATE_KEY"], main_agent(person), agent_type="codex"
-        )
-        path.touch(mode=0o600)
-        path.write_text(json.dumps({"id": client.agent_id, "api_key": client.api_key}))
+    async with _bootstrap_lock(directory, person):
+        if path.exists():
+            state = json.loads(path.read_text())
+            client = SwitchClient(url, state["id"], state["api_key"])
+        else:
+            client = await SwitchClient.register(
+                url,
+                os.environ[f"{person.upper()}_GATE_KEY"],
+                main_agent(person),
+                agent_type="codex",
+            )
+            path.touch(mode=0o600)
+            path.write_text(json.dumps({"id": client.agent_id, "api_key": client.api_key}))
 
-    async def drain():
-        async for _ in client.events():
-            pass
+        async def drain():
+            async for _ in client.events():
+                pass
 
-    stream = asyncio.create_task(drain())
+        stream = asyncio.create_task(drain())
+        try:
+            await asyncio.wait_for(client.ready.wait(), 15)
+            # First contact: a new person has no home until their agent asks for it.
+            await home(person, client)
+        except BaseException:
+            stream.cancel()
+            await asyncio.gather(stream, return_exceptions=True)
+            await client.aclose()
+            raise
     try:
-        await asyncio.wait_for(client.ready.wait(), 15)
         yield client
     finally:
         stream.cancel()
@@ -48,17 +97,47 @@ async def session(person):
 
 
 async def home(person, client):
-    detail = await client.get_agent_detail(client.agent_id)
-    rooms = [
-        r
-        for r in detail["rooms"]
-        if r["room_name"].lstrip("#") == person + "-home" and not r.get("archived")
-    ]
-    if not rooms:
-        raise SwitchError(
-            "Home membership is required; invite the registered Hermes identity first"
+    """Return the person's private home, bootstrapping it on first contact.
+
+    The gate also creates a home when it starts first, but that room cannot be
+    seen by an agent that is not a member yet. So when the agent sees no home it
+    creates one and invites its gate. A look-alike home holding another owner's
+    agent is refused rather than joined or recreated: private notes must never
+    land in a stranger's room.
+    """
+    name = home_name(person)
+    gate = person + "-gate"
+    agent = main_agent(person)
+    chosen, safe, blocked = await find_home(
+        client, person, own_names={gate, agent}, agent_name=agent
+    )
+    if chosen is None:
+        if blocked:
+            foreign = sorted({member for _room, members in blocked for member in members})
+            raise SwitchError(
+                f"refusing {name}: it holds another owner's agent ({', '.join(foreign)})"
+            )
+        result = await client.create_room(
+            name,
+            "Trust network home",
+            [agent],
+            internal_only=True,
+            read_visibility="private",
+            write_visibility="private",
         )
-    return rooms[0]["room_id"]
+        chosen = result.get("room_id", result.get("id"))
+        names = {agent}
+    else:
+        names = next(names for room, names in safe if room == chosen)
+    if gate not in names:
+        try:
+            await client.invite_agent_to_room(chosen, gate)
+        except (SwitchError, ValueError) as exc:
+            raise SwitchError(
+                f"{gate} must be registered before {person}'s home can be used"
+            ) from exc
+    await client.connect_to_room(chosen)
+    return chosen
 
 
 async def inbox(person, consume=True):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Probe a switch-core server over HTTPS and WebSockets.
 
-Day-0 check 2 (PLAN.md section 8): the Azure VM must reach the laptop's
+Day-0 check 2 (the original design section 8): the Azure VM must reach the laptop's
 switch-core through Tailscale Serve, WebSockets included. Run this from the VM.
 
 Usage:
