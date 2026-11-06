@@ -32,6 +32,11 @@ def claims(person):
     ]
 
 
+def _item_key(name):
+    """One wishlist item however it's written: case and spacing don't matter."""
+    return " ".join(name.split()).casefold()
+
+
 def _json_object(text):
     """A JSON object from a gift envelope, or ``None`` for anything else."""
     try:
@@ -228,18 +233,23 @@ async def handle(gate, event, sender, level, detail):
             or entry["expires"] <= gate._now().timestamp()
         ):
             return True
-        key = command.item.casefold()
+        # Match the wishlist's own item, ignoring case and spacing: agents re-case
+        # names ("LEGO"), and the claim is stored in the wishlist's spelling.
+        wanted = _item_key(command.item)
         permitted = [i["item"] for i in values.get("wishlist", [])]
-        if command.item not in entry["offered"] or command.item not in permitted or key in taken:
+        item = next(
+            (i for i in permitted if _item_key(i) == wanted and i in entry["offered"]), None
+        )
+        if item is None or item.casefold() in taken:
             payload = {"error": "Item unavailable"}
         else:
-            taken[key] = {
-                "item": command.item,
+            taken[item.casefold()] = {
+                "item": item,
                 "claimer": sender.person,
                 "reveal_after": entry["reveal_after"],
             }
             save(person, "claims.json", taken)
-            payload = {"status": "claimed", "item": command.item}
+            payload = {"status": "claimed", "item": item}
     else:
         return True
     await client.post_message(f"@{sender.person}-gate gift-result " + json.dumps(payload))

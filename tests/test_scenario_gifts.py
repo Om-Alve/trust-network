@@ -54,13 +54,15 @@ async def test_two_askers_taken_items_and_the_recipients_seal(tmp_path, monkeypa
         ]
         assert first["taken"] == []
 
-        assert await personal.claim("rahul", "om", "Lego Millennium Falcon") == {
+        # Agents re-case brand names ("LEGO"); the claim is the wishlist's item,
+        # in the wishlist's spelling.
+        assert await personal.claim("rahul", "om", "LEGO  Millennium Falcon") == {
             "status": "claimed",
             "item": "Lego Millennium Falcon",
         }
         # A second asker who asked before the claim cannot take the same item.
         with pytest.raises(SwitchError, match="Item unavailable"):
-            await personal.claim("priya", "om", "Lego Millennium Falcon")
+            await personal.claim("priya", "om", "lego millennium falcon")
 
         third = await personal.gift_ideas("priya", "om", "birthday", OCCASION, 3000)
         assert third["taken"] == [{"item": "Lego Millennium Falcon", "status": "taken"}]
