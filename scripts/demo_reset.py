@@ -25,7 +25,7 @@ STATE_FILES = (
 def clear_local(root, dry_run=False):
     for person in PEOPLE:
         directory = root / person
-        for name in (*STATE_FILES, "share-cards"):
+        for name in (*STATE_FILES, "share-cards", "room-watches"):
             target = directory / name
             if target.exists():
                 print("Clear", target)
