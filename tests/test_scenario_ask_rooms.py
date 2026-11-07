@@ -98,6 +98,32 @@ async def test_ask_room_returns_close_wishlist_without_recipient_agent_or_notice
         await world.stop()
 
 
+async def test_first_contact_ask_stays_quiet_and_reuses_its_room(tmp_path, monkeypatch):
+    """No pairwise room ever said hello: the ask is still quiet, and a second ask
+    reuses the pair's room instead of opening another."""
+    world = await _ask_world(tmp_path, monkeypatch)
+    await world.start()
+    try:
+        om_home_before = list(world.home_bodies("om"))
+        first = await personal.ask("rahul", "om", ["wishlist"])
+        await world.wait_for(
+            lambda: any(body.startswith("wishlist:") for body in world.bodies(first["room"])),
+            what="the first wishlist answer",
+        )
+        second = await personal.ask("rahul", "om", ["diet"])
+        await world.wait_for(
+            lambda: any(body.startswith("diet:") for body in world.bodies(second["room"])),
+            what="the diet answer",
+        )
+        assert second["room"] == first["room"]
+        assert len(world.rooms_named("ask-om-rahul-")) == 1
+        assert "om-hermes" not in world.switch.rooms[first["room"]]["members"]
+        assert not world.rooms_named("dm-om-rahul-")
+        assert world.home_bodies("om") == om_home_before
+    finally:
+        await world.stop()
+
+
 async def test_quiet_hidden_field_ledgers_but_does_not_alert(tmp_path, monkeypatch):
     """A hidden quiet fact is ledgered; a hidden non-quiet fact still alerts."""
     world = await _ask_world(
