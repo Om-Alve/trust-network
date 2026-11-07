@@ -13,7 +13,10 @@ agent on news, and it lets the person talk to their agent by typing.
 Each turn's prompt carries the person's persona (``agent.md`` in their data
 directory, if present), the trust-network skill, the recent conversation with the
 person, and what just happened. Agent sessions are not resumed, so a turn never
-depends on a framework's own memory.
+depends on a framework's own memory. The Codex preset keeps the user's own Codex
+configuration, so MCP servers and connectors they already set up (a calendar, for
+example) remain available; it only adds the trust-network server and tightens the
+shell and web settings.
 
 Ways this can go wrong, and what the runner does:
 - an agent turn fails or times out → the error is shown, and that turn's news is
@@ -24,9 +27,8 @@ Ways this can go wrong, and what the runner does:
   the second;
 - the agent has nothing for the person → it replies ``[SILENT]`` and nothing is
   printed;
-- the agent could reach its person's files or the shell and act outside the gate
-  → the presets run Codex without its shell tool and OpenCode on a private config
-  that denies its shell, file and web tools; only the ``tn mcp`` tools remain.
+- the presets disable shell/file/web tools while keeping the person's configured
+  MCP connectors available for calendar work. Those connectors are trusted tools.
 """
 
 from __future__ import annotations
@@ -57,10 +59,18 @@ def _mcp_env() -> dict[str, str]:
     """What the ``tn mcp`` server needs, with data paths made absolute."""
     env = {
         key: os.environ[key]
-        for key in ("SWITCH_URL", "TN_DATA_DIR", "TN_STATE_DIR")
+        for key in (
+            "SWITCH_URL",
+            "TN_DATA_DIR",
+            "TN_STATE_DIR",
+            "TN_CONFIG_DIR",
+            "TN_TIMEZONE",
+            "TN_CALENDAR_DELIVERY",
+            "TN_OUTGOING",
+        )
         if os.environ.get(key)
     }
-    for key in ("TN_DATA_DIR", "TN_STATE_DIR"):
+    for key in ("TN_DATA_DIR", "TN_STATE_DIR", "TN_CONFIG_DIR"):
         if key in env:
             env[key] = str(Path(env[key]).expanduser().resolve())
     return env
@@ -71,16 +81,22 @@ def _tn() -> str:
 
 
 def codex_command(person: str, model: str, workdir: Path, reply: Path) -> list[str]:
-    """``codex exec`` with only the trust-network MCP server, tools pre-approved, no shell."""
+    """``codex exec`` with trust-network added to the user's own configuration.
+
+    ``--ignore-user-config`` used to isolate the turn, but it also removed every
+    MCP server and connector the person had configured, including their calendar.
+    The runner now loads the normal Codex config and only overrides the
+    trust-network server, its tool approval, the shell and web search.
+    """
     table = ",".join(f"{k}={json.dumps(v)}" for k, v in _mcp_env().items())
     return [
-        "codex", "exec", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
+        "codex", "exec", "--skip-git-repo-check", "--ephemeral",
         "-m", model, "-s", "read-only", "-C", str(workdir),
         "-c", "features.shell_tool=false", "-c", 'web_search="disabled"',
-        "-c", f"mcp_servers.trustnet.command={json.dumps(_tn())}",
-        "-c", f'mcp_servers.trustnet.args=["--as","{person}","mcp"]',
-        "-c", 'mcp_servers.trustnet.default_tools_approval_mode="approve"',
-        "-c", f"mcp_servers.trustnet.env={{{table}}}",
+        "-c", f"mcp_servers.trust-network.command={json.dumps(_tn())}",
+        "-c", f'mcp_servers.trust-network.args=["--as","{person}","mcp"]',
+        "-c", 'mcp_servers.trust-network.default_tools_approval_mode="approve"',
+        "-c", f"mcp_servers.trust-network.env={{{table}}}",
         "-o", str(reply), "-",
     ]  # fmt: skip
 
@@ -94,20 +110,15 @@ OPENCODE_DENY = (
 
 
 def opencode_command(person: str, model: str, workdir: Path) -> tuple[list[str], dict]:
-    """``opencode run`` on a private config holding only the trust-network MCP server.
-
-    ``XDG_CONFIG_HOME`` points at that config, so the user's global OpenCode config
-    (other MCP servers, instructions) is not loaded; credentials stay where they are.
-    """
-    config = workdir / "config" / "opencode"
-    config.mkdir(parents=True, exist_ok=True)
-    (config / "opencode.json").write_text(
+    """Overlay the trust-network entry while retaining the user's connectors."""
+    workdir.mkdir(parents=True, exist_ok=True)
+    (workdir / "opencode.json").write_text(
         json.dumps(
             {
                 "$schema": "https://opencode.ai/config.json",
                 "permission": {"*": "allow", **{tool: "deny" for tool in OPENCODE_DENY}},
                 "mcp": {
-                    "trustnet": {
+                    "trust-network": {
                         "type": "local",
                         "command": [_tn(), "--as", person, "mcp"],
                         "environment": _mcp_env(),
@@ -118,7 +129,7 @@ def opencode_command(person: str, model: str, workdir: Path) -> tuple[list[str],
         )
     )
     argv = ["opencode", "run", "--standalone", "--format", "json", "-m", model]
-    return argv, {"XDG_CONFIG_HOME": str(workdir / "config")}
+    return argv, {}
 
 
 def opencode_reply(stdout: str) -> str:
@@ -147,6 +158,10 @@ def opencode_reply(stdout: str) -> str:
 def describe(report: dict) -> str:
     """The same wake text the Hermes cron pre-check prints."""
     lines = []
+    if report.get("calendar_pending"):
+        lines.append(
+            f"{report['calendar_pending']} approved calendar operation(s) need delivery. Call calendar_tasks and use your existing calendar tools."
+        )
     if report["inbox_unread"]:
         lines.append(
             f"{report['inbox_unread']} unread item(s) in your person's trust-network inbox."
@@ -200,7 +215,7 @@ class Runner:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=self.workdir,
-                    env={**os.environ, **extra_env},
+                    env={**os.environ, **_mcp_env(), **extra_env},
                 )
                 out, err = await asyncio.wait_for(
                     process.communicate(self.prompt(now).encode()), TURN_TIMEOUT

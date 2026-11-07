@@ -63,10 +63,23 @@ async def test_invite_to_running_connection(tmp_path):
             guest = tmp_path / "alice"
             guests.append(guest)
             env = {**guest_env, "TN_CONFIG_DIR": str(guest)}
-            ready = await cli(env, "setup", invite["invite_url"], "--agent", "manual", "--json")
+            ready = await cli(
+                env,
+                "setup",
+                invite["invite_url"],
+                "--agent",
+                "manual",
+                "--wake-external",
+                "invite harness cron",
+                "--json",
+            )
             assert ready["person"] == "alice" and ready["gate_pid"]
+            assert ready["calendar"]["delivery"] == "agent"
+            assert ready["wake"] == {"mode": "external", "external": "invite harness cron"}
             report = await cli(env, "doctor", "--json")
             assert report["ok"] is True
+            assert report["automation_ready"] is True
+            assert report["wake_verified"] is False
             await cli(env, "setup", invite["invite_url"], "--json")
             assert wire.registrations == ["alice-gate", "alice-hermes"]
             second = tmp_path / "other"

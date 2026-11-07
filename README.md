@@ -48,7 +48,7 @@ and an installed, signed-in agent CLI. Clone this repository and run from its ro
 
 ```sh
 uv tool install .
-tn setup '<invite-from-organizer>' --agent codex --consent via-agent
+tn setup '<invite-from-organizer>' --agent codex --consent via-agent --wake --background-service
 tn doctor
 ```
 
@@ -56,6 +56,11 @@ Choose `codex`, `claude`, `opencode` or `manual`. Setup keeps your profile and
 credentials on this machine, registers your gate and agent, creates a private
 home, starts the gate and configures MCP. It preserves your data when repeated.
 Restart your agent after setup to load the new MCP connection.
+`--background-service` starts the gate and agent runner at login on macOS or
+Linux. Omit it to configure the runner without starting it, then keep the printed
+wake command running in a terminal. Both modes need the machine awake and online.
+Choose your timezone with `--timezone <IANA-name>`. New profiles use agent calendar
+delivery; existing profiles retain ICS until you choose `--calendar-delivery agent`.
 Manual mode writes `mcp.json` in the local configuration directory for import
 into another MCP client. Discord and a VM are optional.
 
@@ -80,7 +85,9 @@ The gate does not automatically dump their inventory or recommendations.
 must come directly from your Switch user account.
 
 `tn doctor` checks your profile, Switch connection, home, trusted identities,
-running gate and MCP configuration. Configuration lives under
+gate, MCP and wake runner. It reports connection and automation readiness
+separately; a configured but stopped runner is not ready. `tn status` shows
+processes and installed services. Configuration lives under
 `~/.config/trust-network`, or `TN_CONFIG_DIR` when set. Setup logs stay there.
 Use `tn stop` to stop the gate and `tn setup` to start it again. A connected MCP
 server alone does not wake the agent when a friend replies. Configure the wake

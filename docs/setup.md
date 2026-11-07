@@ -9,7 +9,7 @@ Install from the checkout and redeem the organizer's invite:
 
 ```sh
 uv tool install .
-tn setup '<invite>' --agent codex --consent via-agent
+tn setup '<invite>' --agent codex --consent via-agent --wake --background-service
 tn doctor
 ```
 
@@ -29,8 +29,34 @@ same configuration directory. The saved request ID recovers the original result.
 Your profile, retained credentials and logs stay under
 `~/.config/trust-network`, or `TN_CONFIG_DIR` when set. Repeating `tn setup`
 preserves your data. `tn stop` stops the gate it launched. Run `tn setup` again
-to restart it. The gate runs in the background while this machine is awake;
-setup does not install an OS login service.
+to restart it. The gate and runner need this machine awake and online.
+
+## Choose how your agent wakes
+
+`--wake` configures the selected Codex or OpenCode runner. It prints the command
+to keep running in a terminal and starts no agent loop on its own.
+`--background-service` opts into installing and starting both gate and runner
+under macOS launchd or Linux systemd user services. Use it with `--wake` for
+automatic startup at login. `tn stop` stops the services; `tn setup` starts them
+again. `tn status` shows both processes and service units.
+
+For an existing Hermes cron job or another external integration, use
+`tn setup --wake-external "Hermes cron every minute"`. Doctor labels this as a
+declared integration that it cannot verify locally. Claude/manual clients need
+an external poller or a custom `tn wake --cmd` command.
+
+`tn doctor` separates `connection_ok`, `automation_ready` and `wake_verified`.
+MCP connectivity alone does not prove a runner is active. Configure your own
+calendar connector in the selected agent; Codex and OpenCode wake turns preserve
+those configured connectors. Set `--timezone <IANA-name>` and
+`--calendar-delivery agent` to use them. Existing profiles retain ICS by default.
+Setup restarts its gate when timezone or delivery settings change. Restart the
+agent client as instructed so it loads its updated MCP configuration.
+
+For background service logs on macOS, read `gate-service.log` and
+`wake-service.log` in the configuration directory. On Linux use
+`journalctl --user -u trust-network-<person>-gate.service` and the corresponding
+`-wake.service` unit. Systemd user services follow the host's login-session policy.
 
 ## Choose what to share
 

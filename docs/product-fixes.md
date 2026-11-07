@@ -81,3 +81,19 @@ The group runner passed ten scenarios in
 `data/product-e2e-20261107T060924819314Z/`, including real group conversation tools.
 The installed-wheel runner passed all six checks in
 `data/install-20261107T113621/report.md`.
+
+## Final onboarding integration
+
+Setup can configure a runner or explicitly install gate/runner login services.
+Doctor distinguishes connection checks from a running wake path. New profiles
+use agent calendar delivery; legacy profiles retain ICS. A timezone or delivery
+change restarts the managed gate. Switching to an external poller stops existing
+managed services. Units retain non-secret provider configuration paths, while
+credentials remain in the private connection files and existing agent accounts.
+
+Codex wake turns retain user configuration and override the same `trust-network`
+entry that setup installs. OpenCode uses a project overlay and retains global
+connectors. Calendar-only work wakes the agent after message cursors are consumed;
+child processes receive absolute profile paths even with a custom command.
+
+Final verification and repeatable artifact paths are in [verification.md](verification.md).

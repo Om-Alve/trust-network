@@ -4,6 +4,30 @@ import json
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+CALENDAR_DELIVERIES = ("agent", "ics")
+WAKE_MODES = ("runner", "external")
+
+
+def checked_timezone(value):
+    """Return an IANA timezone name, or refuse it before it reaches a profile."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Use an IANA timezone such as Asia/Kolkata")
+    name = value.strip()
+    try:
+        ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ValueError(
+            f"Unknown timezone {name!r}; use an IANA name such as Asia/Kolkata"
+        ) from None
+    return name
+
+
+def checked_calendar_delivery(value):
+    if value not in CALENDAR_DELIVERIES:
+        raise ValueError("Calendar delivery must be agent or ics")
+    return value
 
 
 def config_dir():
@@ -59,6 +83,26 @@ def apply(settings=None, *, override=False):
         checked_url(settings["identity_url"])
         if not isinstance(settings.get("identity_token"), str) or not settings["identity_token"]:
             raise ValueError("The configured identity endpoint needs an access token")
+    timezone = checked_timezone(settings["timezone"]) if settings.get("timezone") else None
+    delivery = (
+        checked_calendar_delivery(settings["calendar_delivery"])
+        if settings.get("calendar_delivery")
+        else None
+    )
+    wake = settings.get("wake")
+    if wake is not None:
+        if not isinstance(wake, dict) or wake.get("mode") not in WAKE_MODES:
+            raise ValueError("The configured wake mode must be runner or external")
+        if wake["mode"] == "runner":
+            command = wake.get("command")
+            if (
+                not isinstance(command, list)
+                or not command
+                or any(not isinstance(part, str) or not part for part in command)
+            ):
+                raise ValueError("The configured wake runner needs a command")
+        elif not isinstance(wake.get("external"), str) or not wake["external"].strip():
+            raise ValueError("The configured external wake integration needs a description")
     values = {
         "TN_PERSON": settings["person"],
         "SWITCH_URL": settings["switch_url"],
@@ -66,6 +110,11 @@ def apply(settings=None, *, override=False):
         "TN_STATE_DIR": settings["state_dir"],
         settings["person"].upper() + "_GATE_KEY": settings["registration_key"],
     }
+    if timezone:
+        values["TN_TIMEZONE"] = timezone
+    if delivery:
+        values["TN_CALENDAR_DELIVERY"] = delivery
+
     if settings.get("identity_url"):
         values.update(
             TN_IDENTITY_URL=settings["identity_url"], TN_IDENTITY_TOKEN=settings["identity_token"]

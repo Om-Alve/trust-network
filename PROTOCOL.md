@@ -523,10 +523,12 @@ The agent replies with one or two lines for the person, or `[SILENT]` if
 nothing needs them. A per-person lock refuses a second runner. A failed turn is
 carried into the next one.
 
-The `codex` preset runs `codex exec` with only the trust-network server. Codex
-refuses MCP tool calls unless the server sets
-`default_tools_approval_mode="approve"`, and the preset passes it. If you
-configure Codex yourself, set that.
+The `codex` preset loads the person's normal configuration and overrides its
+`trust-network` MCP entry, including `default_tools_approval_mode="approve"`.
+OpenCode receives a project overlay that retains global MCP connectors. Both
+presets restrict built-in shell/file/web tools while retaining configured
+calendar connectors. The owner remains responsible for those connectors' access
+and approval settings.
 
 **What the agent must do,** in the order a plan goes: call `dm`; read the share
 card with `inbox`; plan with `dm_read` and `dm_post` in plain text; ask its person

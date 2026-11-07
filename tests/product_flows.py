@@ -328,6 +328,59 @@ async def cross_timezone_consent(h):
     assert calendar_jobs.pending("rahul")[0]["plan"]["start"] == "2026-11-09T19:00:00-05:00"
 
 
+async def calendar_work_wakes_agent(h):
+    import sys
+
+    from trustnet.tn import wake
+
+    h.patch.setenv("TN_CALENDAR_DELIVERY", "agent")
+    room = await h.open()
+    await h.propose(room)
+    await h.vote("om")
+    await h.vote("rahul")
+    prompt = (h.root / "calendar-wake-prompt.txt").resolve()
+    polls = 0
+
+    async def watch(person):
+        nonlocal polls
+        polls += 1
+        if polls > 1:
+            raise SystemExit(0)
+        return {
+            "inbox_unread": 0,
+            "dm_updates": [],
+            "calendar_pending": len(calendar_jobs.pending(person, due_only=True)),
+        }
+
+    h.patch.setattr(personal, "watch", watch)
+    code = (
+        "import sys; from pathlib import Path; from trustnet.gate import calendar_jobs; "
+        f"Path({str(prompt)!r}).write_text(sys.stdin.read()); "
+        "task=calendar_jobs.pending('om')[0]; "
+        "calendar_jobs.report('om',task['token'],'applied','simulated-calendar','event-woken'); "
+        "print('[SILENT]')"
+    )
+    runner = wake.Runner(
+        "om",
+        lambda reply: ([sys.executable, "-c", code], {}, lambda out: out),
+        "Calendar acceptance agent",
+        every=0.001,
+    )
+    try:
+        await runner.poll()
+    except SystemExit:
+        pass
+    assert prompt.exists(), (
+        "A pending calendar task must wake the agent even without unread messages"
+    )
+    assert "calendar" in prompt.read_text().lower()
+    assert calendar_jobs.pending("om") == []
+    assert calendar_jobs.all_tasks("om")[0]["event_id"] == "event-woken"
+    h.trace.append(
+        "Calendar-only notification launched a real agent subprocess and persisted its receipt"
+    )
+
+
 SCENARIOS = [
     agent_calendar_delivery,
     calendar_revisions,
@@ -336,4 +389,5 @@ SCENARIOS = [
     blocked_approval_and_gift_permissions,
     group_calendar_lifecycle,
     cross_timezone_consent,
+    calendar_work_wakes_agent,
 ]
