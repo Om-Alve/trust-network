@@ -519,7 +519,14 @@ def football_checks(report):
     confirmed = {
         pid: p for s in state.values() for pid, p in s["plans"].items() if p.get("confirmed")
     }
-    dates = sorted({p["confirmed"]["content"]["start"][:10] for p in confirmed.values()})
+    dates = sorted(
+        {
+            (datetime.fromisoformat(c["start"]) + timedelta(weeks=week)).date().isoformat()
+            for p in confirmed.values()
+            for c in [p["confirmed"]["content"]]
+            for week in range(c.get("weekly", 1))
+        }
+    )
     out.append(
         {
             "check": "at least one game confirmed",
