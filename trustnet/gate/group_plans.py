@@ -196,6 +196,7 @@ def summary(plan):
         "confirmed": copy.deepcopy(plan.get("confirmed")),
         "cancelled": copy.deepcopy(plan.get("cancelled")),
         "removed": copy.deepcopy(plan.get("removed")),
+        "former": list(plan.get("former", [])),
         "candidate_declined": bool(plan.get("candidate_declined")),
         "created_at": plan.get("created_at", 0),
         "updated_at": plan.get("updated_at", 0),
@@ -383,6 +384,7 @@ async def _create(gate, payload):
         return
 
     peers = [peer for peer in participants if peer != person]
+    await _check_organizer(gate, peers)
     await _check_peer_capability(
         gate, peers, needed=min_yes < len(participants) or "notes" in content
     )
@@ -523,6 +525,7 @@ async def _revise(gate, payload):
     fingerprint = _fingerprint(plan["id"], revision, participants, content, min_yes)
     now = gate._now()
     plan.update(
+        former=_former(plan, participants),
         participants=participants,
         min_yes=min_yes,
         revision=revision,
@@ -793,6 +796,7 @@ async def _relay(gate, event, sender, payload, name):
             raise PlanError("a revision may only remove participants")
         now = gate._now()
         plan.update(
+            former=_former(plan, participants),
             participants=participants,
             min_yes=min_yes,
             revision=revision,
@@ -1378,6 +1382,42 @@ def _min_yes(value, participants):
     if isinstance(value, bool) or not isinstance(value, int) or not 2 <= value <= count:
         raise PlanError(f"min_yes must be an integer between 2 and {count}")
     return value
+
+
+async def _check_organizer(gate, peers):
+    """The person who started the planning creates the plan, not someone invited.
+
+    When every open planning room this gate shares with the participants was
+    opened by the other side, a friend is already driving the plan: creating it
+    here would make the invitee the organizer, and only the organizer can
+    revise. With no shared room, or one this gate opened, creation is allowed.
+    """
+    directory = resolve_data_dir(gate.person) / "share-cards"
+    if not directory.is_dir():
+        return
+    detail = await gate.client.get_agent_detail(gate.client.agent_id)
+    active = {r["room_id"] for r in detail.get("rooms", []) if not r.get("archived")}
+    openers = {}
+    for path in directory.glob("*.json"):
+        try:
+            card = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        if card.get("room") in active and card.get("friend") in peers and card.get("opened_by"):
+            openers[card["room"]] = (card["friend"], card["opened_by"])
+    if openers and all(opener != gate.person for _, opener in openers.values()):
+        drivers = sorted({friend for friend, _ in openers.values()})
+        raise PlanError(
+            f"{', '.join(drivers)} started planning this with you; ask their agent in "
+            "your planning room to create the group plan, then vote on it"
+        )
+
+
+def _former(plan, participants):
+    """People dropped from the plan. Switch cannot remove a room member, so they
+    stay in the group room and the room check must still accept them."""
+    dropped = set(plan["participants"]) - set(participants)
+    return sorted(set(plan.get("former", [])) | dropped)
 
 
 def _person_list(value, label="person"):

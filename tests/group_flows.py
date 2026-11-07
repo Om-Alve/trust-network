@@ -68,6 +68,9 @@ Quorum, notes and participant removal
     room and plan, or reuses a plan that is no longer pending.
 28. A quorum or notes plan is refused forever because no pairwise room ever ran
     the hello that records the peers' capabilities.
+29. An agent invited into a friend's planning room creates the group plan and
+    becomes organizer, although the friend's person asked for the plan; or the
+    invitee can never organize later even when its own person asks.
 """
 
 from __future__ import annotations
@@ -852,6 +855,12 @@ async def revise_drops_participant(root, monkeypatch):
     assert {call["person"] for call in cancelled} == {"priya"}
     assert {call["uid"] for call in cancelled} == {f"trustnet-group-{plan_id}"}
 
+    # Switch cannot remove priya from the room; the others can still talk there.
+    room = _plan("rahul", plan_id)["room"]
+    await personal.dm_post("rahul", room, "Still on without Priya")
+    await world.settle()
+    assert "Still on without Priya" in world.bodies(room)
+
     # om and rahul still approve the replacement.
     for person in ("om", "rahul"):
         await _vote(world, person, plan_id)
@@ -980,6 +989,38 @@ async def first_quorum_plan_greets_unknown_peers(root, monkeypatch):
     assert _plan("rahul", created[0]["id"])["min_yes"] == 2
 
 
+async def invitee_cannot_take_over_as_organizer(root, monkeypatch):
+    world = await _world(root, monkeypatch)
+    await world.start()
+    try:
+        # 29. Om asked to plan and opened the room; Rahul's agent was invited.
+        await personal.dm("om", "rahul", "dinner next week")
+        await world.wait_for(
+            lambda: any(
+                (root / p / "share-cards").is_dir() and any((root / p / "share-cards").iterdir())
+                for p in ("om", "rahul")
+            ),
+            what="both share cards",
+        )
+        await plans.request("rahul", "create", participants=["om"], content=CONTENT)
+        await world.settle()
+        assert not _state("rahul")["plans"]
+        assert any("om started planning this with you" in b for b in world.home_bodies("rahul"))
+
+        token = await plans.request("om", "create", participants=["rahul"], content=CONTENT)
+        await world.settle()
+        assert plans.status("om", token)["coordinator"] == "om"
+
+        # Rahul's own later request reuses the room and lets his side organize.
+        await personal.dm("rahul", "om", "lunch instead")
+        await world.settle()
+        await plans.request("rahul", "create", participants=["om"], content=CONTENT_2)
+        await world.settle()
+        assert len(_state("rahul")["plans"]) == 2
+    finally:
+        await world.stop()
+
+
 async def fingerprint_backward_compatible(root, monkeypatch):
     import hashlib
 
@@ -1033,6 +1074,7 @@ SCENARIOS = [
     duplicate_create_reuses_plan,
     extended_features_require_capability,
     first_quorum_plan_greets_unknown_peers,
+    invitee_cannot_take_over_as_organizer,
     fingerprint_backward_compatible,
 ]
 

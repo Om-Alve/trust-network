@@ -21,6 +21,7 @@ async def setup(gate, friend, goal, room=None):
     if trust.level_for(friend) is None:
         return
     pair = "-".join(sorted((person, friend)))
+    opened_by = person if room is None else friend
     if room is None:
         detail = await client.get_agent_detail(client.agent_id)
         # Reuse an open, unarchived, not-limit-closed planning room with this
@@ -37,6 +38,12 @@ async def setup(gate, friend, goal, room=None):
             None,
         )
         if existing is not None:
+            card = resolve_data_dir(person) / "share-cards" / f"{existing}.json"
+            if card.exists():
+                # This person's own request now drives the planning in this room.
+                data = json.loads(card.read_text())
+                data["opened_by"] = person
+                card.write_text(json.dumps(data))
             await relay.post_home(
                 person, f"Planning continues with {friend} in {existing}", client=client
             )
@@ -109,6 +116,7 @@ async def setup(gate, friend, goal, room=None):
             {
                 "room": room,
                 "friend": friend,
+                "opened_by": opened_by,
                 "agent": main_agent(person),
                 "text": card.text,
                 "created_at": gate._now().isoformat(),

@@ -346,9 +346,8 @@ async def dm_operate(person, room, text=None):
                 peer != person and trust.level_for(peer) is None for peer in plan["participants"]
             ):
                 raise ValueError("A participant is no longer trusted")
-            allowed = set(plan["participants"]) | {
-                p + suffix for p in plan["participants"] for suffix in ("-gate", "-hermes")
-            }
+            members = {*plan["participants"], *plan.get("former", [])}
+            allowed = members | {p + suffix for p in members for suffix in ("-gate", "-hermes")}
             if any(p.get("name") not in allowed for p in await client.list_participants()):
                 raise ValueError("Unexpected participant in the group room")
         if text is not None:
