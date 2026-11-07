@@ -498,7 +498,13 @@ def services(live):
     supervision["after"] = until(restarted, 120, "launchd did not restart the killed gate")
     supervision["restart_seconds"] = round(time.monotonic() - killed, 1)
     supervision["old_pid_alive_after_kill"] = alive(before["pid"])
-    supervision["status_after"] = live.tn(a, "status")
+
+    def serving():
+        status = live.tn(a, "status")
+        return status if status["gate_running"] else None
+
+    supervision["status_after"] = until(serving, 60, "the restarted gate never took its lock")
+    supervision["serving_seconds"] = round(time.monotonic() - killed, 1)
     supervision["gate_reply_after_restart"] = live.gate_answers(b, a)
 
     evidence["stop"] = {p: live.stop(p) for p in live.names}
