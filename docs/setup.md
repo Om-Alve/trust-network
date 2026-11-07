@@ -48,17 +48,51 @@ declared integration that it cannot verify locally. Claude/manual clients need
 an external poller or a custom `tn wake --cmd` command.
 
 `tn doctor` separates `connection_ok`, `automation_ready` and `wake_verified`.
-MCP connectivity alone does not prove a runner is active. Configure your own
-calendar connector in the selected agent; Codex and OpenCode wake turns preserve
-those configured connectors. Set `--timezone <IANA-name>` and
-`--calendar-delivery agent` to use them. Existing profiles retain ICS by default.
-Setup restarts its gate when timezone or delivery settings change. Restart the
-agent client as instructed so it loads its updated MCP configuration.
+MCP connectivity alone does not prove a runner is active.
 
 For background service logs on macOS, read `gate-service.log` and
 `wake-service.log` in the configuration directory. On Linux use
 `journalctl --user -u trust-network-<person>-gate.service` and the corresponding
 `-wake.service` unit. Systemd user services follow the host's login-session policy.
+
+## Connect your calendar
+
+Trust-network has no Google Calendar or Outlook adapter. Your personal agent
+writes events with a calendar connector it already has. In Codex, that is the
+Google Calendar or Outlook Calendar plugin. In Claude or OpenCode, use an
+equivalent calendar MCP server. Calendar credentials stay in that connector.
+
+Set up the connector in your agent first, then select agent delivery and your
+timezone:
+
+```sh
+tn setup --calendar-delivery agent --timezone <IANA-name>
+```
+
+New profiles use agent delivery by default. Profiles created before this setting
+existed keep local ICS until you pass `--calendar-delivery agent`. Setup restarts
+its gate when the timezone or delivery setting changes. Restart the agent client
+as instructed so it loads its updated MCP configuration. Codex and OpenCode wake
+turns keep your configured connectors.
+
+When everyone approves a plan, each gate queues a calendar task for its person.
+The agent then delivers it:
+
+1. The agent calls `calendar_tasks` to get the exact event and its stable UID.
+2. Before a retry, the agent searches the calendar for that UID, so it does not
+   create a duplicate.
+3. The agent creates, updates or cancels the event with its connector and puts
+   the UID in the event description.
+4. The agent calls `calendar_report` with status `applied`, the provider and the
+   event ID. If access or delivery fails, it reports `failed` with the error.
+
+The gate stores the receipt as the agent reports it and does not query the
+provider. Until a task has a receipt, `status` and `calendar_tasks` keep showing
+it. Approval alone never counts as delivery. Ask your agent to read your actual
+availability through the connector before planning, including all-day events.
+
+Local ICS mode writes `calendar.ics` in your profile directory. It does not sync
+with Google Calendar, Outlook or any other provider.
 
 ## Choose what to share
 
@@ -73,15 +107,7 @@ An agent can suggest private facts and sharing changes through its setup prompt.
 Review those suggestions before approving wider visibility. The `--consent
 via-agent` option lets the agent relay your yes/no. Omit it for direct approval
 from your Switch user account. You can change it later with `tn setup --consent
-direct`. A confirmed plan is queued automatically into each person's
-calendar delivery queue. In agent mode, the agent uses its existing calendar
-tools and reports the provider event ID. Legacy ICS mode writes a local file;
-it does not synchronize a provider calendar. Ask your agent to read actual
-availability before planning, including all-day events and the correct timezone.
-
-Approval and delivery are separate. The agent's `status` and `calendar_tasks`
-tools show unfinished work. Missing calendar access must produce a visible
-failure, not an assurance that an event was created.
+direct`.
 
 For optional exact-text review of outgoing DM messages, add `TN_OUTGOING=review`
 to the MCP environment. Review with `tn outbox list` and release only the text
