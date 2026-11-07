@@ -383,7 +383,9 @@ async def _create(gate, payload):
         return
 
     peers = [peer for peer in participants if peer != person]
-    _check_peer_capability(gate, peers, needed=min_yes < len(participants) or "notes" in content)
+    await _check_peer_capability(
+        gate, peers, needed=min_yes < len(participants) or "notes" in content
+    )
     plan_id = _new_id(state, person, token)
     revision = 1
     fingerprint = _fingerprint(plan_id, revision, participants, content, min_yes)
@@ -511,7 +513,7 @@ async def _revise(gate, payload):
 
     removed = sorted(set(plan["participants"]) - set(participants))
     peers = [peer for peer in participants if peer != person]
-    _check_peer_capability(
+    await _check_peer_capability(
         gate,
         peers + removed,
         needed=(min_yes < len(participants)) or ("notes" in content) or bool(removed),
@@ -1393,10 +1395,22 @@ def _person_list(value, label="person"):
     return sorted(names)
 
 
-def _check_peer_capability(gate, peers, *, needed):
-    """Refuse to send new-feature plans to peers whose gates lack the capability."""
+async def _check_peer_capability(gate, peers, *, needed):
+    """Refuse to send new-feature plans to peers whose gates lack the capability.
+
+    A peer that has never said hello may well support it: greet it and ask for a
+    retry, since its reply is handled after this request returns.
+    """
     if not needed:
         return
+    unknown = [peer for peer in peers if handshake.peer(gate.person, peer) is None]
+    for peer in unknown:
+        await handshake.greet(gate, peer)
+    if unknown:
+        raise PlanError(
+            f"said hello to {', '.join(unknown)}'s gate to check for {handshake.GROUP_PLANS}; "
+            "send the same request again in a few seconds"
+        )
     missing = [
         peer
         for peer in peers

@@ -66,6 +66,8 @@ Quorum, notes and participant removal
     the organizer is accepted.
 27. A duplicate create (same participants and content, new token) opens a second
     room and plan, or reuses a plan that is no longer pending.
+28. A quorum or notes plan is refused forever because no pairwise room ever ran
+    the hello that records the peers' capabilities.
 """
 
 from __future__ import annotations
@@ -958,6 +960,26 @@ async def extended_features_require_capability(root, monkeypatch):
     assert plans.status("om", token)["status"] == "pending"
 
 
+async def first_quorum_plan_greets_unknown_peers(root, monkeypatch):
+    people = ("om", "rahul", "priya")
+    world = await _world(root, monkeypatch, people=people, trust=_full_trust(people))
+
+    # 28. No pairwise room ever ran a hello, so the gate cannot know the peers'
+    # capabilities yet: it greets them and asks for a retry instead of refusing
+    # forever.
+    request = {"participants": ["rahul", "priya"], "content": CONTENT, "min_yes": 2}
+    await plans.request("om", "create", **request)
+    await world.settle()
+    assert not _state("om")["plans"]
+    assert any("send the same request again" in body for body in world.home_bodies("om"))
+
+    await plans.request("om", "create", **request)
+    await world.settle()
+    created = list(_state("om")["plans"].values())
+    assert len(created) == 1 and created[0]["min_yes"] == 2
+    assert _plan("rahul", created[0]["id"])["min_yes"] == 2
+
+
 async def fingerprint_backward_compatible(root, monkeypatch):
     import hashlib
 
@@ -1010,6 +1032,7 @@ SCENARIOS = [
     notes_and_fresh_votes,
     duplicate_create_reuses_plan,
     extended_features_require_capability,
+    first_quorum_plan_greets_unknown_peers,
     fingerprint_backward_compatible,
 ]
 

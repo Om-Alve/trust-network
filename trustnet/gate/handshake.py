@@ -93,6 +93,29 @@ async def say(gate, room, friend) -> None:
     await gate.client.post_message(line(friend))
 
 
+async def greet(gate, friend) -> None:
+    """Say hello to ``friend``'s gate in the pair's connection room, creating it if needed."""
+    client, person = gate.client, gate.person
+    name = "conn-" + "-".join(sorted((person, friend)))
+    detail = await client.get_agent_detail(client.agent_id)
+    room = next(
+        (
+            r["room_id"]
+            for r in detail.get("rooms", [])
+            if r["room_name"] == name and not r.get("archived")
+        ),
+        None,
+    )
+    if room is None:
+        result = await client.create_room(
+            name, "Gate connection", [person + "-gate"], internal_only=True
+        )
+        room = result.get("room_id", result.get("id"))
+        await client.connect_to_room(room)
+        await client.invite_agent_to_room(room, friend + "-gate")
+    await say(gate, room, friend)
+
+
 async def handle(gate, event, command: c.Hello, sender) -> None:
     _record(gate.person, sender.person, command, event.room_id)
     if event.room_id not in gate.hellos:
