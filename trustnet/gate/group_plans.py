@@ -348,24 +348,51 @@ async def _create(gate, payload):
     participants = _participants(payload.get("participants"), person)
     _check_participants(gate, participants)
     content = _content(payload.get("content"), gate._now())
-    plan_id = _new_id(state)
+    plan_id = _new_id(state, person, token)
     revision = 1
     fingerprint = _fingerprint(plan_id, revision, participants, content)
 
     name = "group-" + plan_id
     try:
-        result = await gate.client.create_room(
-            name,
-            "Group plan",
-            [person + "-gate"],
-            internal_only=True,
-            read_visibility="private",
-            write_visibility="private",
+        own = await gate.client.get_agent_detail(gate.client.agent_id)
+        previous_room = next(
+            (r for r in own.get("rooms", []) if r["room_name"].lstrip("#") == name),
+            None,
         )
-        room = result.get("room_id", result.get("id"))
+        if previous_room:
+            if previous_room.get("archived"):
+                raise PlanError("the earlier request room was archived; use a new request token")
+            room = previous_room["room_id"]
+            detail = await gate.client.get_room_detail(room)
+            if (
+                not detail.get("internal_only")
+                or detail.get("read_visibility") != "private"
+                or detail.get("write_visibility") != "private"
+            ):
+                raise PlanError("the earlier request room is not private")
+        else:
+            result = await gate.client.create_room(
+                name,
+                "Group plan",
+                [person + "-gate"],
+                internal_only=True,
+                read_visibility="private",
+                write_visibility="private",
+            )
+            room = result.get("room_id", result.get("id"))
         await gate.client.connect_to_room(room)
+        allowed = set(participants) | {
+            p + suffix for p in participants for suffix in ("-gate", "-hermes")
+        }
+        members = set()
+        identities = gate.identities()
+        for member in await gate.client.list_participants():
+            identity = identities.get(member["id"])
+            if identity is None or identity.id not in allowed:
+                raise PlanError("the earlier request room has an unexpected participant")
+            members.add(identity.id)
         for peer in participants:
-            if peer != person:
+            if peer != person and peer + "-gate" not in members:
                 await gate.client.invite_agent_to_room(room, peer + "-gate")
     except (SwitchError, ValueError, PermissionError) as exc:
         LOG.warning("group room creation failed person=%s error=%s", person, type(exc).__name__)
@@ -1215,11 +1242,13 @@ def _fingerprint(plan_id, revision, participants, content):
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
-def _new_id(state):
-    while True:
-        candidate = PLAN_PREFIX + secrets.token_hex(8)
-        if candidate not in state["plans"]:
-            return candidate
+def _new_id(state, person, token):
+    # The random request token also determines the room name after an interrupted
+    # server acknowledgment, before local state has been committed.
+    candidate = PLAN_PREFIX + hashlib.sha256(json.dumps([person, token]).encode()).hexdigest()[:16]
+    if candidate in state["plans"]:
+        raise PlanError("the request identity is already bound to a plan")
+    return candidate
 
 
 def _resolve(state, reference):

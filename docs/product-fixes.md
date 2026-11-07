@@ -73,3 +73,11 @@ restart and cancellation. Its report is
 Calendar provider operations are simulated, with stable provider event IDs.
 No external accounts were modified. New group lifecycle tools do not convert
 legacy confirmed P plans automatically.
+
+Interrupted room creation now reuses a room derived from the owner's random
+request token. A retry verifies the existing room's privacy and participants.
+The group runner passed ten scenarios in
+`data/group-plans-20261107T060924044693Z/`; the product runner passed seven in
+`data/product-e2e-20261107T060924819314Z/`, including real group conversation tools.
+The installed-wheel runner passed all six checks in
+`data/install-20261107T113621/report.md`.

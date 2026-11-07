@@ -129,9 +129,10 @@ def build(person: str) -> MCPServer:
 
     @server.tool(
         description=(
-            "Add a confirmed plan to your person's calendar. id is the proposal "
-            "reference (P1). start accepts ISO or plain phrases like 'Sun 9pm'; "
-            "duration is 2h or 90m; title and place are the agreed fixed-form values."
+            "Add a separate event to the local ICS calendar only. This does not write "
+            "Google Calendar or Outlook. Use calendar_tasks and your existing provider "
+            "tools for approved external delivery, then calendar_report. start accepts "
+            "ISO or a phrase like 'Sun 9pm'; duration is 2h or 90m."
         )
     )
     async def cal_add(

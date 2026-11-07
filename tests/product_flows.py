@@ -213,6 +213,8 @@ async def group_calendar_lifecycle(h):
     plan = group_plans.status("om", token)
     assert plan is not None
     reference, uid = plan["id"], plan["uid"]
+    await call("om", "dm_post", room=plan["room"], text="Dinner at Cafe is my proposal.")
+    assert "Dinner at Cafe is my proposal." in h.bodies(plan["room"])
     assert all(group_plans.status(p, reference)["status"] == "pending" for p in h.clients)
     assert any(item["kind"] == "group-plan" for item in personal.open_items("rahul"))
 

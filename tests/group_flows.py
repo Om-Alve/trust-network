@@ -655,6 +655,38 @@ async def revoked_outbox(root, monkeypatch):
     assert not any(body.startswith("@rahul-gate plan-relay") for body in world.bodies(plan["room"]))
 
 
+async def interrupted_room_creation(root, monkeypatch):
+    from trustnet.switch_client import SwitchError
+
+    world = await _world(
+        root,
+        monkeypatch,
+        people=("om", "rahul"),
+        trust={"om": {"rahul": "close"}, "rahul": {"om": "close"}},
+    )
+    client = world.gate_clients["om"]
+    original = client.create_room
+    interrupted = False
+
+    async def create(*args, **kwargs):
+        nonlocal interrupted
+        result = await original(*args, **kwargs)
+        if args[0].startswith("group-") and not interrupted:
+            interrupted = True
+            raise SwitchError("Room created; acknowledgment interrupted")
+        return result
+
+    monkeypatch.setattr(client, "create_room", create)
+    token = "interrupted-create-token"
+    await plans.request("om", "create", token=token, participants=["rahul"], content=CONTENT)
+    await world.settle()
+    assert len(world.rooms_named("group-")) == 1
+    await plans.request("om", "create", token=token, participants=["rahul"], content=CONTENT)
+    await world.settle()
+    assert len(world.rooms_named("group-")) == 1
+    assert plans.status("om", token)["id"] == plans.status("rahul", token)["id"]
+
+
 SCENARIOS = [
     consensus_and_calendar,
     authority_and_forgery,
@@ -665,6 +697,7 @@ SCENARIOS = [
     durable_outbox,
     exact_consent_and_revision_authority,
     revoked_outbox,
+    interrupted_room_creation,
 ]
 
 

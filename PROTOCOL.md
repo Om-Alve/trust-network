@@ -681,7 +681,9 @@ new plans with two to twelve participants. These structured tools post
 fresh membership, ownership and room trust before dispatching either envelope.
 Every participant must trust every other member.
 
-The organizer drafts an immutable random plan ID. A SHA-256 fingerprint covers
+The organizer derives an immutable opaque plan ID from the owner and a random
+request token, so a retry can reuse the room after an interrupted server reply.
+A SHA-256 fingerprint covers
 its ID, revision, sorted participant set and normalized content. Protocol content
 uses UTC so the fingerprint is independent of each person's display timezone.
 Every person's vote, revision request and cancellation must name the exact
