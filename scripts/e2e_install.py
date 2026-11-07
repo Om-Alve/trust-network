@@ -86,10 +86,12 @@ calls = 0
 
 async def fake_watch(person):
     global calls
-    calls += 1
-    if calls > 1:
+    # Stop once the turn has run: poll watches again after a settle delay and
+    # after every turn, so the agent writing its prompt is the signal to end.
+    if os.path.exists(prompt_path):
         raise SystemExit(0)
-    return {"inbox_unread": 1, "dm_updates": []}
+    calls += 1
+    return {"inbox_unread": 1, "dm_updates": [], "calendar_pending": 0}
 
 
 personal.watch = fake_watch
