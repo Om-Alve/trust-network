@@ -9,6 +9,8 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
+from trustnet.gate import calendar_jobs, group_plans
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
 from planning_flows import Planning  # noqa: E402
 from product_flows import SCENARIOS  # noqa: E402
@@ -31,10 +33,8 @@ async def main():
             except Exception:
                 status, error = "FAIL", traceback.format_exc()
             artifact = {**harness.snapshot(), "status": status, "error": error}
-            artifact["calendar_jobs"] = {
-                p: __import__("trustnet.gate.calendar_jobs", fromlist=["all_tasks"]).all_tasks(p)
-                for p in harness.clients
-            }
+            artifact["calendar_jobs"] = {p: calendar_jobs.all_tasks(p) for p in harness.clients}
+            artifact["group_plans"] = {p: group_plans.projection(p) for p in harness.clients}
             (directory / "transcript.json").write_text(json.dumps(artifact, indent=2, default=str))
             summary.append(f"{status} {scenario.__name__}")
     text = "\n".join(summary) + "\n"

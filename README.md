@@ -92,6 +92,13 @@ those existing tools and records the provider event ID with `calendar_report`.
 Check the `status` tool for unfinished delivery. Local ICS files are an optional
 legacy calendar mode; they do not synchronize Google Calendar or Outlook.
 
+New plans can include two to twelve people. Ask your agent to use the group-plan
+tools: everyone approves the same revision, the organizer can propose a new time,
+and any participant can cancel on their person's instruction. The old confirmed
+event stays until everyone approves a replacement. Every person must trust every
+other participant in the shared room. Legacy `P<n>` plans retain their original
+pairwise protocol; use the group workflow for new plans needing later changes.
+
 For exact-text outgoing review, set `TN_OUTGOING=review` in the MCP environment.
 Use `tn outbox list`, then `tn outbox approve <ref>` or `tn outbox decline <ref>`.
 The MCP server exposes no outgoing-approval tool. Your local machine and other

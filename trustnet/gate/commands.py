@@ -646,7 +646,10 @@ def _parse_day(text: str, *, now: datetime, raw: str, command: str) -> date:
 
 
 def _parse_moment(text: str, *, now: datetime, raw: str, command: str) -> datetime:
-    parsed = _dateparser(text, now=now)
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        parsed = _dateparser(text, now=now)
     if parsed is None:
         raise _err(
             command,
@@ -655,7 +658,6 @@ def _parse_moment(text: str, *, now: datetime, raw: str, command: str) -> dateti
         )
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=time_zone())
-    parsed = parsed.astimezone(time_zone())
     if not _sane_year(parsed.date(), now=now):
         raise _err(command, f"could not read the date and time {text!r}", raw)
     return parsed

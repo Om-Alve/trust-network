@@ -189,8 +189,21 @@ def open_items(person):
             items.append({"ref": ref, "kind": "question", "question": v["card"]})
         elif person not in v.get("votes", {}):
             items.append({"ref": ref, "kind": "proposal", "with": v["friend"], "plan": v["card"]})
-    from trustnet.gate import calendar_jobs
+    from trustnet.gate import calendar_jobs, group_plans
     from trustnet.gate.fact_changes import review
+
+    for plan in group_plans.pending(person):
+        items.append(
+            {
+                "ref": plan["id"],
+                "kind": "group-plan",
+                "participants": plan["participants"],
+                "revision": plan["revision"],
+                "fingerprint": plan["fingerprint"],
+                "plan": plan["content"],
+                "waiting_for": sorted(set(plan["participants"]) - set(plan["votes"])),
+            }
+        )
 
     return (
         items
@@ -213,7 +226,9 @@ async def watch(person):
     async with session(person) as client:
         detail = await client.get_agent_detail(client.agent_id)
         for membership in detail["rooms"]:
-            if not membership["room_name"].startswith("dm-") or membership.get("archived"):
+            if not membership["room_name"].startswith(("dm-", "group-")) or membership.get(
+                "archived"
+            ):
                 continue
             rid = membership["room_id"]
             context = await client.read_context(room_id=rid, limit=50)
@@ -282,7 +297,11 @@ async def dm_operate(person, room, text=None):
     async with session(person) as client:
         detail = await client.get_agent_detail(client.agent_id)
         rooms = [r for r in detail["rooms"] if room in (r["room_id"], r["room_name"])]
-        if not rooms or not rooms[0]["room_name"].startswith("dm-") or rooms[0].get("archived"):
+        if (
+            not rooms
+            or not rooms[0]["room_name"].startswith(("dm-", "group-"))
+            or rooms[0].get("archived")
+        ):
             raise SwitchError("An active DM membership is required")
         rid = rooms[0]["room_id"]
         card_path = resolve_data_dir(person) / "share-cards" / f"{rid}.json"
@@ -293,6 +312,20 @@ async def dm_operate(person, room, text=None):
                     "This friendship is no longer trusted; open a new room after restoring trust"
                 )
         await client.connect_to_room(rid)
+        if rooms[0]["room_name"].startswith("group-"):
+            from trustnet.gate import group_plans
+
+            plan = group_plans.status(person, rooms[0]["room_name"].removeprefix("group-"))
+            if not plan or plan["status"] in {"cancelled", "expired"}:
+                raise ValueError("This group plan is closed or unknown")
+            trust = load_trust(person)
+            if any(
+                peer != person and trust.level_for(peer) is None for peer in plan["participants"]
+            ):
+                raise ValueError("A participant is no longer trusted")
+            allowed = {p + suffix for p in plan["participants"] for suffix in ("-gate", "-hermes")}
+            if any(p.get("name") not in allowed for p in await client.list_participants()):
+                raise ValueError("Unexpected participant in the group room")
         if text is not None:
             await wait_until_live(client, rid, text)
             return await client.post_message(text)

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from trustnet.gate import calendar, calendar_jobs, handshake, ledger, relay, storage
 from trustnet.gate import commands as c
 from trustnet.gate.dm import main_agent
-from trustnet.gate.facts import load_profile
+from trustnet.gate.facts import load_profile, load_trust
 
 
 def load(person):
@@ -56,6 +56,14 @@ async def recover(gate, *, force=True):
             save(gate.person, state)
         for key, job in item.get("jobs", {}).items():
             if job["done"] or (not force and job.get("retry_at", 0) > time.time()):
+                continue
+            if (
+                job["kind"] in {"message", "document"}
+                and item["friend"] != gate.person
+                and load_trust(gate.person).level_for(item["friend"]) is None
+            ):
+                job.update(done=True, stopped="The friend is no longer trusted")
+                save(gate.person, state)
                 continue
             if job["kind"] == "archive" and any(
                 not pending["done"] for name, pending in item["jobs"].items() if name != key

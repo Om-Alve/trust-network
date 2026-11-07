@@ -174,10 +174,164 @@ async def blocked_approval_and_gift_permissions(h):
     assert load_trust("om").level_for("rahul") is Level.CLOSE
 
 
+async def group_calendar_lifecycle(h):
+    from contextlib import asynccontextmanager
+
+    from trustnet.gate import group_plans
+    from trustnet.gate.facts import Level, load_trust, save_trust
+
+    h.patch.setenv("TN_CALENDAR_DELIVERY", "agent")
+    for person in h.clients:
+        trust = load_trust(person)
+        for peer in h.clients:
+            if peer != person:
+                trust.grant(peer, Level.FRIEND)
+        save_trust(trust, h.root / person / "trust.yaml")
+
+    @asynccontextmanager
+    async def session(person):
+        yield next(c for c in h.switch.clients if c.name == person + "-hermes")
+
+    h.patch.setattr(personal, "session", session)
+
+    async def call(person, tool, **arguments):
+        response = await mcp.build(person).call_tool(tool, arguments)
+        await h.drain()
+        return response.structured_content
+
+    token = (
+        await call(
+            "om",
+            "group_plan_create",
+            participants=["rahul", "priya"],
+            start="2026-11-20T19:00:00+05:30",
+            minutes=120,
+            title="Dinner",
+            place="Cafe",
+        )
+    )["token"]
+    plan = group_plans.status("om", token)
+    assert plan is not None
+    reference, uid = plan["id"], plan["uid"]
+    assert all(group_plans.status(p, reference)["status"] == "pending" for p in h.clients)
+    assert any(item["kind"] == "group-plan" for item in personal.open_items("rahul"))
+
+    async def vote(person):
+        current = group_plans.status(person, reference)
+        await call(
+            person,
+            "group_plan_vote",
+            reference=reference,
+            vote="yes",
+            revision=current["revision"],
+            fingerprint=current["fingerprint"],
+        )
+
+    await vote("om")
+    await vote("rahul")
+    assert all(calendar_jobs.pending(p) == [] for p in h.clients)
+    await vote("priya")
+    for person in h.clients:
+        task = calendar_jobs.pending(person)[0]
+        assert task["action"] == "create"
+        assert task["uid"] == uid
+        calendar_jobs.report(person, task["token"], "applied", "outlook", person + "-event")
+
+    stale = group_plans.status("om", reference)
+    await call(
+        "om",
+        "group_plan_revise",
+        reference=reference,
+        revision=stale["revision"],
+        fingerprint=stale["fingerprint"],
+        start="2026-11-21T19:00:00+05:30",
+        minutes=90,
+        title="Dinner",
+        place="Terrace",
+    )
+    await call(
+        "rahul",
+        "group_plan_vote",
+        reference=reference,
+        vote="yes",
+        revision=stale["revision"],
+        fingerprint=stale["fingerprint"],
+    )
+    assert group_plans.status("rahul", reference)["votes"] == {}
+    for person in h.clients:
+        assert calendar_jobs.pending(person) == []
+        await vote(person)
+    for person in h.clients:
+        task = calendar_jobs.pending(person)[0]
+        assert task["action"] == "update"
+        assert task["uid"] == uid
+        assert task["event_id"] == person + "-event"
+        assert task["plan"]["place"] == "Terrace"
+        calendar_jobs.report(person, task["token"], "applied", "outlook", person + "-event")
+    current = group_plans.status("rahul", reference)
+    await call(
+        "rahul",
+        "group_plan_cancel",
+        reference=reference,
+        reason="Plans changed",
+        revision=current["revision"],
+        fingerprint=current["fingerprint"],
+    )
+    for person in h.clients:
+        assert group_plans.status(person, reference)["status"] == "cancelled"
+        task = calendar_jobs.pending(person)[0]
+        assert task["action"] == "cancel"
+        assert task["event_id"] == person + "-event"
+    h.restart()
+    for gate in h.gates.values():
+        await group_plans.recover(gate)
+    assert all(len(calendar_jobs.pending(p)) == 1 for p in h.clients)
+    for person in h.clients:
+        task = calendar_jobs.pending(person)[0]
+        await call(
+            person,
+            "calendar_report",
+            token=task["token"],
+            status="applied",
+            provider="outlook",
+            event_id=person + "-event",
+        )
+        assert calendar_jobs.pending(person) == []
+    h.trace.append(
+        "Three-person approval, stale vote rejection, same-event update and cancellation"
+    )
+
+
+async def cross_timezone_consent(h):
+    from pytest import MonkeyPatch
+
+    h.patch.setenv("TN_CALENDAR_DELIVERY", "agent")
+    zones = {"om": "America/New_York", "rahul": "Asia/Kolkata", "priya": "UTC"}
+    for person, gate in h.gates.items():
+        original = gate.handle
+
+        async def handle(event, person=person, original=original):
+            with MonkeyPatch.context() as patch:
+                patch.setenv("TN_TIMEZONE", zones[person])
+                await original(event)
+
+        h.patch.setattr(gate, "handle", handle)
+    room = await h.open()
+    await h.propose(room)
+    assert consent.load("om")["P1"]["card"] == consent.load("rahul")["P1"]["card"]
+    await h.vote("om")
+    await h.vote("rahul")
+    assert all(consent.load(p)["P1"]["status"] == "confirmed" for p in ("om", "rahul"))
+    assert calendar_jobs.pending("om")[0]["plan"]["start"] == "2026-11-09T19:00:00-05:00"
+    assert calendar_jobs.pending("rahul")[0]["plan"]["start"] == "2026-11-09T19:00:00-05:00"
+
+
 SCENARIOS = [
     agent_calendar_delivery,
     calendar_revisions,
     all_day_availability,
     reviewed_outgoing,
     blocked_approval_and_gift_permissions,
+    group_calendar_lifecycle,
+    cross_timezone_consent,
 ]

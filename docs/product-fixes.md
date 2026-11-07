@@ -51,3 +51,25 @@ report is `data/product-e2e-20261107T051740033399Z/`. `make check` passed 549 te
 blocks the personal-agent API's existing DM room. Automatic mode still depends
 on the personal agent's judgement. Local shell access, direct Switch clients,
 and separate messaging tools remain inside the owner's trusted environment.
+
+## Group lifecycle verification
+
+The production runtime now dispatches group requests and relays after identity
+and membership checks. Tests do not replace that dispatch path. Every mutation
+requires the exact current revision and fingerprint; only the organizer drafts
+replacements. Votes cannot carry across revisions. Pending offers and replies
+use canonical UTC content, independent of each gate's local timezone. Legacy
+pairwise ISO offsets are preserved so consent fingerprints also match across
+timezones.
+
+`make check` passed 560 tests. `scripts/e2e_group_plans.py` passed nine scenarios,
+including forged/stale votes, cancellation, delayed replies, interrupted delivery,
+and revocation of queued relays. Its report is
+`data/group-plans-20261107T060304077011Z/summary.txt`.
+`scripts/e2e_product.py` passed seven scenarios; its three-person lifecycle checks
+the real calendar task queue and MCP receipts through creation, replacement,
+restart and cancellation. Its report is
+`data/product-e2e-20261107T060517751426Z/summary.txt`.
+Calendar provider operations are simulated, with stable provider event IDs.
+No external accounts were modified. New group lifecycle tools do not convert
+legacy confirmed P plans automatically.

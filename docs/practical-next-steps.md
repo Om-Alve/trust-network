@@ -15,6 +15,12 @@ person votes. Superseded votes cannot confirm the replacement.
 Runtime templates, agent instructions, watcher prompts and the identity exporter
 ship in the wheel. New people get a private home automatically on first contact.
 
+New plans use the group lifecycle, including two-person plans: every participant
+votes on an exact revision, the organizer can draft a replacement, and a person
+can cancel through their own gate. An approved replacement updates the existing
+provider event. Legacy P plans keep their original protocol and are not converted
+automatically.
+
 ## Remaining limitations
 
 - A main agent can already know private data from its own memory. Gates restrict

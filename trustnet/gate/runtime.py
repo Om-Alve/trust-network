@@ -17,7 +17,7 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from trustnet.gate import commands as c
-from trustnet.gate import consent, dm, handshake, ledger, relay, surprise
+from trustnet.gate import consent, dm, group_plans, handshake, ledger, relay, surprise
 from trustnet.gate.calendar import busy, time_zone
 from trustnet.gate.facts import (
     FactsError,
@@ -75,6 +75,7 @@ class Gate:
 
     async def _handle(self, event):
         await consent.recover(self, force=False)
+        await group_plans.recover(self, force=False)
         from trustnet.gate import fact_changes
 
         fact_changes.recover(self.person)
@@ -143,6 +144,8 @@ class Gate:
             (member.person for member in members if member.person and member.person != self.person),
         )
         if await surprise.handle(self, event, sender, level, room_detail):
+            return
+        if await group_plans.handle(self, event, sender, level, room_detail):
             return
         own_side = _is_own_side(self.person, sender)
         try:
@@ -639,6 +642,7 @@ class Gate:
             async with self._dispatch_lock:
                 try:
                     await consent.recover(self, force=False)
+                    await group_plans.recover(self, force=False)
                     from trustnet.gate import fact_changes
 
                     fact_changes.recover(self.person)
@@ -657,6 +661,7 @@ class Gate:
             except BlockingIOError:
                 raise RuntimeError(f"a gate is already running for {self.person}") from None
             await consent.recover(self)
+            await group_plans.recover(self)
             timer = asyncio.create_task(self._timeouts())
             try:
                 await self._events()

@@ -31,7 +31,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from trustnet.gate.facts import FactsError
 from trustnet.switch_client import SwitchError
-from trustnet.tn import cli, personal
+from trustnet.tn import cli, personal, plans
 
 __all__ = ["build", "main"]
 
@@ -199,8 +199,76 @@ def build(person: str) -> MCPServer:
                 t for t in calendar_jobs.all_tasks(person) if t["status"] == "applied"
             ],
             "outgoing_review": outgoing.pending(person),
+            "group_plans": plans.list(person),
             "privacy": "Gate tool disclosures are enforced. Automatic conversation text depends on the agent; use outgoing review for owner approval of exact text.",
         }
+
+    async def plan_call(action: str, **payload):
+        return {"token": await _call(plans.request, person, action, **payload)}
+
+    @server.tool(
+        description="Draft a plan for two or more people including your person. All participants must trust each other; everyone must approve. Use existing calendar tools to establish availability first. This submits a draft, not consent."
+    )
+    async def group_plan_create(
+        participants: list[str], start: str, minutes: int, title: str, place: str
+    ) -> dict[str, Any]:
+        return await plan_call(
+            "create",
+            participants=participants,
+            content={"start": start, "minutes": minutes, "title": title, "place": place},
+        )
+
+    @server.tool(
+        description="Relay your person's explicit yes or no for the exact group-plan revision and fingerprint they reviewed. Read them from group_plan_status. Never supply consent for them or bind an old yes to a changed plan."
+    )
+    async def group_plan_vote(
+        reference: str, vote: str, revision: int, fingerprint: str
+    ) -> dict[str, Any]:
+        return await plan_call(
+            "vote", plan=reference, vote=vote, revision=revision, fingerprint=fingerprint
+        )
+
+    @server.tool(
+        description="The organizer drafts a replacement for the exact current revision. The existing confirmed event remains until everyone approves the replacement. Preserve participants; ask the organizer to revise if you are another participant."
+    )
+    async def group_plan_revise(
+        reference: str,
+        revision: int,
+        fingerprint: str,
+        start: str,
+        minutes: int,
+        title: str,
+        place: str,
+    ) -> dict[str, Any]:
+        return await plan_call(
+            "revise",
+            plan=reference,
+            revision=revision,
+            fingerprint=fingerprint,
+            content={"start": start, "minutes": minutes, "title": title, "place": place},
+        )
+
+    @server.tool(
+        description="Cancel the exact current group-plan revision after your person explicitly requests cancellation. Every participant is notified and receives a calendar cancellation task for the same provider event."
+    )
+    async def group_plan_cancel(
+        reference: str, revision: int, fingerprint: str, reason: str = ""
+    ) -> dict[str, Any]:
+        return await plan_call(
+            "cancel", plan=reference, revision=revision, fingerprint=fingerprint, reason=reason
+        )
+
+    @server.tool(
+        description="List group plans from the local durable record, including approval and revision status."
+    )
+    async def group_plans() -> dict[str, Any]:
+        return {"plans": plans.list(person)}
+
+    @server.tool(
+        description="Read a group plan by immutable ID or submitted token. Show the exact content, revision and fingerprint before requesting consent. The sharing field is this group's permitted fact set; share nothing else from memory in its conversation."
+    )
+    async def group_plan_status(reference: str) -> dict[str, Any]:
+        return {"plan": plans.status(person, reference)}
 
     @server.tool(
         description=(
@@ -286,7 +354,7 @@ def build(person: str) -> MCPServer:
     return server
 
 
-async def _call(func, *args) -> Any:
+async def _call(func, *args, **kwargs) -> Any:
     """Await one personal-agent operation, turning failures into safe tool errors.
 
     ``SwitchError`` text is written to be shown (e.g. "An active DM membership is
@@ -294,7 +362,7 @@ async def _call(func, *args) -> Any:
     else stays a crash, so the SDK withholds its text and logs a traceback.
     """
     try:
-        return await func(*args)
+        return await func(*args, **kwargs)
     except KeyError as exc:
         raise ToolError(f"missing environment variable {exc.args[0]}") from None
     except (SwitchError, FactsError, ValueError, OSError) as exc:

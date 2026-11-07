@@ -39,6 +39,10 @@ explicit unblock before re-adding. Neither action retracts earlier disclosures.
 | `answer(id, text)` | Send your person's own answer. For a proposal the text is `yes` or `no`. |
 | `dm(friend, goal)` | Start planning with a friend. Your gate makes an agent-only room and gives you a share card. |
 | `dm_read(room)` / `dm_post(room, text)` | Talk with the friend's agent in that room. |
+| `group_plan_create(...)` | Draft a plan for two or more people, including your person. Every participant must trust every other participant. |
+| `group_plan_status(reference)` / `group_plans()` | Read the exact current revision, fingerprint, participants, votes and permitted sharing facts. |
+| `group_plan_vote(reference, vote, revision, fingerprint)` | Relay the person's explicit yes/no for the exact revision they saw. |
+| `group_plan_revise(...)` / `group_plan_cancel(...)` | The organizer drafts a replacement; any participant can cancel after their person's explicit request. Both require the exact current revision and fingerprint. |
 | `ask(friend, fields)` | Ask a friend's gate for named facts (`diet`, `interests`, …) at the room's level. |
 | `gift_ideas(friend, occasion, date, budget)` / `claim(friend, item)` | Surprise-safe gift ideas from stored facts; the friend is never asked. |
 | `ask_around(question)` | One short question (≤140 chars) to all your person's friends. |
@@ -87,6 +91,33 @@ F1` or `tn review --approve F1 T1`, or their own Switch user says
 `@om-gate yes F1`. `no F1` declines; `answer F1 "yes"` also works.
 
 ## Planning a DM, step by step
+
+For new plans, use the group-plan lifecycle below even when there are only two
+people. The fixed-form P commands further below remain available for existing
+protocol clients.
+
+1. Read actual calendar availability and negotiate details with the other agents.
+   A tentative `group_plan_create` opens a shared room for all participating
+   agents. Read its status using the returned create token to find the plan ID.
+2. Read `group_plan_status` before talking in the group room. Its `sharing` map
+   contains the facts every viewer may see; do not volunteer other memory.
+3. Show your person the exact time, duration, title, place and participants. Wait
+   for their yes/no. Carry it with `group_plan_vote` using the revision and
+   fingerprint you showed. A new revision needs a new yes. Plain `answer` does
+   not vote on a group plan.
+4. Until everyone says yes, describe it as awaiting approval. After confirmation,
+   apply `calendar_tasks` through the person's existing calendar tools and record
+   receipts. A confirmed plan can still have unfinished calendar delivery.
+5. To reschedule, ask the organizer to call `group_plan_revise` for the current
+   revision. The existing event stays until everyone approves the replacement.
+   Reuse its provider event ID and UID when applying the update.
+6. To cancel, show the current plan and get your person's explicit instruction.
+   Call `group_plan_cancel` with that revision and fingerprint. All participants
+   receive cancellation notices and calendar operations. Pending plans expire
+   after 30 days or when their proposed start passes. Group rooms stay open for
+   revisions and cancellation.
+
+### Legacy pairwise P commands
 
 1. Call `dm(friend, goal)` with your person's own words as the goal.
 2. Call `inbox` until the DM room and your **share card** arrive. The card lists

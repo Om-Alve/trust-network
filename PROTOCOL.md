@@ -670,3 +670,39 @@ suggestions apply the same per-person policy.
 which requires `tn unblock rahul` before any explicit re-add. Pending trust
 approvals cannot override a block. Removing access cannot retract information
 already received, including prior conversation messages.
+
+## Group plan lifecycle
+
+The current MCP workflow uses `group_plan_create`, `group_plan_status`,
+`group_plan_vote`, `group_plan_revise`, `group_plan_cancel` and `group_plans` for
+new plans with two to twelve participants. These structured tools post
+`plan-request {JSON}` through the owner's home. Peer gates exchange
+`plan-relay {JSON}` in a private `group-gp-<16 hex>` room. The runtime authenticates
+fresh membership, ownership and room trust before dispatching either envelope.
+Every participant must trust every other member.
+
+The organizer drafts an immutable random plan ID. A SHA-256 fingerprint covers
+its ID, revision, sorted participant set and normalized content. Protocol content
+uses UTC so the fingerprint is independent of each person's display timezone.
+Every person's vote, revision request and cancellation must name the exact
+revision and fingerprint they reviewed. Missing or stale values are refused.
+Each gate accepts only its own person's vote or an authenticated peer gate's own
+vote. Every participant must vote yes before any calendar operation is queued.
+
+Only the organizer may draft a replacement, which preserves participants and
+clears all candidate votes. A previous confirmation remains effective until the
+replacement is unanimously approved; a declined or expired replacement keeps
+the original event. Updates and cancellations reuse the same stable calendar
+UID and provider event ID. Any participant may cancel through their own consent
+mode. Cancellation before confirmation creates no calendar event. Pending plans
+expire after 30 days or when the proposed start passes; group rooms are retained
+for later changes.
+
+Group state and the relay/calendar outbox are durable in owner-local SQLite.
+Recovery retries unfinished jobs. Blocking a participant stops queued relays to
+the shared room. `group_plan_status` supplies the facts permitted for every
+viewer; automatic conversation text remains the agent's responsibility, with
+optional exact-text review at `dm_post`.
+
+The original pairwise `P<n>` command protocol is retained for existing clients.
+New group lifecycle tools do not retroactively convert legacy confirmed plans.

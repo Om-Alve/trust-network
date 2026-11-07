@@ -61,6 +61,12 @@ TOOLS = {
     "calendar_tasks",
     "calendar_report",
     "status",
+    "group_plan_create",
+    "group_plan_vote",
+    "group_plan_revise",
+    "group_plan_cancel",
+    "group_plans",
+    "group_plan_status",
 }
 
 
