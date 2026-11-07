@@ -1,6 +1,6 @@
 # Verification
 
-The integrated changes passed `make check`: 585 pytest tests, Ruff formatting and
+The integrated changes passed `make check`: 586 pytest tests, Ruff formatting and
 lint. The fixture acceptance runs use temporary profiles and real CLI/MCP subprocesses.
 The live-agent acceptance below also uses real model calls and a running Switch server.
 No personal calendar or existing user profile was changed.
@@ -16,13 +16,13 @@ uv run python scripts/e2e_readiness.py
 uv run python scripts/e2e_install.py
 ```
 
-- Product: 8 passed. Covers two-owner calendar delivery, failed provider receipts,
+- Product: 9 passed. Covers two-owner calendar delivery, failed provider receipts,
   stale operation replay, all-day/DST availability, exact outgoing-message review,
   blocked trust approvals and gift denials, three-person create/revise/cancel,
   cross-timezone consent, and calendar-only wakeup. The final wake scenario starts
   a real agent subprocess from another working directory and checks its durable
   calendar receipt with no unread home messages.
-- Group lifecycle: 10 passed. Production dispatch handles identity checks,
+- Group lifecycle: 20 passed. Production dispatch handles identity checks,
   unanimous approval, stale/forged votes, exact revision consent, organizer-only
   replacement, cancellation, multi-day replies, failed delivery/restart, revocation
   and interrupted room creation without duplicates.
