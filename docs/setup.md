@@ -13,7 +13,7 @@ tn setup '<invite>' --agent codex --consent via-agent --wake --background-servic
 tn doctor
 ```
 
-Use `claude`, `opencode` or `manual` for another agent. Manual mode writes a
+Use `hermes`, `opencode`, `claude` or `manual` for another agent. Manual mode writes a
 standard MCP configuration to `~/.config/trust-network/mcp.json`. Setup registers
 your identities, creates a private home and empty profile, starts your gate and
 configures the chosen agent. It verifies identity discovery and opens the MCP
@@ -35,12 +35,24 @@ to restart it. The gate and runner need this machine awake and online.
 
 ## Choose how your agent wakes
 
-`--wake` configures the selected Codex or OpenCode runner. It prints the command
-to keep running in a terminal and starts no agent loop on its own.
+`--wake` configures the selected Codex, OpenCode or Hermes runner. It prints the
+command to keep running in a terminal and starts no agent loop on its own.
 `--background-service` opts into installing and starting both gate and runner
 under macOS launchd or Linux systemd user services. Use it with `--wake` for
-automatic startup at login. `tn stop` stops the services; `tn setup` starts them
-again. `tn status` shows both processes and service units.
+automatic startup at login. `tn stop` stops both services and disables them in
+launchd or systemd, so they stay stopped after logout or reboot. The unit files
+stay in place. Run `tn setup` to enable and start them again. `tn status` shows
+both processes and service units.
+
+The Hermes runner starts each turn with `hermes chat` and a temporary Hermes
+managed-config layer. That layer adds the trust-network MCP server and limits the
+turn to the terminal and skills toolsets. Your `~/.hermes/config.yaml`, credentials,
+skills and other MCP servers stay as they are. The terminal stays enabled because
+Hermes' Google Workspace skill is a script, so a Hermes wake turn has your shell's
+access. The Codex and OpenCode runners disable their shells. If Hermes already has
+a managed scope, the runner refuses to replace it; add trust-network to that scope
+and use `tn wake --cmd`. Interactive `hermes` sessions get the trust-network tools
+only after `hermes mcp add`.
 
 For an existing Hermes cron job or another external integration, use
 `tn setup --wake-external "Hermes cron every minute"`. Doctor labels this as a
@@ -59,8 +71,12 @@ For background service logs on macOS, read `gate-service.log` and
 
 Trust-network has no Google Calendar or Outlook adapter. Your personal agent
 writes events with a calendar connector it already has. In Codex, that is the
-Google Calendar or Outlook Calendar plugin. In Claude or OpenCode, use an
-equivalent calendar MCP server. Calendar credentials stay in that connector.
+Google Calendar or Outlook Calendar plugin. In Hermes, it is the google-workspace
+skill; its `setup.py --check` must print `AUTHENTICATED`. In Claude or OpenCode,
+use an equivalent calendar MCP server. Calendar credentials stay in that connector.
+Google Calendar through Hermes is verified live; see
+[verification](verification.md#run-live-services-and-google-calendar). Outlook uses
+the same task and receipt path but has not been run against a real account.
 
 Set up the connector in your agent first, then select agent delivery and your
 timezone:
@@ -72,8 +88,8 @@ tn setup --calendar-delivery agent --timezone <IANA-name>
 New profiles use agent delivery by default. Profiles created before this setting
 existed keep local ICS until you pass `--calendar-delivery agent`. Setup restarts
 its gate when the timezone or delivery setting changes. Restart the agent client
-as instructed so it loads its updated MCP configuration. Codex and OpenCode wake
-turns keep your configured connectors.
+as instructed so it loads its updated MCP configuration. Codex, OpenCode and
+Hermes wake turns keep your configured connectors.
 
 When everyone approves a plan, each gate queues a calendar task for its person.
 The agent then delivers it:

@@ -94,16 +94,75 @@ Plan requests also wait for the gate to become live before posting. Some Switch
 versions omit room visibility metadata; doctor reports that limitation while
 checking ownership, reachability and any visibility fields returned.
 
+## Run live services and Google Calendar
+
+Two more live runs use real macOS launchd units, a local Switch Console and fresh
+test accounts. Each person has a separate `TN_CONFIG_DIR` under the run's
+`data/` directory. Neither run edits `~/.config/trust-network`, `~/.hermes` or
+`~/.codex`.
+
+```sh
+uv run python -m scripts.e2a_live_services
+uv run python -m scripts.e2a_hermes_calendar
+uv run python -m scripts.e2a_live_services --verify data/live-services-<timestamp>/report.json
+uv run python -m scripts.e2a_hermes_calendar --verify data/hermes-calendar-<timestamp>/report.json
+```
+
+**Launchd services.** Two people join through a private `tn host` and invite with
+`tn setup '<invite>' --agent codex --wake --background-service`. The units run an
+isolated `uv tool install` of the checkout. The run makes no model calls. For both
+people, `launchctl print` shows the gate and wake units running, and each process
+ID is alive with the expected arguments. Doctor reports `connection_ok`,
+`automation_ready` and `wake_verified`, and one gate answers the other's request
+on Switch. After `kill -9`, launchd restarts the gate, which serves again within
+about 21 seconds and answers on Switch. `tn stop` unloads and disables every unit
+and leaves no processes. The run then bootstraps the remaining plists, as launchd
+does at login, and launchd refuses them. A later `tn setup` re-enables and
+restarts the units, and a repeated setup still leaves one gate and one runner
+per person. Successful evidence: `data/live-services-20261107T103025/report.json`.
+
+**Google Calendar through Hermes.** Two Hermes agents run under
+`tn setup --agent hermes --wake --background-service`. Person A delivers to Google
+Calendar through Hermes' google-workspace skill. Person B uses local ICS. Owner
+yeses arrive as separate foreground Hermes turns. A's launchd-managed runner then
+writes the Google event on its own. The harness reads the event by its ID with
+the skill's client, not the agent. Title, start, end, location and the
+`uid: trustnet-group-…` marker match the plan and the gate's `calendar_report`
+receipt. Exactly one event carries the UID, and B's ICS has the same UID and
+time. The harness then deletes the event and confirms that a reread returns
+`cancelled`. Successful evidence:
+`data/hermes-calendar-20261107T103139/report.json`.
+
+Live runs exposed and corrected four gaps that the fixtures missed:
+
+- Switch binds a room to an agent's newest connection. The wake runner, MCP tools,
+  setup and doctor all connect as the same agent and took rooms from each other.
+  Setup then failed intermittently on the private-home check. The Switch client
+  now reconnects once and retries after Switch rejects an operation.
+- Every participant's gate posted the confirmed group-plan document under one
+  name. Switch rejected all but the first, and the others retried forever. Only
+  the organizer's gate posts it now.
+- Hermes' calendar skill asked for confirmation before writing an approved event.
+  The watch prompt now states that a calendar task exists only after every
+  owner's explicit yes to that plan. Any other calendar write still needs a yes.
+- `tn stop` left the launchd plists in `~/Library/LaunchAgents` with `RunAtLoad`,
+  so a stopped gate and runner would start again at the next login. Stop now
+  disables both units, and setup enables them before starting them. Without the
+  fix, the run's login bootstrap starts both units again.
+
 ## Remaining boundaries
 
-Calendar writes are performed by the person's existing agent tools. The live E2A
-verifies local ICS writes; the other fixtures simulate provider operations.
-The gate records agent-reported provider receipts
-and does not independently verify Google or Outlook. External retries require
-the agent to search for the stable UID marker before creating an event.
+Calendar writes are performed by the person's existing agent tools. Google
+Calendar through Hermes is verified live. Outlook and Codex's Google Calendar
+plugin use the same task and receipt path but have not been run against real
+accounts. The gate records agent-reported receipts and does not query the
+provider itself. External retries require the agent to search for the stable UID
+marker before creating an event.
 
-Supervisor tests use fake launchctl/systemctl commands; live OS service startup
-has not been exercised. The gate machine must be online. Switch hosting and its
+Live launchd startup, restart and stop are verified on macOS. The login check
+bootstraps the plists rather than logging out. Linux systemd units are exercised
+only with a fake `systemctl`. A background runner's replies go to
+`wake-service.log`, not to the person's chat. The gate machine must be online. Switch hosting and its
 administrator remain trusted. Automatic conversation text still depends on the
 agent; exact-text owner review applies to the `dm_post` path, while local shell
 access and other messaging tools remain trusted. Legacy confirmed P plans are

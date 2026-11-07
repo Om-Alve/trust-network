@@ -42,8 +42,8 @@ the machine's available package manager. From the checkout, install the CLI:
 uv tool install --python 3.12 .
 ```
 
-For Codex or OpenCode, use the selected agent's signed-in CLI and configure a
-background runner. This example uses Codex; substitute `opencode` when appropriate:
+For Codex, OpenCode or Hermes, use the selected agent's signed-in CLI and configure a
+background runner. This example uses Codex; substitute `opencode` or `hermes` when appropriate:
 
 ```sh
 tn setup '<invite>' --agent codex --timezone '<IANA-timezone>' --calendar-delivery agent --consent via-agent --wake --background-service
