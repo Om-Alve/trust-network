@@ -1,6 +1,6 @@
 # Verification
 
-The integrated changes passed `make check`: 563 pytest tests, Ruff formatting and
+The integrated changes passed `make check`: 585 pytest tests, Ruff formatting and
 lint. The fixture acceptance runs use temporary profiles and real CLI/MCP subprocesses.
 The live-agent acceptance below also uses real model calls and a running Switch server.
 No personal calendar or existing user profile was changed.
@@ -149,6 +149,51 @@ Live runs exposed and corrected four gaps that the fixtures missed:
   so a stopped gate and runner would start again at the next login. Stop now
   disables both units, and setup enables them before starting them. Without the
   fix, the run's login bootstrap starts both units again.
+
+## Multi-person scenarios
+
+`scripts/e2a_scenarios.py` provisions fresh Switch users and runs one real agent
+per person against production gates and local ICS calendars. Each scripted
+owner approves a plan only when it fits their stated availability, declines
+with a reason otherwise, and answers the agent's questions from a short script.
+
+```sh
+uv run python -m scripts.e2a_scenarios football --agent hermes
+uv run python -m scripts.e2a_scenarios gift --agent hermes
+uv run python -m scripts.e2a_scenarios timezones --agent hermes
+uv run python -m scripts.e2a_scenarios --verify data/scenario-<name>-<timestamp>/report.json
+```
+
+Every run checks that all participants hold the same revision, that each vote
+came from that owner's own yes to that plan, that each calendar has exactly the
+confirmed events, and that no private fact appears in a shared room. Each
+scenario adds its own checks. Each run writes `report.json` and a readable
+`summary.md` with plans, owner chats and room transcripts.
+
+| Scenario | People | Result on the final code |
+| --- | --- | --- |
+| Weekly football | 8 | PASS, `data/scenario-football-20261107T133026`: one weekly plan for four Thursdays, quorum of 6, Tara dropped in a revision, 13.2 min |
+| Pooled gift | 5 | PASS, `data/scenario-gift-20261107T131257`. A later run, `data/scenario-gift-20261107T133050`, failed: one buyer's agent claimed a second item on its own. The claim guidance was then tightened; not rerun live |
+| Time zones | 4 | PASS, `data/scenario-timezones-20261107T131313`: Thu 12 Nov 16:00 UTC, one plan, 5.6 min |
+
+Earlier runs of the same scenarios found the defects fixed alongside this
+runner:
+
+- `ask` opened a planning room that invited the recipient's agent, so a gift
+  surprise leaked. Fact requests now use a quiet `ask-` room.
+- One no declined an 8-person plan, and revisions could not drop anyone. Plans
+  now take `min_yes`, the organizer can drop participants, and a `weekly`
+  count makes a series one plan.
+- An agent invited into a planning room created the plan and became organizer.
+  The earliest shared planning room now decides who organizes.
+- Agents used `cal_add` for an approved update, which left the old time and
+  still reported success. `cal_apply` writes local ICS and records the receipt.
+- Join greetings and gate-to-gate relays woke agents for nothing. `watch`
+  now ignores both.
+
+The scripted owners are approximations. A run takes 5 to 15 minutes and calls the
+model about 25 to 110 times. Codex was refused with "out of credits" when
+several turns ran at once, so these runs use Hermes for everyone.
 
 ## Remaining boundaries
 

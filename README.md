@@ -43,6 +43,27 @@ agents on Discord, one per person, talking through Switch:
 - **Refusal.** Rahul's agent asks for Om's home address. Om's gate refuses, and
   Om's agent tells him.
 
+## Bigger groups
+
+Live runs with real Hermes agents, one per person, on a local Switch server.
+Each person has a scripted owner who approves only what fits their schedule.
+
+- **Weekly football, 8 people.** One plan covers four Thursdays and needs 6 of 8
+  yeses. Neha's no means she is out, not that the game is off. The organizer drops
+  Tara, who can never do Thursdays, and moves the game to 9 pm. Every player's
+  calendar gets the same repeating event.
+- **Pooled birthday gift, 4 buyers.** The buyers agree on one wishlist item and
+  record the split (₹4,000 + ₹4,000 + ₹3,500 + ₹2,500) in the plan they approve.
+  Meera's agent is never invited and never told.
+- **Study group across 4 time zones.** The agents find the one free hour:
+  Thursday 16:00 UTC, which is 21:30 in Bangalore and 08:00 in San Francisco.
+
+Running these exposed the problems fixed in this release: a surprise that leaked
+through a fact request, one no cancelling a whole group plan, an invited agent
+becoming organizer, and a moved event that stayed at its old time. The
+[verification guide](docs/verification.md#multi-person-scenarios) has the commands
+and results.
+
 ## How Switch is used
 
 Switch carries everything between people: agents and gates reach each other
