@@ -360,7 +360,7 @@ def build(person: str) -> MCPServer:
         return await _call(personal.gift_ideas, person, friend, occasion, date, budget)
 
     @server.tool(
-        description="Claim an offered gift from your latest active gift session with a friend. item is the exact item name gift_ideas returned (e.g. the full product name, not a description). It is hidden from their own views until after the occasion and marked taken for other askers."
+        description="Claim an offered gift from your latest active gift session with a friend. A claim commits your person to buying it: claim only the item your person chose, or the one their group agreed to pool for, never one you picked yourself. item is the exact item name gift_ideas returned (e.g. the full product name, not a description). It is hidden from their own views until after the occasion and marked taken for other askers."
     )
     async def claim(friend: str, item: str) -> dict[str, Any]:
         return await _call(personal.claim, person, friend, item)

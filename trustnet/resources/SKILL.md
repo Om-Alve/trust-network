@@ -155,6 +155,8 @@ to type them yourself, because the tools above do the same thing.
   invent an answer or a preference you don't know, and never give a yes.
 - **Stay inside the share card.** If the card doesn't show a fact, don't say it,
   even if you know it. Private facts never leave you.
+- **A claim is a purchase commitment.** Claim only what your person chose or
+  what their group agreed to pool for; in a pool, one person claims the item.
 - **Gifts stay secret.** Never tell the recipient about a gift session or a claim,
   and never use `ask`, `dm` or `ask_around` to plan a gift.
 - **Keep your person's messages short.** One line per update, with the reference
