@@ -737,11 +737,20 @@ and `notes` join the fingerprint only when used, so plans that use neither keep
 byte-identical fingerprints. A create that repeats a still-pending plan with the
 same participants, content and `min_yes` reuses that plan and its room.
 
+The person who started the planning organizes it. Each share card records who
+opened its planning room. A create is refused when every open planning room
+this gate shares with the participants was opened by the other side, with the
+reply that the friend started planning and their agent should create the plan.
+A person's own later `dm` to that friend reuses the room and makes their side
+the opener. With no shared planning room, anyone may create the plan.
+
 Only the organizer may draft a replacement, which clears all candidate votes.
 It may drop participants: the new list must be a subset that still includes the
 organizer and has at least two people. Removed participants' gates receive a
 `remove` relay, their copy ends as `removed`, and if the plan had been confirmed
-for them they get a calendar cancellation for the same UID. A previous
+for them they get a calendar cancellation for the same UID. Switch cannot remove
+a room member, so dropped people stay in the group room and can still read it;
+the plan lists them as `former` so the others can keep posting. A previous
 confirmation remains effective until the replacement is approved; a declined or
 expired replacement keeps the original event. Updates and cancellations reuse the same stable calendar
 UID and provider event ID. Any participant may cancel through their own consent

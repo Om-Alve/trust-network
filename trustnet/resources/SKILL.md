@@ -120,6 +120,9 @@ single get-together into several proposals.
 5. Until everyone says yes, describe the plan as awaiting approval. After
    confirmation, apply `calendar_tasks` through the person's existing calendar
    tools and record receipts; a confirmed plan can still have unfinished delivery.
+   When your person's calendar is the local ICS file, call `cal_apply(token)` for
+   each task instead: it creates, moves or cancels the event and records the
+   receipt. Never write test or probe events.
 6. To reschedule, ask the organizer to call `group_plan_revise` for the current
    revision; the existing event stands until everyone approves the replacement.
    To cancel, get your person's explicit instruction and call `group_plan_cancel`

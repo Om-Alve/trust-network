@@ -51,6 +51,7 @@ TOOLS = {
     "dm_post",
     "ask_around",
     "cal_add",
+    "cal_apply",
     "fact_set",
     "fact_add",
     "fact_share_request",

@@ -2,8 +2,11 @@
 
 from datetime import datetime
 
+from icalendar import Calendar
+
 from trustnet.gate import calendar_jobs, consent
-from trustnet.gate.calendar import busy
+from trustnet.gate.calendar import add_event, busy
+from trustnet.gate.facts import load_profile
 from trustnet.tn import mcp, personal
 
 
@@ -74,6 +77,59 @@ async def calendar_revisions(h):
     assert cancelled["action"] == "cancel"
     calendar_jobs.report("om", cancelled["token"], "applied", "outlook", "outlook-17")
     assert calendar_jobs.pending("om") == []
+
+
+async def local_calendar_apply(h):
+    """cal_apply writes the exact approved operation to local ICS and records the receipt.
+
+    Found live: an agent "applied" an update with cal_add, which keeps an existing
+    UID untouched, and reported success while the event stayed at the old time.
+    Ways this could fail:
+    - an update leaves the old time, or adds a second event with the same UID;
+    - a cancel leaves the event in the file;
+    - a superseded token still changes the file or records a receipt;
+    - re-applying an applied token duplicates the event or errors;
+    - an unrelated event in the same file is changed or removed.
+    """
+    h.patch.setenv("TN_CALENDAR_DELIVERY", "agent")
+    path = load_profile("om").calendar_path
+    add_event(path, datetime.fromisoformat("2026-11-09T09:00:00+05:30"), 30, "Dentist", uid="mine")
+    server = mcp.build("om")
+
+    def events(uid):
+        calendar = Calendar.from_ical(path.read_bytes())
+        return [e for e in calendar.walk("VEVENT") if str(e.get("UID")) == uid]
+
+    uid = "trustnet-group-gp-local"
+    plan = {
+        "start": "2026-11-12T14:30:00+00:00",
+        "minutes": 60,
+        "title": "Football",
+        "place": "Arena",
+    }
+    first = calendar_jobs.queue("om", "gp-local", plan, uid=uid)
+    await server.call_tool("cal_apply", {"token": first["token"]})
+    assert [e.decoded("DTSTART") for e in events(uid)] == [datetime.fromisoformat(plan["start"])]
+
+    moved = {**plan, "start": "2026-11-12T15:30:00+00:00"}
+    second = calendar_jobs.queue("om", "gp-local", moved, action="update", uid=uid)
+    try:
+        await server.call_tool("cal_apply", {"token": first["token"]})
+    except Exception as exc:
+        assert "superseded" in str(exc) or "Unknown" in str(exc)
+    else:
+        raise AssertionError("A superseded token was applied")
+    for _ in range(2):
+        response = await server.call_tool("cal_apply", {"token": second["token"]})
+    assert response.structured_content["event_id"] == uid
+    assert [e.decoded("DTSTART") for e in events(uid)] == [datetime.fromisoformat(moved["start"])]
+
+    cancel = calendar_jobs.queue("om", "gp-local", moved, action="cancel", uid=uid)
+    await server.call_tool("cal_apply", {"token": cancel["token"]})
+    assert events(uid) == []
+    assert len(events("mine")) == 1
+    assert calendar_jobs.pending("om") == []
+    h.trace.append("Local ICS create, update and cancel applied by the gate with receipts")
 
 
 async def all_day_availability(h):
@@ -385,6 +441,7 @@ async def calendar_work_wakes_agent(h):
 SCENARIOS = [
     agent_calendar_delivery,
     calendar_revisions,
+    local_calendar_apply,
     all_day_availability,
     reviewed_outgoing,
     blocked_approval_and_gift_permissions,

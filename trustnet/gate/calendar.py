@@ -175,6 +175,38 @@ def add_event(
         return Block(start_ist, start_ist + length, title)
 
 
+def put_event(
+    path: str | Path,
+    start: datetime,
+    duration: timedelta | int | float,
+    title: str,
+    place: str,
+    uid: str,
+) -> Block:
+    """Create or replace the event ``uid`` in ``path`` with exactly these details."""
+    path = Path(path)
+    remove_event(path, uid)
+    return add_event(path, start, duration, title, place, uid=uid)
+
+
+def remove_event(path: str | Path, uid: str) -> bool:
+    """Remove the event ``uid`` from ``path``; ``False`` when it was not there."""
+    path = Path(path)
+    if not path.is_file():
+        return False
+    with path.with_suffix(".lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        calendar = _load_or_new(path)
+        event = _find_event(calendar, uid)
+        if event is None:
+            return False
+        calendar.subcomponents.remove(event)
+        from trustnet.gate.storage import atomic_write
+
+        atomic_write(path, calendar.to_ical())
+        return True
+
+
 def _as_ist(value: datetime, label: str) -> datetime:
     """Read a naive time as India time and convert an aware one to it."""
     if not isinstance(value, datetime):

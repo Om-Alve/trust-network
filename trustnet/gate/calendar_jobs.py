@@ -86,6 +86,33 @@ def pending(person, *, due_only=False):
     ]
 
 
+def apply_local(person, token):
+    """Apply one approved operation to the person's local ICS file, then record it.
+
+    The gate writes the file itself, so a local receipt always matches the file.
+    """
+    from datetime import datetime
+
+    from trustnet.gate.calendar import put_event, remove_event
+    from trustnet.gate.facts import load_profile
+
+    item = next((t for t in all_tasks(person) if t["token"] == token), None)
+    if item is None:
+        raise ValueError("Unknown or superseded calendar operation")
+    if item["status"] == "applied":
+        return item
+    path = load_profile(person).calendar_path
+    plan = item["plan"]
+    if item["action"] == "cancel":
+        remove_event(path, item["uid"])
+    else:
+        start = datetime.fromisoformat(plan["start"])
+        put_event(
+            path, start, int(plan["minutes"]), plan["title"], plan.get("place", ""), item["uid"]
+        )
+    return report(person, token, "applied", "local-ics", item["uid"])
+
+
 def report(person, token, status, provider="", event_id="", error=""):
     if status not in {"applied", "failed"}:
         raise ValueError("Calendar status must be applied or failed")

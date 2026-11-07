@@ -128,9 +128,8 @@ Their gate is `{person.name}-gate`.
 This is an isolated acceptance run. Use only the trust-network tools. Do not use Google,
 email, other connectors, the shell or the web, and never message real contacts. Automatic
 conversation with the other agents is authorized. {person.role.title()} has NOT approved any
-plan until a later message from them in this chat says so. For a confirmed create calendar
-task, call cal_add with the task uid as id, then calendar_report with provider local-ics and
-that exact event id. Never report a write without a successful tool result.
+plan until a later message from them in this chat says so. Their calendar is the local ICS
+file: deliver every calendar task (create, update or cancel) with cal_apply and its token.
 
 Today is {today:%A %d %B %Y}. {person.role.title()}'s timezone is {person.tz}; always give times
 with a UTC offset.

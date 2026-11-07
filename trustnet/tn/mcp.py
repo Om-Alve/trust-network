@@ -133,8 +133,10 @@ def build(person: str) -> MCPServer:
     @server.tool(
         description=(
             "Add a separate event to the local ICS calendar only. This does not write "
-            "Google Calendar or Outlook. Use calendar_tasks and your existing provider "
-            "tools for approved external delivery, then calendar_report. start accepts "
+            "Google Calendar or Outlook, and it never changes an existing event: deliver "
+            "an approved task to the local calendar with cal_apply. Use calendar_tasks and "
+            "your existing provider tools for approved external delivery, then "
+            "calendar_report. start accepts "
             "ISO or a phrase like 'Sun 9pm'; duration is 2h or 90m."
         )
     )
@@ -176,6 +178,22 @@ def build(person: str) -> MCPServer:
         try:
             return calendar_jobs.report(person, token, status, provider, event_id, error)
         except ValueError as exc:
+            raise ToolError(str(exc)) from None
+
+    @server.tool(
+        description=(
+            "Deliver one approved calendar task (create, update or cancel) to your "
+            "person's local ICS calendar. The gate writes the exact approved event and "
+            "records the receipt itself; do not call calendar_report afterwards. Use this "
+            "only when the local ICS file is your person's calendar destination."
+        )
+    )
+    async def cal_apply(token: str) -> dict[str, Any]:
+        from trustnet.gate import calendar_jobs
+
+        try:
+            return calendar_jobs.apply_local(person, token)
+        except (ValueError, OSError) as exc:
             raise ToolError(str(exc)) from None
 
     @server.tool(
