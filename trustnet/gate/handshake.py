@@ -23,6 +23,7 @@ MAJOR = 1
 CAPABILITIES = (
     "hello",
     "join-dm",
+    "join-ask",
     "free",
     "ask",
     "propose",

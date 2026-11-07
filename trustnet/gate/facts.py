@@ -127,14 +127,22 @@ FACT_LEVELS: Final[frozenset[Level]] = frozenset(
 
 @dataclass(slots=True)
 class Fact:
-    """One preference, possession or recommendation, tagged with its level."""
+    """One preference, possession or recommendation, tagged with its level.
+
+    ``quiet`` is an explicit owner choice: a friend's request for this fact, when
+    the room may not see it, is still recorded in the ledger but raises no
+    real-time overreach note in the owner's home room.
+    """
 
     value: Any
     level: Level
+    quiet: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.level, Level) or not self.level.is_fact_tag:
             raise FactsError(f"a fact level must be one of {_names(FACT_LEVELS)}")
+        if not isinstance(self.quiet, bool):
+            raise FactsError("quiet must be true or false")
 
 
 @dataclass(slots=True)
@@ -479,14 +487,18 @@ def load_profile_file(path: str | Path) -> Profile:
         where = f"{path}: facts.{key}"
         if not isinstance(entry, dict):
             raise FactsError(f"{where}: expected 'value' and 'level'")
-        _check_keys(entry, frozenset({"value", "level"}), where)
+        _check_keys(entry, frozenset({"value", "level", "quiet"}), where)
         if "value" not in entry:
             raise FactsError(f"{where}: missing 'value'")
         if "level" not in entry:
             raise FactsError(f"{where}: missing 'level'")
+        quiet = entry.get("quiet", False)
+        if not isinstance(quiet, bool):
+            raise FactsError(f"{where}: 'quiet' must be true or false")
         facts[key.strip()] = Fact(
             value=entry["value"],
             level=_parse_level(entry["level"], FACT_LEVELS, where),
+            quiet=quiet,
         )
 
     return Profile(
@@ -514,7 +526,10 @@ def save_profile(profile: Profile, path: str | Path) -> None:
     payload: dict[str, Any] = {
         "calendar": calendar_value,
         "facts": {
-            key: {"value": fact.value, "level": fact.level.value}
+            key: (
+                {"value": fact.value, "level": fact.level.value}
+                | ({"quiet": True} if fact.quiet else {})
+            )
             for key, fact in profile.facts.items()
         },
     }

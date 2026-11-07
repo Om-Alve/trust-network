@@ -16,8 +16,8 @@ from collections.abc import Callable, Mapping
 from datetime import datetime, time, timedelta
 from typing import Any
 
+from trustnet.gate import ask_room, consent, dm, group_plans, handshake, ledger, relay, surprise
 from trustnet.gate import commands as c
-from trustnet.gate import consent, dm, group_plans, handshake, ledger, relay, surprise
 from trustnet.gate.calendar import busy, time_zone
 from trustnet.gate.facts import (
     FactsError,
@@ -161,9 +161,13 @@ class Gate:
                     f" ({_snippet(event.text)})",
                 )
             return
-        name = {c.ViewAs: "view-as", c.JoinDm: "join-dm", c.AskOwner: "ask-owner"}.get(
-            type(command), type(command).__name__.lower()
-        )
+        name = {
+            c.ViewAs: "view-as",
+            c.JoinDm: "join-dm",
+            c.JoinAsk: "join-ask",
+            c.AskRoom: "ask-room",
+            c.AskOwner: "ask-owner",
+        }.get(type(command), type(command).__name__.lower())
         direction = Direction.OUTBOUND if sender.person == self.person else Direction.INBOUND
         if isinstance(command, c.AskAround):
             name = "ask-around"
@@ -249,6 +253,10 @@ class Gate:
             if level == Level.SELF:
                 await dm.setup(self, command.person, command.goal)
             return
+        if isinstance(command, c.AskRoom):
+            if level == Level.SELF:
+                await ask_room.setup(self, command.person)
+            return
         if isinstance(command, c.JoinDm):
             reason = handshake.problem(self.person, sender.person)
             if reason:
@@ -262,9 +270,22 @@ class Gate:
                 return
             await dm.setup(self, sender.person, command.goal, command.room)
             return
+        if isinstance(command, c.JoinAsk):
+            reason = handshake.problem(self.person, sender.person)
+            if reason:
+                await self.client.post_message(f"join-ask refused: {reason}.")
+                await relay.post_home(
+                    self.person,
+                    f"Didn't answer a fact request from {_display(sender.person)}: {reason}.",
+                    client=self.client,
+                )
+                return
+            await ask_room.join(self, sender.person, command.room)
+            return
         profile = load_profile(self.person)
         disclosed = {}
         overreach: list[tuple[str, str]] = []
+        quiet: list[tuple[str, str]] = []
         if isinstance(command, c.Ask):
             values = {
                 k: surprise.owner_value(self.person, k, v, self._now()) if own_side else v
@@ -291,7 +312,11 @@ class Gate:
                         f"{_display(sender.person)}'s side asked for your {key}"
                         f" ({fact.level.value})"
                     )
-                overreach.append((f"fact:{key}", note))
+                if fact is not None and fact.quiet:
+                    # An explicit owner choice: record the request, stay quiet.
+                    quiet.append((key, note))
+                else:
+                    overreach.append((f"fact:{key}", note))
             text = "\n".join(lines)
         elif isinstance(command, c.Free):
             start = datetime.combine(command.start, time.min, time_zone())
@@ -335,6 +360,16 @@ class Gate:
                 ledger.record(field, value, recipient, event.room_id, "answer", person=self.person)
         for field, note in overreach:
             await self._overreach(event, sender, field, note)
+        for key, note in quiet:
+            fact = profile.facts[key]
+            ledger.record(
+                key,
+                f"not shared ({fact.level.value})",
+                sender.person,
+                event.room_id,
+                "request",
+                person=self.person,
+            )
 
     def _around_state(self):
         path = resolve_data_dir(self.person) / "ask-around.json"

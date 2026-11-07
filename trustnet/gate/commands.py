@@ -24,6 +24,7 @@ __all__ = [
     "Ask",
     "AskAround",
     "AskOwner",
+    "AskRoom",
     "Answer",
     "Claim",
     "Command",
@@ -33,6 +34,7 @@ __all__ = [
     "Free",
     "GiftIdeas",
     "Hello",
+    "JoinAsk",
     "JoinDm",
     "Ledger",
     "No",
@@ -80,6 +82,7 @@ EXAMPLES: Final[dict[str, str]] = {
     "claim": '@om-gate claim "Lego Millennium Falcon"',
     "ask-around": '@om-gate ask-around "tent to borrow, Nov 14-16"',
     "dm": '@om-gate dm rahul "something fun Sunday evening, not pricey"',
+    "ask-room": "@om-gate ask-room rahul",
     "yes": "@om-gate yes P1",
     "no": "@om-gate no P1",
     "answer": '@om-gate answer Q3 "yes, up to ₹1,500"',
@@ -87,6 +90,7 @@ EXAMPLES: Final[dict[str, str]] = {
     "view-as": "@om-gate view-as rahul",
     "ledger": "@om-gate ledger",
     "join-dm": '@rahul-gate join-dm dm-om-rahul-sun "something fun Sunday evening"',
+    "join-ask": "@rahul-gate join-ask ask-om-rahul-1",
     "consent": "@rahul-gate consent P1 yes via-agent",
     "hello": "@rahul-gate hello trust-network/1 free,ask,propose,consent,join-dm",
 }
@@ -181,6 +185,16 @@ class AskOwner(_Addressed):
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "question_id", _question_id(self.question_id))
+
+
+@dataclass(frozen=True, slots=True)
+class AskRoom(_Addressed):
+    """``ask-room <person>``: open a quiet fact-request room with a friend."""
+
+    person: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "person", _person(self.person))
 
 
 @dataclass(frozen=True, slots=True)
@@ -347,6 +361,16 @@ class JoinDm(_Addressed):
 
 
 @dataclass(frozen=True, slots=True)
+class JoinAsk(_Addressed):
+    """``join-ask <room>``: gate-to-gate invitation to a fact-request room."""
+
+    room: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "room", _room(self.room))
+
+
+@dataclass(frozen=True, slots=True)
 class Consent(_Addressed):
     """``consent P<n> yes|no via-agent|direct``: one side's recorded answer."""
 
@@ -381,6 +405,7 @@ Command: TypeAlias = (
     Free
     | Ask
     | AskOwner
+    | AskRoom
     | Propose
     | Counter
     | GiftIdeas
@@ -394,6 +419,7 @@ Command: TypeAlias = (
     | ViewAs
     | Ledger
     | JoinDm
+    | JoinAsk
     | Consent
     | Hello
     | Unknown
@@ -743,6 +769,17 @@ def _handle_ask_owner(args: str, *, target: str | None, now: datetime, raw: str)
     )
 
 
+def _handle_ask_room(args: str, *, target: str | None, now: datetime, raw: str) -> Command:
+    parts = args.split()
+    if len(parts) != 1:
+        raise _err("ask-room", "ask-room needs one friend's name", raw)
+    try:
+        person = _person(parts[0])
+    except ValueError as exc:
+        raise _err("ask-room", str(exc), raw) from None
+    return AskRoom(person=person, target=target)
+
+
 _PROPOSAL_RE: Final = re.compile(
     r"""^(?P<ids>(?:P\d+\s+)+)
         (?P<start>.+?)\s+
@@ -950,6 +987,17 @@ def _handle_join_dm(args: str, *, target: str | None, now: datetime, raw: str) -
     )
 
 
+def _handle_join_ask(args: str, *, target: str | None, now: datetime, raw: str) -> Command:
+    parts = args.split()
+    if len(parts) != 1:
+        raise _err("join-ask", "join-ask needs one room name", raw)
+    try:
+        room = _room(parts[0])
+    except ValueError as exc:
+        raise _err("join-ask", str(exc), raw) from None
+    return JoinAsk(room=room, target=target)
+
+
 def _handle_consent(args: str, *, target: str | None, now: datetime, raw: str) -> Command:
     match = re.fullmatch(
         r"(?P<id>P\d+)\s+(?P<answer>yes|no)\s+(?P<via>via-agent|direct)(?:\s+(?P<fingerprint>[a-f0-9]{64}))?",
@@ -993,6 +1041,7 @@ _HANDLERS: Final[dict[str, _Handler]] = {
     "free": _handle_free,
     "ask": _handle_ask,
     "ask-owner": _handle_ask_owner,
+    "ask-room": _handle_ask_room,
     "propose": _handle_propose,
     "counter": _handle_counter,
     "gift-ideas": _handle_gift_ideas,
@@ -1006,6 +1055,7 @@ _HANDLERS: Final[dict[str, _Handler]] = {
     "view-as": _handle_view_as,
     "ledger": _handle_ledger,
     "join-dm": _handle_join_dm,
+    "join-ask": _handle_join_ask,
     "consent": _handle_consent,
     "hello": _handle_hello,
 }

@@ -126,13 +126,12 @@ async def three_people(h):
 
 async def collisions_and_decline(h):
     first = await h.open()
-    second = await h.open(goal="Other games")
     third = await h.open("priya")
     await h.propose(first)
-    for room, friend in ((second, "rahul"), (third, "priya")):
-        await h.propose(room, friend=friend)
-        assert any("already used" in b and "fresh" in b for b in h.bodies(room))
-        assert consent.load("om")["P1"]["room"] == first
+    # A reused P<n> ID is refused even in another friend's room: IDs are global.
+    await h.propose(third, friend="priya")
+    assert any("already used" in b and "fresh" in b for b in h.bodies(third))
+    assert consent.load("om")["P1"]["room"] == first
     await h.vote("rahul", vote="no")
     assert consent.load("om")["P1"]["status"] == "declined"
     assert not h.switch.rooms[first]["archived"]
@@ -144,12 +143,12 @@ async def collisions_and_decline(h):
 
 async def consent_replays_and_restart(h):
     room = await h.open()
-    other = await h.open(goal="Another plan")
+    conn = next(r for r in h.switch.rooms.values() if r["name"] == "conn-om-rahul")
     await h.propose(room)
     digest = consent.digest(consent.load("om")["P1"]["card"])
     for rid, sender, fingerprint in (
         (room, "rahul-gate", "0" * 64),
-        (other, "rahul-gate", digest),
+        (conn["id"], "rahul-gate", digest),
         (room, "rahul-hermes", digest),
     ):
         await h.send(rid, sender, f"@om-gate consent P1 yes direct {fingerprint}")
@@ -163,14 +162,15 @@ async def consent_replays_and_restart(h):
     await h.send(room, "rahul-gate", f"@om-gate consent P1 no direct {digest}")
     assert consent.load("om")["P1"]["status"] == "confirmed"
     assert len(h.switch.rooms[room]["documents"]) == 2
-    # Both local yeses may be processed before either peer sees the relay.
-    await h.propose(other, "P2")
+    # The confirmed room is archived, so a fresh dm opens a new planning room.
+    second = await h.open(goal="Another plan")
+    await h.propose(second, "P2")
     await h.send(h.homes["om"], "om", "@om-gate yes P2", drain=False)
     await h.send(h.homes["rahul"], "rahul", "@rahul-gate yes P2", drain=False)
     await h.drain()
     assert consent.load("om")["P2"]["status"] == "confirmed"
     assert consent.load("rahul")["P2"]["status"] == "confirmed"
-    assert len(h.switch.rooms[other]["documents"]) == 2
+    assert len(h.switch.rooms[second]["documents"]) == 2
 
 
 async def authority_and_questions(h):

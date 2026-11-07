@@ -32,7 +32,7 @@ from mcp.client.stdio import stdio_client  # noqa: E402
 from mcp.server.mcpserver.exceptions import ToolError  # noqa: E402
 from scenario_harness import build_world, personal_session  # noqa: E402
 
-from trustnet.gate import ledger, surprise  # noqa: E402
+from trustnet.gate import handshake, ledger, surprise  # noqa: E402
 from trustnet.gate.calendar import TIME_ZONE  # noqa: E402
 from trustnet.gate.facts import Level, load_profile  # noqa: E402
 from trustnet.gate.policy import visible_facts  # noqa: E402
@@ -574,6 +574,169 @@ async def wake_runner(base: Path) -> dict:
             os.environ["TN_DATA_DIR"] = old
 
 
+def _write_peer(world, asker: str, friend: str, *, with_join_ask: bool) -> None:
+    """Record ``friend``'s advertised capabilities in ``asker``'s ``peers.json``.
+
+    ``personal.ask`` reads this file to choose the quiet ``ask-`` room versus the
+    legacy DM. Writing it directly simulates a peer that already said hello with
+    (or without) ``join-ask``, without a live exchange where the gate would
+    re-advertise its own full capability list.
+    """
+    capabilities = list(handshake.CAPABILITIES)
+    if not with_join_ask:
+        capabilities.remove("join-ask")
+    path = world.tmp / asker / "peers.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                friend: {
+                    "protocol": "trust-network/1",
+                    "major": 1,
+                    "capabilities": capabilities,
+                    "room": "conn",
+                    "at": "2026-11-05T00:00:00+00:00",
+                }
+            }
+        )
+    )
+
+
+async def facts_ask_room(base: Path) -> dict:
+    """A close friend's wishlist ask uses the quiet room, never the recipient's agent."""
+    async with world_for(base, "ask-room") as world:
+        old_session = personal.session
+        personal.session = personal_session(world)
+        _write_peer(world, "rahul", "om", with_join_ask=True)
+        await world.start()
+        try:
+            om_home_before = list(world.home_bodies("om"))
+            result = await personal.ask("rahul", "om", ["wishlist"])
+            room = result["room"]
+            await world.wait_for(
+                lambda: any(b.startswith("wishlist:") for b in world.bodies(room)),
+                what="the wishlist answer",
+            )
+            answer = next(b for b in world.bodies(room) if b.startswith("wishlist:"))
+            assert "Lego Millennium Falcon" in answer
+            ask = world.switch.rooms[room]
+            assert ask["name"].startswith("ask-om-rahul-")
+            assert "rahul-hermes" in ask["members"]
+            assert "om-hermes" not in ask["members"]
+            assert not world.rooms_named("dm-om-rahul-")
+            assert world.home_bodies("om") == om_home_before
+            return {
+                "checks": {
+                    "answer": answer,
+                    "room": ask["name"],
+                    "members": sorted(ask["members"]),
+                    "recipient_agent_absent": True,
+                    "recipient_home_quiet": True,
+                },
+                "transcripts": {"world": world.transcript()},
+            }
+        finally:
+            personal.session = old_session
+            await world.stop()
+
+
+async def facts_quiet_field(base: Path) -> dict:
+    """A hidden quiet fact is ledgered; a hidden non-quiet fact still alerts."""
+    async with world_for(
+        base,
+        "quiet-field",
+        trust={"om": {"rahul": "friend"}},
+        facts={"om": {"sizes": {"value": {"tshirt": "M"}, "level": "close", "quiet": True}}},
+    ) as world:
+        room = await world.add_room("conn-om-rahul", ["om-gate", "rahul-gate"])
+        await world.say(room, "rahul-gate", "@om-gate ask sizes address")
+        assert world.bodies(room)[-1].splitlines() == [
+            "sizes: not shared with you",
+            "address: not shared with you",
+        ]
+        notes = world.home_bodies("om")
+        assert any("asked for your address (private)" in note for note in notes)
+        assert not any("sizes" in note for note in notes)
+        request = next(entry for entry in ledger.read("om") if entry.field == "sizes")
+        assert request.kind.value == "request" and request.value == "not shared (close)"
+        return {
+            "checks": {
+                "reply": world.bodies(room)[-1],
+                "notes": notes,
+                "quiet_ledger_entry": request.to_dict(),
+            },
+            "transcripts": {"world": world.transcript()},
+        }
+
+
+async def facts_ask_legacy_fallback(base: Path) -> dict:
+    """A peer without ``join-ask`` still answers through the legacy DM path."""
+    async with world_for(base, "ask-legacy") as world:
+        old_session = personal.session
+        personal.session = personal_session(world)
+        _write_peer(world, "rahul", "om", with_join_ask=False)
+        await world.start()
+        try:
+            result = await personal.ask("rahul", "om", ["wishlist"])
+            room = result["room"]
+            await world.wait_for(
+                lambda: any(b.startswith("wishlist:") for b in world.bodies(room)),
+                what="the legacy DM wishlist answer",
+            )
+            assert any(b.startswith("wishlist:") for b in world.bodies(room))
+            assert not world.rooms_named("ask-om-rahul-")
+            assert world.rooms_named("dm-om-rahul-facts-request")
+            assert "om-hermes" in world.switch.rooms[room]["members"]
+            return {
+                "checks": {
+                    "legacy_dm_room": world.rooms_named("dm-om-rahul-facts-request")[0]["name"],
+                    "recipient_agent_invited": True,
+                },
+                "transcripts": {"world": world.transcript()},
+            }
+        finally:
+            personal.session = old_session
+            await world.stop()
+
+
+async def dm_room_reuse(base: Path) -> dict:
+    """A second dm to the same friend reuses the open planning room."""
+    async with world_for(base, "dm-reuse") as world:
+        old_session = personal.session
+        personal.session = personal_session(world)
+        await world.start()
+        try:
+            await personal.dm("om", "rahul", "something fun Sunday evening")
+            await world.wait_for(
+                lambda: len(world.rooms_named("dm-om-rahul-")) == 1,
+                what="the first planning room",
+            )
+            first = world.rooms_named("dm-om-rahul-")[0]
+            await personal.dm("om", "rahul", "a different wording for the same plan")
+            await world.wait_for(
+                lambda: any(
+                    "Planning continues with rahul" in body for body in world.home_bodies("om")
+                ),
+                what="the reuse notice",
+            )
+            assert len(world.rooms_named("dm-om-rahul-")) == 1
+            assert any(first["id"] in body for body in world.home_bodies("om"))
+            return {
+                "checks": {
+                    "rooms_after_two_dm_calls": len(world.rooms_named("dm-om-rahul-")),
+                    "reuse_notice": next(
+                        body
+                        for body in world.home_bodies("om")
+                        if "Planning continues with rahul" in body
+                    ),
+                },
+                "transcripts": {"world": world.transcript()},
+            }
+        finally:
+            personal.session = old_session
+            await world.stop()
+
+
 SCENARIOS = (
     ("facts-levels", facts_levels),
     ("facts-mixed-room", facts_mixed_room),
@@ -585,6 +748,10 @@ SCENARIOS = (
     ("ask-around-long-list", around_long_list),
     ("mcp-bad-input", mcp_bad_input),
     ("tn-wake", wake_runner),
+    ("facts-ask-room", facts_ask_room),
+    ("facts-quiet-field", facts_quiet_field),
+    ("facts-ask-legacy-fallback", facts_ask_legacy_fallback),
+    ("dm-room-reuse", dm_room_reuse),
 )
 
 
