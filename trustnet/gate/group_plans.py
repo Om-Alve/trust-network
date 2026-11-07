@@ -42,7 +42,7 @@ import time
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 
-from trustnet.gate import relay, storage
+from trustnet.gate import handshake, relay, storage
 from trustnet.gate.dm import main_agent
 from trustnet.gate.facts import Level, load_profile, load_trust, resolve_data_dir
 from trustnet.gate.policy import SenderKind, combined_permissions, visible_facts
@@ -69,6 +69,7 @@ MAX_PARTICIPANTS = 12
 MAX_BODY = 20_000
 MAX_TITLE = 60
 MAX_PLACE = 60
+MAX_NOTES = 140
 RETRY_SECONDS = 2
 EXPIRY = timedelta(days=30)
 
@@ -177,19 +178,24 @@ def _read_state(person):
 
 
 def summary(plan):
+    participants = list(plan.get("participants", []))
     return {
         "id": plan["id"],
         "uid": plan.get("uid", ""),
         "room": plan.get("room", ""),
         "coordinator": plan.get("coordinator", ""),
-        "participants": list(plan.get("participants", [])),
+        "participants": participants,
+        "min_yes": plan.get("min_yes", len(participants)),
         "revision": plan.get("revision", 0),
         "fingerprint": plan.get("fingerprint", ""),
         "status": plan.get("status", ""),
         "content": copy.deepcopy(plan.get("content", {})),
         "votes": copy.deepcopy(plan.get("votes", {})),
+        "in": [p for p in participants if plan.get("votes", {}).get(p, {}).get("vote") is True],
+        "out": [p for p in participants if plan.get("votes", {}).get(p, {}).get("vote") is False],
         "confirmed": copy.deepcopy(plan.get("confirmed")),
         "cancelled": copy.deepcopy(plan.get("cancelled")),
+        "removed": copy.deepcopy(plan.get("removed")),
         "candidate_declined": bool(plan.get("candidate_declined")),
         "created_at": plan.get("created_at", 0),
         "updated_at": plan.get("updated_at", 0),
@@ -348,9 +354,41 @@ async def _create(gate, payload):
     participants = _participants(payload.get("participants"), person)
     _check_participants(gate, participants)
     content = _content(payload.get("content"), gate._now())
+    min_yes = _min_yes(payload.get("min_yes"), participants)
+    now = gate._now()
+
+    # Idempotent create: the organizer already holds a pending plan for exactly
+    # this group and content, so reuse it instead of opening a second room and
+    # plan. Bind this request's token to it so the caller's status lookup works.
+    for plan_id, existing in state["plans"].items():
+        if existing.get("status") != "pending":
+            continue
+        if sorted(existing.get("participants", [])) != participants:
+            continue
+        if existing.get("content") != content:
+            continue
+        if existing.get("min_yes", len(existing.get("participants", []))) != min_yes:
+            continue
+        state["tokens"][token] = {
+            "plan": plan_id,
+            "action": "create",
+            "created_at": now.timestamp(),
+        }
+        existing.setdefault("tokens", []).append(token)
+        save(person, state)
+        await _home(
+            gate,
+            f"Plan {plan_id} already holds these participants and details; reusing it.",
+        )
+        return
+
+    peers = [peer for peer in participants if peer != person]
+    await _check_peer_capability(
+        gate, peers, needed=min_yes < len(participants) or "notes" in content
+    )
     plan_id = _new_id(state, person, token)
     revision = 1
-    fingerprint = _fingerprint(plan_id, revision, participants, content)
+    fingerprint = _fingerprint(plan_id, revision, participants, content, min_yes)
 
     name = "group-" + plan_id
     try:
@@ -399,13 +437,13 @@ async def _create(gate, payload):
         await _home(gate, "Plan not created: could not open the shared group room.")
         return
 
-    now = gate._now()
     plan = {
         "id": plan_id,
         "uid": "trustnet-group-" + plan_id,
         "room": room,
         "coordinator": person,
         "participants": participants,
+        "min_yes": min_yes,
         "revision": revision,
         "fingerprint": fingerprint,
         "content": content,
@@ -449,20 +487,44 @@ async def _revise(gate, payload):
         raise PlanError("ask the organizer to draft a replacement")
     if plan.get("status") == "cancelled":
         raise PlanError("the plan is cancelled")
+
     if payload.get("participants") is not None:
-        participants = _participants(payload.get("participants"))
-        if sorted(participants) != sorted(plan["participants"]):
-            raise PlanError("a revision must keep the same participant set")
-    participants = list(plan["participants"])
+        participants = _participants(payload.get("participants"), person)
+        if not set(participants) <= set(plan["participants"]):
+            raise PlanError("a revision may only remove participants")
+    else:
+        participants = list(plan["participants"])
     _check_participants(gate, participants)
+
     content = _content(payload.get("content"), gate._now())
-    if content == plan["content"]:
+    if payload.get("min_yes") is not None:
+        min_yes = _min_yes(payload.get("min_yes"), participants)
+    else:
+        # Dropping people cannot raise the bar; a unanimous quorum (the default)
+        # follows the shrinking set, while an explicit lower quorum persists.
+        min_yes = min(plan.get("min_yes", len(plan["participants"])), len(participants))
+    previous_min_yes = plan.get("min_yes", len(plan["participants"]))
+    if (
+        content == plan["content"]
+        and participants == plan["participants"]
+        and min_yes == previous_min_yes
+    ):
         raise PlanError("the revision changes nothing")
 
+    removed = sorted(set(plan["participants"]) - set(participants))
+    peers = [peer for peer in participants if peer != person]
+    await _check_peer_capability(
+        gate,
+        peers + removed,
+        needed=(min_yes < len(participants)) or ("notes" in content) or bool(removed),
+    )
+
     revision = int(plan["revision"]) + 1
-    fingerprint = _fingerprint(plan["id"], revision, participants, content)
+    fingerprint = _fingerprint(plan["id"], revision, participants, content, min_yes)
     now = gate._now()
     plan.update(
+        participants=participants,
+        min_yes=min_yes,
         revision=revision,
         fingerprint=fingerprint,
         content=content,
@@ -477,8 +539,8 @@ async def _revise(gate, payload):
         f"home-revision-{revision}",
         "home",
         text=(
-            f"Plan {plan['id']} revision {revision}: {_card(content)} · every participant "
-            "must approve before the calendar changes."
+            f"Plan {plan['id']} revision {revision}: {_card(content)} · "
+            f"{_quorum_text(participants, min_yes)}"
         ),
     )
     for peer in participants:
@@ -489,6 +551,13 @@ async def _revise(gate, payload):
                 "relay",
                 text=f"@{peer}-gate plan-relay {_offer_text(plan, person)}",
             )
+    for peer in removed:
+        _job(
+            plan,
+            f"remove-{revision}-{peer}",
+            "relay",
+            text=f"@{peer}-gate plan-relay {_remove_text(plan, person, removed)}",
+        )
     save(person, state)
     await recover(gate, force=False)
 
@@ -523,19 +592,9 @@ async def _vote(gate, sender, payload):
         "at": now.isoformat(),
     }
     plan["updated_at"] = now.timestamp()
-    if not value:
-        _decline(plan, person, now, gate)
-    elif _all_yes(plan):
-        _confirm(plan, now, gate)
-    else:
-        _job(
-            plan,
-            f"home-vote-{plan['revision']}-{person}",
-            "home",
-            text=(
-                f"Plan {plan['id']}: {person} voted yes. Waiting for {', '.join(_waiting(plan))}."
-            ),
-        )
+    notice = _vote_transition(plan, person, value, now, gate)
+    if notice:
+        _job(plan, f"home-vote-{plan['revision']}-{person}", "home", text=notice)
     for peer in plan["participants"]:
         if peer == person:
             continue
@@ -558,7 +617,7 @@ async def _cancel(gate, sender, payload):
         await _home(gate, f"Plan {plan['id']} is already cancelled.")
         return
     now = gate._now()
-    _cancel_plan(plan, person, now)
+    _cancel_plan(plan, person, now, gate)
     reason = payload.get("reason")
     for peer in plan["participants"]:
         if peer == person:
@@ -586,14 +645,18 @@ async def _relay(gate, event, sender, payload, name):
     if claimed_from is not None:
         if not isinstance(claimed_from, str) or claimed_from.strip().lower() != sender.person:
             raise PlanError("relay from does not match its sender")
+    if action == "remove":
+        await _remove(gate, sender, payload, plan_id)
+        return
     participants = _participants(payload.get("participants"))
     if gate.person not in participants or sender.person not in participants:
         raise PlanError("relay is not from a participant")
     _check_participants(gate, participants)
     revision = _revision(payload.get("revision"))
     fingerprint = _hex(payload.get("fingerprint"))
+    min_yes = _min_yes(payload.get("min_yes"), participants)
     content = _content(payload.get("content"), gate._now(), future=action == "offer")
-    if _fingerprint(plan_id, revision, participants, content) != fingerprint:
+    if _fingerprint(plan_id, revision, participants, content, min_yes) != fingerprint:
         raise PlanError("fingerprint does not match the relayed plan")
     coordinator = payload.get("coordinator")
     if coordinator is not None:
@@ -620,6 +683,7 @@ async def _relay(gate, event, sender, payload, name):
                 "room": event.room_id,
                 "coordinator": coordinator,
                 "participants": participants,
+                "min_yes": min_yes,
                 "revision": revision,
                 "fingerprint": fingerprint,
                 "content": content,
@@ -665,6 +729,7 @@ async def _relay(gate, event, sender, payload, name):
             "room": event.room_id,
             "coordinator": coordinator,
             "participants": participants,
+            "min_yes": min_yes,
             "revision": revision,
             "fingerprint": fingerprint,
             "content": content,
@@ -695,15 +760,13 @@ async def _relay(gate, event, sender, payload, name):
             "home",
             text=(
                 f"Plan {plan_id} from {coordinator}: {_card(content)} · with "
-                f"{', '.join(participants)} · vote when you are ready."
+                f"{', '.join(participants)} · {_quorum_text(participants, min_yes)}"
             ),
         )
         save(gate.person, state)
         await recover(gate, force=False)
         return
 
-    if sorted(participants) != sorted(plan["participants"]):
-        raise PlanError("stale participant set")
     if event.room_id != plan.get("room"):
         raise PlanError("relay is not in the plan's own room")
     if coordinator is not None and coordinator != plan["coordinator"]:
@@ -717,13 +780,21 @@ async def _relay(gate, event, sender, payload, name):
         if revision == plan["revision"]:
             if fingerprint != plan["fingerprint"]:
                 raise PlanError("stale fingerprint")
+            if sorted(participants) != sorted(plan["participants"]):
+                raise PlanError("stale participant set")
+            if min_yes != plan.get("min_yes", len(participants)):
+                raise PlanError("stale quorum")
             return  # idempotent replay
         if revision != plan["revision"] + 1:
             raise PlanError("revision gap")
         if plan.get("status") == "cancelled":
             raise PlanError("the plan is cancelled")
+        if not set(participants) <= set(plan["participants"]):
+            raise PlanError("a revision may only remove participants")
         now = gate._now()
         plan.update(
+            participants=participants,
+            min_yes=min_yes,
             revision=revision,
             fingerprint=fingerprint,
             content=content,
@@ -738,8 +809,8 @@ async def _relay(gate, event, sender, payload, name):
             f"home-revision-{revision}",
             "home",
             text=(
-                f"Plan {plan_id} revision {revision}: {_card(content)} · every participant "
-                "must approve before the calendar changes."
+                f"Plan {plan_id} revision {revision}: {_card(content)} · "
+                f"{_quorum_text(participants, min_yes)}"
             ),
         )
         save(gate.person, state)
@@ -750,6 +821,8 @@ async def _relay(gate, event, sender, payload, name):
         raise PlanError("stale revision")
     if fingerprint != plan["fingerprint"]:
         raise PlanError("stale fingerprint")
+    if sorted(participants) != sorted(plan["participants"]):
+        raise PlanError("stale participant set")
 
     if action == "vote":
         if not _is_self_voter(payload.get("voter"), sender.person):
@@ -773,20 +846,9 @@ async def _relay(gate, event, sender, payload, name):
             "at": now.isoformat(),
         }
         plan["updated_at"] = now.timestamp()
-        if not value:
-            _decline(plan, sender.person, now, gate)
-        elif _all_yes(plan):
-            _confirm(plan, now, gate)
-        else:
-            _job(
-                plan,
-                f"home-peer-vote-{revision}-{sender.person}",
-                "home",
-                text=(
-                    f"Plan {plan_id}: {sender.person} voted yes. Waiting for "
-                    f"{', '.join(_waiting(plan))}."
-                ),
-            )
+        notice = _vote_transition(plan, sender.person, value, now, gate)
+        if notice:
+            _job(plan, f"home-peer-vote-{revision}-{sender.person}", "home", text=notice)
         save(gate.person, state)
         await recover(gate, force=False)
         return
@@ -796,12 +858,59 @@ async def _relay(gate, event, sender, payload, name):
             raise PlanError("a gate may relay only its own cancellation")
         if plan.get("status") == "cancelled":
             return
-        _cancel_plan(plan, sender.person, gate._now())
+        _cancel_plan(plan, sender.person, gate._now(), gate)
         save(gate.person, state)
         await recover(gate, force=False)
         return
 
     raise PlanError("unknown relay action")
+
+
+async def _remove(gate, sender, payload, plan_id):
+    """A dropped participant ends this gate's copy and gets a cancellation task.
+
+    The removal relay names the people the organizer dropped; the coordinator's
+    own gate is the only sender allowed to send it. A participant whose plan was
+    confirmed for them (they were in the previous ``in`` set) receives a calendar
+    cancellation for the same UID, exactly like an ordinary cancellation.
+    """
+    removed = _person_list(payload.get("removed"), label="participant")
+    if gate.person not in removed:
+        raise PlanError("a removal relay must name this gate's person")
+    coordinator = payload.get("coordinator")
+    if not isinstance(coordinator, str) or coordinator.strip().lower() != sender.person:
+        raise PlanError("only the organizer may remove a participant")
+    state = load(gate.person)
+    plan = state["plans"].get(plan_id)
+    if plan is None:
+        raise PlanError("unknown plan")
+    if plan.get("coordinator") != sender.person:
+        raise PlanError("only the organizer may remove a participant")
+    if plan.get("status") in {"cancelled", "removed"}:
+        return  # idempotent replay
+    now = gate._now()
+    plan["status"] = "removed"
+    plan["removed"] = {"by": sender.person, "at": now.isoformat()}
+    plan["updated_at"] = now.timestamp()
+    confirmed = plan.get("confirmed")
+    if confirmed and gate.person in _confirmed_in(plan):
+        _job(
+            plan,
+            f"calendar-cancel-removed-{confirmed['revision']}-{confirmed['fingerprint'][:8]}",
+            "calendar",
+            action="cancel",
+            uid=plan["uid"],
+            content=copy.deepcopy(confirmed["content"]),
+        )
+        text = (
+            f"❌ Plan {plan_id}: {sender.person} removed you from the group; "
+            "your confirmed event was cancelled."
+        )
+    else:
+        text = f"Plan {plan_id}: {sender.person} removed you from the group."
+    _job(plan, f"home-removed-{plan['revision']}", "home", text=text)
+    save(gate.person, state)
+    await recover(gate, force=False)
 
 
 # --- plan transitions -------------------------------------------------------
@@ -820,7 +929,7 @@ def _decline(plan, by, now, gate):
         plan,
         f"home-declined-{plan['revision']}",
         "home",
-        text=f"Plan {plan['id']} revision {plan['revision']} declined by {by}.{suffix}",
+        text=f"Plan {plan['id']} revision {plan['revision']} declined{_in_out_suffix(plan)}.{suffix}",
     )
 
 
@@ -829,24 +938,28 @@ def _confirm(plan, now, gate):
     revision = plan["revision"]
     fingerprint = plan["fingerprint"]
     content = copy.deepcopy(plan["content"])
+    in_voters = _yes_voters(plan)
     plan["status"] = "confirmed"
     plan["candidate_declined"] = False
     plan["confirmed"] = {
         "revision": revision,
         "fingerprint": fingerprint,
         "content": copy.deepcopy(content),
+        "in": in_voters,
         "at": now.isoformat(),
     }
     plan["updated_at"] = now.timestamp()
     action = "update" if previous else "create"
-    _job(
-        plan,
-        f"calendar-{action}-{revision}-{fingerprint[:8]}",
-        "calendar",
-        action=action,
-        uid=plan["uid"],
-        content=copy.deepcopy(content),
-    )
+    if gate.person in in_voters:
+        # Only participants who voted yes receive a calendar event.
+        _job(
+            plan,
+            f"calendar-{action}-{revision}-{fingerprint[:8]}",
+            "calendar",
+            action=action,
+            uid=plan["uid"],
+            content=copy.deepcopy(content),
+        )
     _job(
         plan,
         f"home-confirmed-{revision}-{fingerprint[:8]}",
@@ -864,12 +977,12 @@ def _confirm(plan, now, gate):
         )
 
 
-def _cancel_plan(plan, by, now):
+def _cancel_plan(plan, by, now, gate):
     plan["status"] = "cancelled"
     plan["cancelled"] = {"by": by, "at": now.isoformat()}
     plan["updated_at"] = now.timestamp()
     confirmed = plan.get("confirmed")
-    if confirmed:
+    if confirmed and gate.person in _confirmed_in(plan):
         _job(
             plan,
             f"calendar-cancel-{confirmed['revision']}-{confirmed['fingerprint'][:8]}",
@@ -909,11 +1022,49 @@ def _expire(plan, gate, now):
     return True
 
 
-def _all_yes(plan):
-    return all(
-        plan.get("votes", {}).get(participant, {}).get("vote") is True
+def _yes_voters(plan):
+    return [
+        participant
         for participant in plan["participants"]
-    )
+        if plan.get("votes", {}).get(participant, {}).get("vote") is True
+    ]
+
+
+def _no_voters(plan):
+    return [
+        participant
+        for participant in plan["participants"]
+        if plan.get("votes", {}).get(participant, {}).get("vote") is False
+    ]
+
+
+def _no_count(plan):
+    return len(_no_voters(plan))
+
+
+def _min_yes_of(plan):
+    return plan.get("min_yes", len(plan["participants"]))
+
+
+def _quorum_reached(plan):
+    """Every participant has voted and enough of them said yes."""
+    votes = plan.get("votes", {})
+    return all(participant in votes for participant in plan["participants"]) and len(
+        _yes_voters(plan)
+    ) >= _min_yes_of(plan)
+
+
+def _unreachable(plan):
+    """Too many no votes for ``min_yes`` to ever be reached."""
+    return _no_count(plan) > len(plan["participants"]) - _min_yes_of(plan)
+
+
+def _confirmed_in(plan):
+    """The participants who had a confirmed event (all of them before quorum)."""
+    confirmed = plan.get("confirmed")
+    if not confirmed:
+        return []
+    return confirmed.get("in", list(plan.get("participants", [])))
 
 
 def _waiting(plan):
@@ -922,6 +1073,21 @@ def _waiting(plan):
         for participant in plan["participants"]
         if participant not in plan.get("votes", {})
     ]
+
+
+def _vote_transition(plan, voter, value, now, gate):
+    """After recording ``voter``'s vote, decline/confirm or return a wait notice."""
+    if _unreachable(plan):
+        _decline(plan, voter, now, gate)
+        return None
+    if _quorum_reached(plan):
+        _confirm(plan, now, gate)
+        return None
+    if value:
+        return f"Plan {plan['id']}: {voter} voted yes. Waiting for {', '.join(_waiting(plan))}."
+    return (
+        f"Plan {plan['id']}: {voter} voted no and is out. Waiting for {', '.join(_waiting(plan))}."
+    )
 
 
 # --- durable outbox ---------------------------------------------------------
@@ -1004,23 +1170,55 @@ def _job(plan, key, kind, **payload):
 
 
 def _card(content):
-    return f'{content["start"]} {content["minutes"]}m "{content["title"]}" @ "{content["place"]}"'
+    text = f'{content["start"]} {content["minutes"]}m "{content["title"]}" @ "{content["place"]}"'
+    if content.get("notes"):
+        text += f' notes "{content["notes"]}"'
+    return text
+
+
+def _quorum_text(participants, min_yes):
+    if min_yes < len(participants):
+        return f"needs {min_yes} of {len(participants)} yes votes."
+    return "every participant must approve before the calendar changes."
+
+
+def _in_out_suffix(plan):
+    yes = sorted(_yes_voters(plan))
+    no = sorted(_no_voters(plan))
+    parts = []
+    if yes:
+        parts.append("in: " + ", ".join(yes))
+    if no:
+        parts.append("out: " + ", ".join(no))
+    return " (" + "; ".join(parts) + ")" if parts else ""
 
 
 def _drafted_text(plan, token):
     return (
         f"Plan {plan['id']} drafted: {_card(plan['content'])} · with "
-        f"{', '.join(plan['participants'])} · token {token} · every participant must vote."
+        f"{', '.join(plan['participants'])} · {_quorum_text(plan['participants'], _min_yes_of(plan))}"
+        f" · token {token}"
     )
 
 
 def _confirmed_text(plan):
-    labels = " · ".join(
+    yes = sorted(_yes_voters(plan))
+    no = sorted(_no_voters(plan))
+    labels = []
+    if yes:
+        labels.append("In: " + _vote_labels(plan, yes))
+    if no:
+        labels.append("Out: " + ", ".join(person.title() for person in no))
+    suffix = " · " + " · ".join(labels) if labels else ""
+    return f"✅ Plan {plan['id']}: {_card(plan['content'])}{suffix}"
+
+
+def _vote_labels(plan, people):
+    return ", ".join(
         f"{person.title()} ✅ "
         + ("via agent" if plan["votes"][person].get("via") == "via-agent" else "direct")
-        for person in sorted(plan.get("votes", {}))
+        for person in people
     )
-    return f"✅ Plan {plan['id']}: {_card(plan['content'])} · {labels}"
 
 
 def _offer_text(plan, sender):
@@ -1034,6 +1232,8 @@ def _offer_text(plan, sender):
         "participants": list(plan["participants"]),
         "content": copy.deepcopy(plan["content"]),
     }
+    if _min_yes_of(plan) < len(plan["participants"]):
+        payload["min_yes"] = _min_yes_of(plan)
     if plan.get("tokens"):
         payload["token"] = plan["tokens"][0]
     return _json(payload)
@@ -1053,6 +1253,8 @@ def _vote_text(plan, voter, value, via):
         "vote": value,
         "via": via,
     }
+    if _min_yes_of(plan) < len(plan["participants"]):
+        payload["min_yes"] = _min_yes_of(plan)
     if plan.get("tokens"):
         payload["token"] = plan["tokens"][0]
     return _json(payload)
@@ -1070,10 +1272,28 @@ def _cancel_text(plan, by, reason):
         "content": copy.deepcopy(plan["content"]),
         "coordinator": plan["coordinator"],
     }
+    if _min_yes_of(plan) < len(plan["participants"]):
+        payload["min_yes"] = _min_yes_of(plan)
     if plan.get("tokens"):
         payload["token"] = plan["tokens"][0]
     if isinstance(reason, str) and reason.strip():
         payload["reason"] = reason.strip()[:200]
+    return _json(payload)
+
+
+def _remove_text(plan, sender, removed):
+    payload = {
+        "action": "remove",
+        "from": sender,
+        "coordinator": plan["coordinator"],
+        "plan": plan["id"],
+        "revision": plan["revision"],
+        "fingerprint": plan["fingerprint"],
+        "participants": list(plan["participants"]),
+        "removed": list(removed),
+    }
+    if plan.get("tokens"):
+        payload["token"] = plan["tokens"][0]
     return _json(payload)
 
 
@@ -1150,6 +1370,60 @@ def _check_participants(gate, participants):
             raise PlanError(f"{peer}'s gate identity does not match")
 
 
+def _min_yes(value, participants):
+    """Parse the minimum-yes quorum; ``None`` is the unanimous default."""
+    count = len(participants)
+    if value is None:
+        return count
+    if isinstance(value, bool) or not isinstance(value, int) or not 2 <= value <= count:
+        raise PlanError(f"min_yes must be an integer between 2 and {count}")
+    return value
+
+
+def _person_list(value, label="person"):
+    if not isinstance(value, list) or not value:
+        raise PlanError(f"{label}s are required")
+    names: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise PlanError(f"each {label} must be a person name")
+        key = item.strip().lower()
+        if not _PERSON_RE.fullmatch(key):
+            raise PlanError(f"invalid {label} {key!r}")
+        if key not in names:
+            names.append(key)
+    return sorted(names)
+
+
+async def _check_peer_capability(gate, peers, *, needed):
+    """Refuse to send new-feature plans to peers whose gates lack the capability.
+
+    A peer that has never said hello may well support it: greet it and ask for a
+    retry, since its reply is handled after this request returns.
+    """
+    if not needed:
+        return
+    unknown = [peer for peer in peers if handshake.peer(gate.person, peer) is None]
+    for peer in unknown:
+        await handshake.greet(gate, peer)
+    if unknown:
+        raise PlanError(
+            f"said hello to {', '.join(unknown)}'s gate to check for {handshake.GROUP_PLANS}; "
+            "send the same request again in a few seconds"
+        )
+    missing = [
+        peer
+        for peer in peers
+        if handshake.GROUP_PLANS
+        not in (handshake.peer(gate.person, peer) or {}).get("capabilities", [])
+    ]
+    if missing:
+        raise PlanError(
+            f"{', '.join(missing)}'s gate does not advertise {handshake.GROUP_PLANS}; "
+            "it cannot join a plan that uses min_yes, notes or participant removal"
+        )
+
+
 def _content(value, now, *, future=True):
     if not isinstance(value, dict):
         raise PlanError("a plan content object is required")
@@ -1182,12 +1456,26 @@ def _content(value, now, *, future=True):
     place = place.strip()
     if not place or len(place) > MAX_PLACE or not _PLACE_RE.fullmatch(place):
         raise PlanError("place must be 1 to 60 letters, digits, spaces or , . ' & -")
-    return {
+    result = {
         "start": start.isoformat(),
         "minutes": minutes,
         "title": title,
         "place": place,
     }
+    notes = value.get("notes")
+    if notes is not None:
+        if not isinstance(notes, str):
+            raise PlanError("notes must be a string")
+        if "\n" in notes or "\r" in notes:
+            raise PlanError("notes must be one line")
+        notes = " ".join(notes.split())
+        if notes:
+            if len(notes) > MAX_NOTES:
+                raise PlanError(f"notes must be at most {MAX_NOTES} characters")
+            if '"' in notes:
+                raise PlanError("notes cannot contain a double quote")
+            result["notes"] = notes
+    return result
 
 
 def _is_self_voter(value, person):
@@ -1233,13 +1521,18 @@ def _hex(value):
     return value.strip().lower()
 
 
-def _fingerprint(plan_id, revision, participants, content):
+def _fingerprint(plan_id, revision, participants, content, min_yes=None):
     payload = {
         "plan": plan_id,
         "revision": revision,
         "participants": sorted(participants),
         "content": content,
     }
+    # New fields join the fingerprint only when they are used, so plans that
+    # rely on none of them keep today's byte-identical fingerprints. ``notes``
+    # already travels inside ``content`` and is absent when unused.
+    if min_yes is not None and min_yes < len(participants):
+        payload["min_yes"] = min_yes
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(encoded.encode()).hexdigest()
 

@@ -178,7 +178,15 @@ async def build_world(
     """
     everyone = (*people, *strangers)
     for person in people:
-        shutil.copytree(ROOT / "examples" / person, tmp_path / person)
+        if (ROOT / "examples" / person).is_dir():
+            shutil.copytree(ROOT / "examples" / person, tmp_path / person)
+            continue
+        (tmp_path / person).mkdir()
+        (tmp_path / person / "calendar.ics").touch()
+        (tmp_path / person / FACTS_FILENAME).write_text("calendar: ./calendar.ics\nfacts: {}\n")
+        (tmp_path / person / TRUST_FILENAME).write_text(
+            "people: {}\nconsent:\n  default: via-agent\n"
+        )
     for person, levels in (trust or {}).items():
         path = tmp_path / person / TRUST_FILENAME
         data = yaml.safe_load(path.read_text())

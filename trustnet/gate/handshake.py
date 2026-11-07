@@ -19,6 +19,13 @@ from trustnet.gate.facts import resolve_data_dir
 
 PROTOCOL = "trust-network/1"
 MAJOR = 1
+#: Capability a gate advertises once it supports the extended group-plan
+#: lifecycle: a minimum-yes quorum, plan ``notes``, and dropping participants in
+#: a revision. Peers that do not advertise it must not receive plans that use
+#: any of those three features. The name matches the hello grammar (lower-case
+#: words and hyphens only, no digits).
+GROUP_PLANS = "group-plans"
+
 #: Gate-to-gate commands this gate accepts from a peer gate.
 CAPABILITIES = (
     "hello",
@@ -31,6 +38,7 @@ CAPABILITIES = (
     "ask-around",
     "gift-ideas",
     "claim",
+    GROUP_PLANS,
 )
 
 
@@ -83,6 +91,29 @@ async def say(gate, room, friend) -> None:
     gate.hellos.add(room)
     await gate.client.connect_to_room(room)
     await gate.client.post_message(line(friend))
+
+
+async def greet(gate, friend) -> None:
+    """Say hello to ``friend``'s gate in the pair's connection room, creating it if needed."""
+    client, person = gate.client, gate.person
+    name = "conn-" + "-".join(sorted((person, friend)))
+    detail = await client.get_agent_detail(client.agent_id)
+    room = next(
+        (
+            r["room_id"]
+            for r in detail.get("rooms", [])
+            if r["room_name"] == name and not r.get("archived")
+        ),
+        None,
+    )
+    if room is None:
+        result = await client.create_room(
+            name, "Gate connection", [person + "-gate"], internal_only=True
+        )
+        room = result.get("room_id", result.get("id"))
+        await client.connect_to_room(room)
+        await client.invite_agent_to_room(room, friend + "-gate")
+    await say(gate, room, friend)
 
 
 async def handle(gate, event, command: c.Hello, sender) -> None:

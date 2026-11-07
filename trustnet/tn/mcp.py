@@ -211,16 +211,34 @@ def build(person: str) -> MCPServer:
         return {"token": await _call(plans.request, person, action, **payload)}
 
     @server.tool(
-        description="Draft one plan for an event, including everyone taking part, whatever the number. All participants must trust each other; everyone must approve. Only create the plan when your own person asked for it; if another agent started it, let that side create it. Use existing calendar tools to establish availability first. This submits a draft, not consent."
+        description=(
+            "Draft one plan for an event, including everyone taking part, whatever the "
+            "number. All participants must trust each other; every participant must vote. "
+            "Only create the plan when your own person asked for it; if another agent "
+            "started it, let that side create it. Set min_yes below the number of "
+            "participants when the event can go ahead without everyone (for example a "
+            "game that needs 6 of 8 players); a no then means that person is out and gets "
+            "no calendar event. Add a one-line notes field (at most 140 characters) for "
+            "something everyone must agree to, such as a cost split. Use existing calendar "
+            "tools to establish availability first. This submits a draft, not consent."
+        )
     )
     async def group_plan_create(
-        participants: list[str], start: str, minutes: int, title: str, place: str
+        participants: list[str],
+        start: str,
+        minutes: int,
+        title: str,
+        place: str,
+        min_yes: int | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any]:
-        return await plan_call(
-            "create",
-            participants=participants,
-            content={"start": start, "minutes": minutes, "title": title, "place": place},
-        )
+        content = {"start": start, "minutes": minutes, "title": title, "place": place}
+        if notes is not None:
+            content["notes"] = notes
+        payload: dict[str, Any] = {"participants": participants, "content": content}
+        if min_yes is not None:
+            payload["min_yes"] = min_yes
+        return await plan_call("create", **payload)
 
     @server.tool(
         description="Relay your person's explicit yes or no for the exact group-plan revision and fingerprint they reviewed. Vote only after your person has seen that plan's exact reference, time, place and participants and said yes to it; a general go-ahead is not a vote. Never supply consent for them or bind an old yes to a changed plan."
@@ -233,7 +251,16 @@ def build(person: str) -> MCPServer:
         )
 
     @server.tool(
-        description="The organizer drafts a replacement for the exact current revision. The existing confirmed event remains until everyone approves the replacement. Preserve participants; ask the organizer to revise if you are another participant."
+        description=(
+            "The organizer drafts a replacement for the exact current revision. The "
+            "existing confirmed event remains until the replacement is approved. Pass a "
+            "strict subset of the current participants (still including your person, at "
+            "least two people) to drop participants; dropped people are notified and, if "
+            "the plan was confirmed for them, get a calendar cancellation for the same "
+            "event. min_yes defaults to the current plan; notes, when given, is part of "
+            "what everyone re-approves. Ask the organizer to revise if you are another "
+            "participant."
+        )
     )
     async def group_plan_revise(
         reference: str,
@@ -243,14 +270,24 @@ def build(person: str) -> MCPServer:
         minutes: int,
         title: str,
         place: str,
+        participants: list[str] | None = None,
+        min_yes: int | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any]:
-        return await plan_call(
-            "revise",
-            plan=reference,
-            revision=revision,
-            fingerprint=fingerprint,
-            content={"start": start, "minutes": minutes, "title": title, "place": place},
-        )
+        content = {"start": start, "minutes": minutes, "title": title, "place": place}
+        if notes is not None:
+            content["notes"] = notes
+        payload: dict[str, Any] = {
+            "plan": reference,
+            "revision": revision,
+            "fingerprint": fingerprint,
+            "content": content,
+        }
+        if participants is not None:
+            payload["participants"] = participants
+        if min_yes is not None:
+            payload["min_yes"] = min_yes
+        return await plan_call("revise", **payload)
 
     @server.tool(
         description="Cancel the exact current group-plan revision after your person explicitly requests cancellation. Every participant is notified and receives a calendar cancellation task for the same provider event."
