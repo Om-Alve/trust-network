@@ -252,7 +252,7 @@ Three capabilities change what this gate sends:
 - `counter`: a counter proposal is sent only to a peer that advertised it.
 - `join-ask`: `ask` uses a quiet `ask-` room unless the peer said hello without
   advertising it, in which case it falls back to a planning DM.
-- `group-plans`: a group plan that uses `min_yes`, `notes` or participant
+- `group-plans`: a group plan that uses `min_yes`, `notes`, `weekly` or participant
   removal is sent only when every peer advertised it. A peer that never said
   hello is greeted in its `conn-` room first, and the request is refused with
   "send the same request again in a few seconds" so the retry finds its answer.
@@ -732,8 +732,10 @@ it declines as soon as the no votes make `min_yes` unreachable. A no marks that
 participant out: calendar operations are queued only for yes voters, and the
 confirmation and status list who is in and who is out. Content may carry a
 one-line `notes` field (at most 140 characters, no double quote or line break),
-such as a cost split, which everyone approves and every card shows. `min_yes`
-and `notes` join the fingerprint only when used, so plans that use neither keep
+such as a cost split, which everyone approves and every card shows. A `weekly`
+count (2 to 12) makes the plan a series of that many weekly occurrences: one
+approval, one calendar task, and one repeating event (`RRULE:FREQ=WEEKLY;COUNT=n`
+in local ICS). `min_yes`, `notes` and `weekly` join the fingerprint only when used, so plans that use neither keep
 byte-identical fingerprints. A create that repeats a still-pending plan with the
 same participants, content and `min_yes` reuses that plan and its room.
 

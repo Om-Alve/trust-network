@@ -107,7 +107,9 @@ single get-together into several proposals.
    returned token's status to find the plan ID. If the event can go ahead
    without everyone (a game that needs 6 of 8 players), set `min_yes`: a no then
    means that person is out, not that the plan dies. Put anything everyone must
-   agree to, such as a cost split, in the one-line `notes`. The organizer can
+   agree to, such as a cost split, in the one-line `notes`. A repeating event
+   (a weekly game) is one plan with `weekly` set to the number of weeks; never
+   add the other dates to anyone's calendar yourself. The organizer can
    drop someone in `group_plan_revise` by passing the smaller `participants`
    list; they get a cancellation if the event was already on their calendar.
 3. Read `group_plan_status` before talking in the group room. Its `sharing` map

@@ -386,7 +386,7 @@ async def _create(gate, payload):
     peers = [peer for peer in participants if peer != person]
     await _check_organizer(gate, peers)
     await _check_peer_capability(
-        gate, peers, needed=min_yes < len(participants) or "notes" in content
+        gate, peers, needed=min_yes < len(participants) or _extended(content)
     )
     plan_id = _new_id(state, person, token)
     revision = 1
@@ -518,7 +518,7 @@ async def _revise(gate, payload):
     await _check_peer_capability(
         gate,
         peers + removed,
-        needed=(min_yes < len(participants)) or ("notes" in content) or bool(removed),
+        needed=(min_yes < len(participants)) or _extended(content) or bool(removed),
     )
 
     revision = int(plan["revision"]) + 1
@@ -1173,8 +1173,14 @@ def _job(plan, key, kind, **payload):
 # --- rendering --------------------------------------------------------------
 
 
+def _extended(content):
+    return "notes" in content or "weekly" in content
+
+
 def _card(content):
     text = f'{content["start"]} {content["minutes"]}m "{content["title"]}" @ "{content["place"]}"'
+    if content.get("weekly"):
+        text += f" weekly x{content['weekly']}"
     if content.get("notes"):
         text += f' notes "{content["notes"]}"'
     return text
@@ -1464,7 +1470,7 @@ async def _check_peer_capability(gate, peers, *, needed):
     if missing:
         raise PlanError(
             f"{', '.join(missing)}'s gate does not advertise {handshake.GROUP_PLANS}; "
-            "it cannot join a plan that uses min_yes, notes or participant removal"
+            "it cannot join a plan that uses min_yes, notes, weekly or participant removal"
         )
 
 
@@ -1519,6 +1525,11 @@ def _content(value, now, *, future=True):
             if '"' in notes:
                 raise PlanError("notes cannot contain a double quote")
             result["notes"] = notes
+    weekly = value.get("weekly")
+    if weekly is not None:
+        if isinstance(weekly, bool) or not isinstance(weekly, int) or not 2 <= weekly <= 12:
+            raise PlanError("weekly must be a number of weekly occurrences from 2 to 12")
+        result["weekly"] = weekly
     return result
 
 

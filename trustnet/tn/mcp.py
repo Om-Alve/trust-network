@@ -237,7 +237,9 @@ def build(person: str) -> MCPServer:
             "participants when the event can go ahead without everyone (for example a "
             "game that needs 6 of 8 players); a no then means that person is out and gets "
             "no calendar event. Add a one-line notes field (at most 140 characters) for "
-            "something everyone must agree to, such as a cost split. Use existing calendar "
+            "something everyone must agree to, such as a cost split. For a repeating event "
+            "(a weekly game), set weekly to the number of weekly occurrences instead of "
+            "creating one plan per week or adding the other dates yourself. Use existing calendar "
             "tools to establish availability first. This submits a draft, not consent."
         )
     )
@@ -249,10 +251,13 @@ def build(person: str) -> MCPServer:
         place: str,
         min_yes: int | None = None,
         notes: str | None = None,
+        weekly: int | None = None,
     ) -> dict[str, Any]:
         content = {"start": start, "minutes": minutes, "title": title, "place": place}
         if notes is not None:
             content["notes"] = notes
+        if weekly is not None:
+            content["weekly"] = weekly
         payload: dict[str, Any] = {"participants": participants, "content": content}
         if min_yes is not None:
             payload["min_yes"] = min_yes
@@ -291,10 +296,13 @@ def build(person: str) -> MCPServer:
         participants: list[str] | None = None,
         min_yes: int | None = None,
         notes: str | None = None,
+        weekly: int | None = None,
     ) -> dict[str, Any]:
         content = {"start": start, "minutes": minutes, "title": title, "place": place}
         if notes is not None:
             content["notes"] = notes
+        if weekly is not None:
+            content["weekly"] = weekly
         payload: dict[str, Any] = {
             "plan": reference,
             "revision": revision,

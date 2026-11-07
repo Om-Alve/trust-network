@@ -182,11 +182,24 @@ def put_event(
     title: str,
     place: str,
     uid: str,
+    weekly: int | None = None,
 ) -> Block:
-    """Create or replace the event ``uid`` in ``path`` with exactly these details."""
+    """Create or replace the event ``uid`` in ``path`` with exactly these details.
+
+    ``weekly`` repeats it that many times, one week apart.
+    """
     path = Path(path)
     remove_event(path, uid)
-    return add_event(path, start, duration, title, place, uid=uid)
+    block = add_event(path, start, duration, title, place, uid=uid)
+    if weekly:
+        with path.with_suffix(".lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            calendar = _load(path)
+            _find_event(calendar, uid).add("RRULE", {"FREQ": "WEEKLY", "COUNT": int(weekly)})
+            from trustnet.gate.storage import atomic_write
+
+            atomic_write(path, calendar.to_ical())
+    return block
 
 
 def remove_event(path: str | Path, uid: str) -> bool:

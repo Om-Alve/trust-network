@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+import recurring_ical_events
 from icalendar import Calendar
 
 from trustnet.gate import calendar_jobs, consent
@@ -128,6 +129,22 @@ async def local_calendar_apply(h):
     await server.call_tool("cal_apply", {"token": cancel["token"]})
     assert events(uid) == []
     assert len(events("mine")) == 1
+
+    # A weekly series is one approved task and one event repeating four times.
+    series = {**plan, "weekly": 4}
+    weekly = calendar_jobs.queue("om", "gp-series", series, uid="trustnet-group-gp-series")
+    await server.call_tool("cal_apply", {"token": weekly["token"]})
+    window = (
+        datetime.fromisoformat("2026-11-12T00:00:00+00:00"),
+        datetime.fromisoformat("2026-12-10T00:00:00+00:00"),
+    )
+    occurrences = recurring_ical_events.of(Calendar.from_ical(path.read_bytes())).between(*window)
+    starts = [
+        e.decoded("DTSTART").date().isoformat()
+        for e in occurrences
+        if str(e.get("UID")) == "trustnet-group-gp-series"
+    ]
+    assert starts == ["2026-11-12", "2026-11-19", "2026-11-26", "2026-12-03"]
     assert calendar_jobs.pending("om") == []
     h.trace.append("Local ICS create, update and cancel applied by the gate with receipts")
 

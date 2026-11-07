@@ -71,6 +71,8 @@ Quorum, notes and participant removal
 29. An agent invited into a friend's planning room creates the group plan and
     becomes organizer, although the friend's person asked for the plan; or the
     invitee can never organize later even when its own person asks.
+30. A weekly series needs one plan per week (agents improvised extra events
+    outside approval), or an out-of-range repeat count is accepted.
 """
 
 from __future__ import annotations
@@ -989,6 +991,25 @@ async def first_quorum_plan_greets_unknown_peers(root, monkeypatch):
     assert _plan("rahul", created[0]["id"])["min_yes"] == 2
 
 
+async def weekly_series_is_one_plan(root, monkeypatch):
+    world = await _world(
+        root, monkeypatch, people=("om", "rahul"), trust=_full_trust(("om", "rahul"))
+    )
+    _advertise(world, "om", ["rahul"])
+
+    # 30. A weekly count outside 2..12 is refused; a valid one is one plan that
+    # every participant holds and approves, and the calendar task carries it.
+    await plans.request("om", "create", participants=["rahul"], content=dict(CONTENT, weekly=13))
+    await world.settle()
+    assert not _state("om")["plans"]
+    _, plan = await _create(world, participants=("rahul",), content=dict(CONTENT, weekly=4))
+    assert _plan("rahul", plan["id"])["content"]["weekly"] == 4
+    for person in ("om", "rahul"):
+        await _vote(world, person, plan["id"])
+    booked = _calls(world, plan["id"], "create")
+    assert {call["plan"]["weekly"] for call in booked} == {4}
+
+
 async def invitee_cannot_take_over_as_organizer(root, monkeypatch):
     world = await _world(root, monkeypatch)
     await world.start()
@@ -1080,6 +1101,7 @@ SCENARIOS = [
     duplicate_create_reuses_plan,
     extended_features_require_capability,
     first_quorum_plan_greets_unknown_peers,
+    weekly_series_is_one_plan,
     invitee_cannot_take_over_as_organizer,
     fingerprint_backward_compatible,
 ]

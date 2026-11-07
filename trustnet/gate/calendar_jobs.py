@@ -108,7 +108,13 @@ def apply_local(person, token):
     else:
         start = datetime.fromisoformat(plan["start"])
         put_event(
-            path, start, int(plan["minutes"]), plan["title"], plan.get("place", ""), item["uid"]
+            path,
+            start,
+            int(plan["minutes"]),
+            plan["title"],
+            plan.get("place", ""),
+            item["uid"],
+            weekly=plan.get("weekly"),
         )
     return report(person, token, "applied", "local-ics", item["uid"])
 
