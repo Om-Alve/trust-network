@@ -19,6 +19,13 @@ from trustnet.gate.facts import resolve_data_dir
 
 PROTOCOL = "trust-network/1"
 MAJOR = 1
+#: Capability a gate advertises once it supports the extended group-plan
+#: lifecycle: a minimum-yes quorum, plan ``notes``, and dropping participants in
+#: a revision. Peers that do not advertise it must not receive plans that use
+#: any of those three features. The name matches the hello grammar (lower-case
+#: words and hyphens only, no digits).
+GROUP_PLANS = "group-plans"
+
 #: Gate-to-gate commands this gate accepts from a peer gate.
 CAPABILITIES = (
     "hello",
@@ -31,6 +38,7 @@ CAPABILITIES = (
     "ask-around",
     "gift-ideas",
     "claim",
+    GROUP_PLANS,
 )
 
 

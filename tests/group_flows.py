@@ -43,6 +43,29 @@ Cancellation and timing
 15. A late vote after cancellation, decline or expiry changes the state.
 16. Human replies that take days are rejected by a 30-minute planning window;
     an unanswered plan instead expires only after the multi-day window.
+
+Quorum, notes and participant removal
+17. ``min_yes`` outside 2..len(participants) is accepted, or crashes dispatch.
+18. A plan confirms before every participant has voted (quorum reached early).
+19. A ``no`` vote that leaves ``min_yes`` still reachable kills the plan anyway.
+20. A plan whose ``min_yes`` became unreachable stays pending instead of
+    declining, or declines when it was still reachable.
+21. Calendar events are queued for a participant who voted no, or omitted for a
+    participant who voted yes; a no voter still receives a cancellation.
+22. ``min_yes`` or ``notes`` enters the fingerprint when unused, so stored plans
+    and older peer gates stop matching; or is omitted when actually used.
+23. A peer that lacks the ``group-plans`` capability still receives a plan that
+    uses ``min_yes``, ``notes`` or participant removal.
+24. ``notes`` longer than 140 characters, containing a double quote or a line
+    break, or an empty string, is accepted.
+25. A notes-only revision is treated as "changes nothing", or a changed note
+    does not clear the votes and require fresh consent.
+26. Dropping a participant in a revision does not tell the removed gate, ends
+    its copy with no cancellation for a confirmed event, or cancels an event the
+    removed person never had; a non-organizer, an added participant, or dropping
+    the organizer is accepted.
+27. A duplicate create (same participants and content, new token) opens a second
+    room and plan, or reuses a plan that is no longer pending.
 """
 
 from __future__ import annotations
@@ -84,6 +107,40 @@ DEFAULT_TRUST = {
     "rahul": {"om": "close", "priya": "friend"},
     "priya": {"om": "friend", "rahul": "friend"},
 }
+
+#: Eight friends planning together; om is the organizer.
+PEOPLE_8 = ("om", "rahul", "priya", "kabir", "ananya", "isha", "rohan", "arjun")
+
+
+def _full_trust(people):
+    """Everyone trusts everyone else at ``friend`` level."""
+    return {person: {other: "friend" for other in people if other != person} for person in people}
+
+
+def _advertise(world, person, peers, *, capabilities=None):
+    """Record that ``person``'s gate completed a hello with each peer's gate.
+
+    Group plans do not open ``conn-`` rooms, so the handshake (which the
+    organizer's gate reads to check the ``group-plans`` capability) is seeded
+    directly, exactly as ``hello`` would after a pairwise exchange.
+    """
+    from trustnet.gate import handshake
+    from trustnet.gate.facts import resolve_data_dir
+
+    caps = list(capabilities) if capabilities is not None else list(handshake.CAPABILITIES)
+    state = handshake.load(person)
+    for peer in peers:
+        state[peer] = {
+            "protocol": "trust-network/1",
+            "major": 1,
+            "capabilities": caps,
+            "room": "conn-" + "-".join(sorted((person, peer))),
+            "at": "2026-11-05T12:00:00+00:00",
+        }
+    path = resolve_data_dir(person) / "peers.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state))
+
 
 #: Set by the most recent scenario so the artifact runner can dump it.
 LAST_WORLD = None
@@ -154,13 +211,16 @@ def _calls(world, ref=None, action=None):
     ]
 
 
-async def _create(world, person="om", *, participants=("rahul", "priya"), content=None):
-    token = await plans.request(
-        person,
-        "create",
-        participants=list(participants),
-        content=content or CONTENT,
-    )
+async def _create(
+    world, person="om", *, participants=("rahul", "priya"), content=None, min_yes=None, notes=None
+):
+    payload_content = dict(content or CONTENT)
+    if notes is not None:
+        payload_content["notes"] = notes
+    request = {"participants": list(participants), "content": payload_content}
+    if min_yes is not None:
+        request["min_yes"] = min_yes
+    token = await plans.request(person, "create", **request)
     await world.settle()
     plan = _plan(person, token)
     assert plan is not None, _state(person)
@@ -690,6 +750,249 @@ async def interrupted_room_creation(root, monkeypatch):
     assert plans.status("om", token)["id"] == plans.status("rahul", token)["id"]
 
 
+async def quorum_confirms_with_nos(root, monkeypatch):
+    people = PEOPLE_8
+    world = await _world(root, monkeypatch, people=people, trust=_full_trust(people))
+    _advertise(world, "om", [p for p in people if p != "om"])
+    _, plan = await _create(world, participants=list(people[1:]), min_yes=6)
+    plan_id = plan["id"]
+    assert plan["min_yes"] == 6
+    assert group_plans.status("om", plan_id)["min_yes"] == 6
+
+    # 19. Two no votes leave min_yes reachable, so the plan stays pending.
+    for person in ("rohan", "arjun"):
+        await _vote(world, person, plan_id, value="no")
+        assert _plan("om", plan_id)["status"] == "pending"
+
+    # 18/21. The other six vote yes; the plan confirms only once every vote is in.
+    for person in people:
+        if person in ("rohan", "arjun"):
+            continue
+        await _vote(world, person, plan_id)
+
+    yes = sorted(p for p in people if p not in ("rohan", "arjun"))
+    for person in people:
+        current = _plan(person, plan_id)
+        assert current["status"] == "confirmed"
+        assert sorted(current["confirmed"]["in"]) == yes
+    # 21. Calendar tasks only for the six yes voters, never for the no voters.
+    booked = _calls(world, plan_id, "create")
+    assert {call["person"] for call in booked} == set(yes)
+    assert len(booked) == 6
+    assert {call["uid"] for call in booked} == {f"trustnet-group-{plan_id}"}
+    # The confirmation and status show who is in and who is out.
+    status = group_plans.status("om", plan_id)
+    assert sorted(status["in"]) == yes
+    assert sorted(status["out"]) == ["arjun", "rohan"]
+    home = "\n".join(world.home_bodies("om"))
+    assert "In: " in home and "Out: " in home
+
+
+async def quorum_declines_unreachable(root, monkeypatch):
+    people = PEOPLE_8
+    world = await _world(root, monkeypatch, people=people, trust=_full_trust(people))
+    _advertise(world, "om", [p for p in people if p != "om"])
+
+    # 17. min_yes outside 2..len(participants) is refused.
+    for bad in (1, 9):
+        await plans.request(
+            "om", "create", participants=list(people[1:]), content=CONTENT, min_yes=bad
+        )
+        await world.settle()
+        assert not _state("om")["plans"]
+
+    _, plan = await _create(world, participants=list(people[1:]), min_yes=6)
+    plan_id = plan["id"]
+
+    # 20. Two no votes are still reachable; the third makes six yes impossible.
+    for person in ("rohan", "arjun"):
+        await _vote(world, person, plan_id, value="no")
+        assert _plan("om", plan_id)["status"] == "pending"
+    await _vote(world, "isha", plan_id, value="no")
+    for person in people:
+        assert _plan(person, plan_id)["status"] == "declined"
+        assert _plan(person, plan_id)["candidate_declined"] is True
+    assert not _calls(world, plan_id)
+
+
+async def revise_drops_participant(root, monkeypatch):
+    people = ("om", "rahul", "priya")
+    world = await _world(root, monkeypatch, people=people, trust=_full_trust(people))
+    _advertise(world, "om", ["rahul", "priya"])
+    _, plan = await _create(world, participants=("rahul", "priya"))
+    plan_id = plan["id"]
+    for person in people:
+        await _vote(world, person, plan_id)
+    assert len(_calls(world, plan_id, "create")) == 3
+
+    # 26. The organizer drops priya; om and rahul continue, priya is removed.
+    current = _plan("om", plan_id)
+    await plans.request(
+        "om",
+        "revise",
+        plan=plan_id,
+        revision=current["revision"],
+        fingerprint=current["fingerprint"],
+        participants=["om", "rahul"],
+        content=CONTENT,
+    )
+    await world.settle()
+    for person in ("om", "rahul"):
+        cur = _plan(person, plan_id)
+        assert cur["revision"] == 2
+        assert cur["participants"] == ["om", "rahul"]
+        assert cur["status"] == "pending"
+        assert cur["votes"] == {}
+    priya = _plan("priya", plan_id)
+    assert priya["status"] == "removed"
+    assert priya["removed"]["by"] == "om"
+    cancelled = _calls(world, plan_id, "cancel")
+    assert {call["person"] for call in cancelled} == {"priya"}
+    assert {call["uid"] for call in cancelled} == {f"trustnet-group-{plan_id}"}
+
+    # om and rahul still approve the replacement.
+    for person in ("om", "rahul"):
+        await _vote(world, person, plan_id)
+    updates = _calls(world, plan_id, "update")
+    assert {call["person"] for call in updates} == {"om", "rahul"}
+
+
+async def notes_and_fresh_votes(root, monkeypatch):
+    people = ("om", "rahul", "priya")
+    world = await _world(root, monkeypatch, people=people, trust=_full_trust(people))
+    _advertise(world, "om", ["rahul", "priya"])
+    note = "Kabir 4000, Ananya 4000, Isha 3500, Rohan 3000"
+
+    # 24. An over-long note, a note with a double quote, or a multi-line note is refused.
+    for bad in ("x" * 141, 'bad "quote"', "two\nlines"):
+        await plans.request(
+            "om", "create", participants=["rahul", "priya"], content=dict(CONTENT, notes=bad)
+        )
+        await world.settle()
+        assert not _state("om")["plans"]
+
+    _, plan = await _create(world, participants=("rahul", "priya"), notes=note)
+    plan_id = plan["id"]
+
+    # 24/notes. The note is part of every participant's status and card.
+    for person in people:
+        assert _plan(person, plan_id)["content"]["notes"] == note
+        assert group_plans.status(person, plan_id)["content"]["notes"] == note
+    for person in people:
+        await _vote(world, person, plan_id)
+    assert any(note in body for body in world.home_bodies("om"))
+
+    # 25. A changed note is a new revision that clears votes and needs fresh consent.
+    current = _plan("om", plan_id)
+    await plans.request(
+        "om",
+        "revise",
+        plan=plan_id,
+        revision=current["revision"],
+        fingerprint=current["fingerprint"],
+        content=dict(CONTENT, notes="Kabir 4000, Ananya 4000"),
+    )
+    await world.settle()
+    for person in people:
+        cur = _plan(person, plan_id)
+        assert cur["revision"] == 2
+        assert cur["status"] == "pending"
+        assert cur["votes"] == {}
+        assert cur["content"]["notes"] == "Kabir 4000, Ananya 4000"
+    assert not _calls(world, plan_id, "update")
+
+
+async def duplicate_create_reuses_plan(root, monkeypatch):
+    world = await _world(
+        root,
+        monkeypatch,
+        people=("om", "rahul", "priya"),
+        trust=_full_trust(("om", "rahul", "priya")),
+    )
+    token, plan = await _create(world, participants=("rahul", "priya"))
+    plan_id = plan["id"]
+
+    # 27. An identical create with a fresh token reuses the same plan and room.
+    token2 = await plans.request("om", "create", participants=["rahul", "priya"], content=CONTENT)
+    await world.settle()
+    assert len(_state("om")["plans"]) == 1
+    assert len(world.rooms_named("group-")) == 1
+    assert plans.status("om", token2)["id"] == plan_id
+    assert plans.status("om", token)["id"] == plan_id
+
+    # A genuinely different plan still opens a second room and plan.
+    token3 = await plans.request("om", "create", participants=["rahul", "priya"], content=CONTENT_2)
+    await world.settle()
+    assert len(_state("om")["plans"]) == 2
+    assert plans.status("om", token3)["id"] != plan_id
+
+
+async def extended_features_require_capability(root, monkeypatch):
+    world = await _world(
+        root,
+        monkeypatch,
+        people=("om", "rahul", "priya"),
+        trust=_full_trust(("om", "rahul", "priya")),
+    )
+    # rahul's gate has not advertised the extended group-plan capability.
+    _advertise(world, "om", ["rahul"], capabilities=["hello", "join-dm"])
+    _advertise(world, "om", ["priya"])
+
+    # 23. min_yes and notes are refused when any peer lacks the capability.
+    await plans.request("om", "create", participants=["rahul", "priya"], content=CONTENT, min_yes=2)
+    await world.settle()
+    assert not _state("om")["plans"]
+    await plans.request(
+        "om",
+        "create",
+        participants=["rahul", "priya"],
+        content=dict(CONTENT, notes="Kabir 4000"),
+    )
+    await world.settle()
+    assert not _state("om")["plans"]
+
+    # A plan that uses none of the new fields needs no capability.
+    token = await plans.request("om", "create", participants=["rahul", "priya"], content=CONTENT)
+    await world.settle()
+    assert len(_state("om")["plans"]) == 1
+    assert plans.status("om", token)["status"] == "pending"
+
+
+async def fingerprint_backward_compatible(root, monkeypatch):
+    import hashlib
+
+    world = await _world(
+        root,
+        monkeypatch,
+        people=("om", "rahul"),
+        trust={"om": {"rahul": "close"}, "rahul": {"om": "close"}},
+    )
+    _, plan = await _create(world, participants=("rahul",))
+
+    # 22. The pre-quorum fingerprint formula, byte for byte.
+    def legacy(plan_id, revision, participants, content):
+        payload = {
+            "plan": plan_id,
+            "revision": revision,
+            "participants": sorted(participants),
+            "content": content,
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return hashlib.sha256(encoded.encode()).hexdigest()
+
+    assert plan["fingerprint"] == legacy(
+        plan["id"], plan["revision"], plan["participants"], plan["content"]
+    )
+    # min_yes at the default is still absent; a real quorum changes the digest.
+    trio = ["om", "rahul", "priya"]
+    assert group_plans._fingerprint(plan["id"], 1, trio, plan["content"]) == legacy(
+        plan["id"], 1, trio, plan["content"]
+    )
+    assert group_plans._fingerprint(plan["id"], 1, trio, plan["content"], 2) != legacy(
+        plan["id"], 1, trio, plan["content"]
+    )
+
+
 SCENARIOS = [
     consensus_and_calendar,
     authority_and_forgery,
@@ -701,6 +1004,13 @@ SCENARIOS = [
     exact_consent_and_revision_authority,
     revoked_outbox,
     interrupted_room_creation,
+    quorum_confirms_with_nos,
+    quorum_declines_unreachable,
+    revise_drops_participant,
+    notes_and_fresh_votes,
+    duplicate_create_reuses_plan,
+    extended_features_require_capability,
+    fingerprint_backward_compatible,
 ]
 
 
