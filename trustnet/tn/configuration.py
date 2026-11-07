@@ -40,6 +40,8 @@ def checked_url(value):
         raise ValueError("Use HTTPS, or HTTP on localhost")
     if not url.hostname or url.username or url.password or url.query or url.fragment:
         raise ValueError("Server addresses cannot contain credentials, queries or fragments")
+    if url.port is not None and url.port == 0:
+        raise ValueError("Server ports must be between 1 and 65535")
     return value.rstrip("/")
 
 
@@ -47,6 +49,16 @@ def apply(settings=None, *, override=False):
     settings = read_json(config_dir() / "config.json") if settings is None else settings
     if not settings:
         return
+    required = ("person", "switch_url", "registration_key", "data_dir", "state_dir")
+    if any(not isinstance(settings.get(key), str) or not settings[key] for key in required):
+        raise ValueError(
+            "Connection configuration is incomplete; repair config.json or use a separate TN_CONFIG_DIR"
+        )
+    checked_url(settings["switch_url"])
+    if settings.get("identity_url"):
+        checked_url(settings["identity_url"])
+        if not isinstance(settings.get("identity_token"), str) or not settings["identity_token"]:
+            raise ValueError("The configured identity endpoint needs an access token")
     values = {
         "TN_PERSON": settings["person"],
         "SWITCH_URL": settings["switch_url"],
@@ -57,6 +69,12 @@ def apply(settings=None, *, override=False):
     if settings.get("identity_url"):
         values.update(
             TN_IDENTITY_URL=settings["identity_url"], TN_IDENTITY_TOKEN=settings["identity_token"]
+        )
+    if not override and any(
+        key in os.environ and os.environ[key] != value for key, value in values.items()
+    ):
+        raise ValueError(
+            "Saved connection conflicts with environment variables; clear the old TN_, SWITCH_URL and registration-key variables before using this profile"
         )
     for key, value in values.items():
         if override or key not in os.environ:

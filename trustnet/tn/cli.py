@@ -288,6 +288,9 @@ def _build_parser() -> argparse.ArgumentParser:
     from trustnet.tn.setup import add_commands
 
     add_commands(commands, common)
+    from trustnet.tn.host import add_commands as add_host_commands
+
+    add_host_commands(commands, common)
     return parser
 
 

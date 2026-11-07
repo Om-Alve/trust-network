@@ -37,23 +37,30 @@ Install from this checkout, then use the invite your organizer gives you:
 
 ```sh
 uv tool install .
-tn setup '<invite-from-organizer>' --agent codex
+tn setup '<invite-from-organizer>' --agent codex --consent via-agent
 tn doctor
 ```
 
 Choose `codex`, `claude`, `opencode` or `manual`. Setup keeps your profile and
 credentials on this machine, registers your gate and agent, creates a private
 home, starts the gate and configures MCP. It preserves your data when repeated.
+Restart your agent after setup to load the new MCP connection.
 Manual mode writes `mcp.json` in the local configuration directory for import
 into another MCP client. Discord and a VM are optional.
+
+[Setup and organizer instructions](docs/setup.md) cover creating invites,
+running the shared identity service and repairing a connection.
 
 Add each friend explicitly with `tn trust <name> <level>`. New profiles have no
 trusted people or shared facts. Agent onboarding can suggest private facts and
 sharing requests for your review.
+`--consent via-agent` lets your agent relay your yes or no. Without it, approval
+must come directly from your Switch user account.
 
 `tn doctor` checks your profile, Switch connection, home, trusted identities,
 running gate and MCP configuration. Configuration lives under
 `~/.config/trust-network`, or `TN_CONFIG_DIR` when set. Setup logs stay there.
+Use `tn stop` to stop the gate and `tn setup` to start it again.
 
 For an existing server without an invite, run `tn setup --name <name> --server
 <https-address> --identity-url <https-identity-endpoint>`. It prompts privately

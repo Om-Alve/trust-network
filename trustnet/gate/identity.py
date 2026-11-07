@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -40,20 +41,23 @@ def write_identity_export(directory: Path) -> Path:
     return path
 
 
-def export_local(path):
+def export_local(path, env=None):
     core = (
         Path.home()
         / "Library/Application Support/switchdash/local-switch-server/native/switch-core/0.31.0"
     )
     with tempfile.TemporaryDirectory(prefix="tn-identity-export-") as temporary:
         script = write_identity_export(Path(temporary))
+        python = os.environ.get("TN_IDENTITY_PYTHON") or (
+            str(core / "venv/bin/python") if (core / "venv/bin/python").exists() else sys.executable
+        )
         subprocess.run(
-            [str(core / "venv/bin/python"), str(script)],
+            [python, str(script)],
             check=True,
             timeout=15,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            env={**os.environ, "TN_IDENTITY_MAP": str(path)},
+            env={**os.environ, "TN_IDENTITY_MAP": str(path), **(env or {})},
         )
     return path.read_bytes()
 

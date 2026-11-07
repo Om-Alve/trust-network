@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -40,12 +41,19 @@ def add_commands(commands, common):
     setup.add_argument("--identity-url")
     setup.add_argument("--identity-token-env")
     setup.add_argument("--agent", choices=("manual", "codex", "claude", "opencode"))
+    setup.add_argument(
+        "--consent",
+        choices=("direct", "via-agent"),
+        help="who may relay your yes/no; default direct Switch-user approval",
+    )
     setup.add_argument("--no-start", action="store_true")
     setup.set_defaults(handler=setup_command)
     doctor = commands.add_parser(
         "doctor", parents=[common], help="check this person's complete connection"
     )
     doctor.set_defaults(handler=doctor_command)
+    stop = commands.add_parser("stop", parents=[common], help="stop the gate started by setup")
+    stop.set_defaults(handler=stop_command)
 
 
 def _secret(env_name, prompt):
@@ -99,7 +107,12 @@ def _settings(args):
     if args.invite:
         values = _redeem(args.invite)
     elif saved and not (args.name or args.server or args.key_env):
-        values = saved
+        values = dict(saved)
+        if args.identity_url:
+            values.update(
+                identity_url=args.identity_url,
+                identity_token=_secret(args.identity_token_env, "Identity access token: "),
+            )
     else:
         person = args.name or (input("Your name: ").strip().lower() if sys.stdin.isatty() else "")
         server = args.server or (
@@ -126,7 +139,8 @@ def _settings(args):
     values["switch_url"] = config.checked_url(values["switch_url"])
     if values.get("identity_url"):
         values["identity_url"] = config.checked_url(values["identity_url"])
-    if saved and (saved["person"], saved["switch_url"]) != (person, values["switch_url"]):
+    retained_gate = config.read_json(Path(saved["state_dir"]) / "gate-state.json") if saved else {}
+    if retained_gate and (saved["person"], saved["switch_url"]) != (person, values["switch_url"]):
         raise ValueError(
             "This configuration already belongs to another person or server; use a separate TN_CONFIG_DIR"
         )
@@ -134,6 +148,7 @@ def _settings(args):
         data_dir=str(config.config_dir() / "profiles"),
         state_dir=str(config.config_dir() / "state"),
         agent=args.agent or values.get("agent", "manual"),
+        consent=args.consent or values.get("consent", "direct"),
     )
     return values
 
@@ -149,7 +164,7 @@ async def _bootstrap(settings):
     if not (directory / "facts.yaml").exists():
         save_profile(Profile(person, {}, directory / "calendar.ics"), directory / "facts.yaml")
     if not (directory / "trust.yaml").exists():
-        save_trust(TrustList(), directory / "trust.yaml")
+        save_trust(TrustList(consent_default=settings["consent"]), directory / "trust.yaml")
     path = Path(settings["state_dir"]) / "gate-state.json"
     state = config.read_json(path)
     if person not in state:
@@ -193,6 +208,9 @@ def _mcp(settings):
     elif agent == "claude":
         if not shutil.which("claude"):
             raise ValueError("Install Claude Code or choose --agent manual")
+        subprocess.run(
+            ["claude", "mcp", "remove", "--scope", "user", "trust-network"], capture_output=True
+        )
         result = subprocess.run(
             ["claude", "mcp", "add-json", "--scope", "user", "trust-network", json.dumps(entry)],
             capture_output=True,
@@ -204,6 +222,10 @@ def _mcp(settings):
             Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
             / "opencode/opencode.json"
         )
+        if path.with_suffix(".jsonc").exists():
+            raise ValueError(
+                "OpenCode has a JSONC configuration; import the generated mcp.json there, or use --agent manual"
+            )
         values = config.read_json(path)
         values.setdefault("mcp", {})["trust-network"] = {
             "type": "local",
@@ -229,16 +251,19 @@ def _gate_running(settings):
 def _start(settings):
     if _gate_running(settings):
         return config.read_json(config.config_dir() / "gate-process.json").get("pid")
+    command = [sys.executable, "-m", "trustnet.tn.setup", "run-gate", str(config.config_dir())]
     with (config.config_dir() / "gate.log").open("ab") as log:
         process = subprocess.Popen(
-            [sys.executable, "-m", "trustnet.tn.setup", "run-gate"],
+            command,
             stdin=subprocess.DEVNULL,
             stdout=log,
             stderr=log,
             start_new_session=True,
             env={**os.environ, "TN_CONFIG_DIR": str(config.config_dir())},
         )
-    config.write_json(config.config_dir() / "gate-process.json", {"pid": process.pid})
+    config.write_json(
+        config.config_dir() / "gate-process.json", {"pid": process.pid, "command": command}
+    )
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         if _gate_running(settings):
@@ -250,6 +275,39 @@ def _start(settings):
         process.terminate()
         process.wait(timeout=5)
     raise ValueError("The gate did not start; inspect the private gate.log and run tn doctor")
+
+
+def _stop(settings):
+    if not _gate_running(settings):
+        return False
+    record = config.read_json(config.config_dir() / "gate-process.json")
+    pid, command = record.get("pid"), record.get("command")
+    if not isinstance(pid, int) or not command:
+        raise ValueError(
+            "This gate was started elsewhere; stop that process before changing its connection"
+        )
+    actual = subprocess.run(
+        ["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True
+    ).stdout.strip()
+    if actual != " ".join(command):
+        raise ValueError("The recorded process is no longer this gate; refusing to stop it")
+    import signal
+
+    os.kill(pid, signal.SIGTERM)
+    deadline = time.monotonic() + 5
+    while _gate_running(settings) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    if _gate_running(settings):
+        raise ValueError("The gate has not stopped yet; inspect gate.log")
+    return True
+
+
+def stop_command(context, args):
+    settings = config.read_json(config.config_dir() / "config.json")
+    stopped = _stop(settings) if settings else False
+    return context.emit(
+        {"stopped": stopped}, "Gate stopped." if stopped else "No managed gate is running."
+    )
 
 
 def setup_command(context, args):
@@ -264,12 +322,29 @@ def setup_command(context, args):
 
 
 def _setup(context, args):
+    previous = config.read_json(config.config_dir() / "config.json")
     settings = _settings(args)
+    if previous and any(
+        previous.get(k) != settings.get(k) for k in ("switch_url", "identity_url", "identity_token")
+    ):
+        _stop(previous)
     config.write_json(config.config_dir() / "config.json", settings)
     config.apply(settings, override=True)
     home = asyncio.run(_bootstrap(settings))
+    if args.consent:
+        from trustnet.gate.fact_changes import editing
+
+        with editing(settings["person"]):
+            trust = load_trust(settings["person"])
+            trust.consent_default = args.consent
+            save_trust(trust, Path(settings["data_dir"]) / settings["person"] / "trust.yaml")
     _mcp(settings)
     pid = None if args.no_start else _start(settings)
+    if not args.no_start:
+        report = asyncio.run(_diagnose(settings))
+        if not report["ok"]:
+            failures = "; ".join(c["fix"] for c in report["checks"] if not c["ok"])
+            raise ValueError("Connection saved, but setup needs attention. " + failures)
     result = {
         "person": settings["person"],
         "home": home,
@@ -295,10 +370,12 @@ async def _diagnose(settings):
     except (ValueError, OSError):
         add("profile", False, "Run tn setup to create missing profile files")
     gate = config.read_json(Path(settings["state_dir"]) / "gate-state.json").get(settings["person"])
+    owner_id = None
     if gate:
         client = SwitchClient(settings["switch_url"], gate["id"], gate["api_key"], timeout=5)
         try:
             detail = await client.get_agent_detail(client.agent_id)
+            owner_id = detail.get("owner_id")
             add("server", bool(detail.get("owner_id")), "Check the Switch address and registration")
         except Exception:
             add("server", False, "Start Switch and check its address and your registration")
@@ -321,9 +398,14 @@ async def _diagnose(settings):
     source = IdentitySource(config.config_dir() / "identities.json", settings.get("identity_url"))
     await asyncio.to_thread(source.refresh)
     identity = source.get(gate["id"]) if gate else None
+    owner = source.get(owner_id) if owner_id else None
     add(
         "identities",
-        identity is not None and identity.person == settings["person"],
+        identity is not None
+        and identity.id == settings["person"] + "-gate"
+        and identity.person == settings["person"]
+        and owner is not None
+        and owner.id == settings["person"],
         "Ask the organizer to check the authenticated identity service",
     )
     add("gate", _gate_running(settings), "Run tn setup to start your gate")
@@ -332,11 +414,35 @@ async def _diagnose(settings):
         .get("mcpServers", {})
         .get("trust-network", {})
     )
-    add(
-        "mcp",
-        bool(mcp.get("command") and mcp.get("args")),
-        "Run tn setup --agent <your-agent> to configure MCP",
+    expected = ["-m", "trustnet.tn.mcp", "--as", settings["person"]]
+    valid = (
+        mcp.get("command") == sys.executable
+        and mcp.get("args") == expected
+        and os.access(sys.executable, os.X_OK)
     )
+    if valid:
+
+        async def probe():
+            from mcp import ClientSession, StdioServerParameters
+            from mcp.client.stdio import stdio_client
+
+            params = StdioServerParameters(
+                command=sys.executable,
+                args=expected,
+                env={**os.environ, "TN_CONFIG_DIR": str(config.config_dir())},
+            )
+            with tempfile.TemporaryFile(mode="w+") as log:
+                async with stdio_client(params, errlog=log) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        tools = await session.list_tools()
+                        return {"inbox", "dm", "answer"} <= {t.name for t in tools.tools}
+
+        try:
+            valid = await asyncio.wait_for(probe(), 10)
+        except Exception:
+            valid = False
+    add("mcp", valid, "Run tn setup --agent <your-agent> to repair the MCP connection")
     return {"ok": all(c["ok"] for c in checks), "checks": checks}
 
 

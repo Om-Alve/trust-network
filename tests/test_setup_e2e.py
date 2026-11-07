@@ -107,7 +107,11 @@ async def test_setup_and_doctor(tmp_path):
         params = StdioServerParameters(
             command=sys.executable,
             args=["-m", "trustnet.tn.mcp"],
-            env={**env, "TN_CONFIG_DIR": str(tmp_path / "config")},
+            env={
+                **env,
+                "TN_CONFIG_DIR": str(tmp_path / "config"),
+                "SWITCH_URL": "http://127.0.0.1:1",
+            },
         )
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
@@ -118,7 +122,44 @@ async def test_setup_and_doctor(tmp_path):
         await cli("setup", "--json")
         assert (profile / "facts.yaml").read_bytes() == before
         assert len(wire.registrations) == 2
+        await cli("setup", "--consent", "via-agent", "--json")
+        assert "default: via-agent" in (profile / "trust.yaml").read_text()
+        await cli("setup", "--json")
+        assert "default: via-agent" in (profile / "trust.yaml").read_text()
         assert (await cli("fact", "get", "--json"))["owner"] == "mira"
+        env["WRONG_IDENTITIES"] = "wrong-token"
+        await cli(
+            "setup",
+            "--identity-url",
+            url + "/identities",
+            "--identity-token-env",
+            "WRONG_IDENTITIES",
+            "--json",
+            expected=1,
+        )
+        assert "Ready" not in transcript[-1]["out"]
+        repaired = await cli(
+            "setup",
+            "--identity-url",
+            url + "/identities",
+            "--identity-token-env",
+            "SETUP_IDENTITIES",
+            "--json",
+        )
+        pid = repaired["gate_pid"]
+        assert (await cli("doctor", "--json"))["ok"] is True
+        mcp_path = tmp_path / "config/mcp.json"
+        mcp_saved = mcp_path.read_text()
+        mcp_broken = json.loads(mcp_saved)
+        mcp_broken["mcpServers"]["trust-network"]["command"] = "/missing/python"
+        mcp_path.write_text(json.dumps(mcp_broken))
+        broken = await cli("doctor", "--json", expected=1)
+        assert any(c["name"] == "mcp" and not c["ok"] for c in broken["checks"])
+        mcp_path.write_text(mcp_saved)
+        env["SWITCH_URL"] = "http://127.0.0.1:1"
+        await cli("doctor", "--json", expected=1)
+        assert "conflicts" in transcript[-1]["err"]
+        env.pop("SWITCH_URL")
         os.kill(pid, signal.SIGTERM)
         for _ in range(100):
             await asyncio.sleep(0.02)
@@ -131,7 +172,13 @@ async def test_setup_and_doctor(tmp_path):
         (tmp_path / "config/config.json").write_text("{broken")
         await cli("doctor", "--json", expected=1)
         assert "Traceback" not in transcript[-1]["err"]
+        (tmp_path / "config/config.json").write_text('{"person":"mira"}')
+        await cli("doctor", "--json", expected=1)
+        assert "Traceback" not in transcript[-1]["err"]
     finally:
+        process_file = tmp_path / "config/gate-process.json"
+        if process_file.exists():
+            pid = json.loads(process_file.read_text())["pid"]
         if pid:
             try:
                 os.kill(pid, signal.SIGTERM)

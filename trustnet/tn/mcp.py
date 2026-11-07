@@ -273,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     from trustnet.tn.configuration import apply
 
     try:
-        apply()
+        apply(override=bool(os.environ.get("TN_CONFIG_DIR")))
     except (ValueError, OSError):
         print("tn mcp: configuration is invalid; run tn setup", file=sys.stderr)
         return 1
