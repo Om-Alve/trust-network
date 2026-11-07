@@ -274,6 +274,7 @@ class SwitchClient(Operations):
         self.max_backoff = max_backoff
         self.cursor: int | str = "head"
         self.rooms: list[str] = []
+        self.connected: dict[str, Any] | None = None
         self.ready = asyncio.Event()
 
     @classmethod
@@ -314,19 +315,33 @@ class SwitchClient(Operations):
         await self.http.aclose()
 
     async def _op(self, name: str, arguments: dict[str, Any]) -> Any:
+        response = await self._post(name, arguments)
+        if response.status_code == 400 and name != "connect_to_room" and self.connected:
+            # Switch binds a room to the newest connection of an agent, so another
+            # process acting as this agent can take it between connect and this op.
+            self._result("connect_to_room", await self._post("connect_to_room", self.connected))
+            response = await self._post(name, arguments)
+        result = self._result(name, response)
+        if name == "connect_to_room":
+            self.connected = arguments
+        return result
+
+    async def _post(self, name: str, arguments: dict[str, Any]) -> httpx.Response:
         try:
-            response = await self.http.post(
+            return await self.http.post(
                 f"agents/{self.agent_id}/ops/{name}",
                 headers={"X-Switch-Connection-Id": self.connection_id},
                 json=arguments,
             )
-            response.raise_for_status()
         except httpx.TimeoutException as exc:
             raise SwitchError(f"{name} timed out after {self.timeout}s; outcome unknown") from exc
-        except httpx.HTTPStatusError as exc:
-            raise SwitchError(f"{name} failed: HTTP {exc.response.status_code}") from exc
         except httpx.HTTPError as exc:
             raise SwitchError(f"{name} transport failed; outcome unknown") from exc
+
+    @staticmethod
+    def _result(name: str, response: httpx.Response) -> Any:
+        if not response.is_success:
+            raise SwitchError(f"{name} failed: HTTP {response.status_code}")
         return response.json()["result"]
 
     async def events(self) -> AsyncIterator[Event]:
