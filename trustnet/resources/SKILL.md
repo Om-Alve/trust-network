@@ -14,7 +14,9 @@ calendar tools for live availability and external event delivery.
 ## When to use
 
 - "Plan something with Rahul Sunday" → start a DM and plan it.
-- "Gift ideas for Om's birthday under ₹3k" → `gift_ideas`, then `claim`.
+- "Gift ideas for Om's birthday under ₹3k" → `gift_ideas`, then `claim`. For a
+  gift, use **only** `gift_ideas` and `claim` — never `ask`, `dm` or `ask_around`,
+  and never put the recipient in a group plan (it would spoil the surprise).
 - "Anyone have a tent for Nov 14–16?" → `ask_around`.
 - A cron notice says something new arrived → call `inbox` and tell your person.
 
@@ -88,93 +90,39 @@ In `consent.default: via-agent`, carry only the person's actual answer. In
 F1` or `tn review --approve F1 T1`, or their own Switch user says
 `@om-gate yes F1`. `no F1` declines; `answer F1 "yes"` also works.
 
-## Planning a DM, step by step
+## Planning, step by step
 
-For new plans, use the group-plan lifecycle below even when there are only two
-people. The fixed-form P commands further below remain available for existing
-protocol clients.
+One event is one plan. Use `group_plan_create` for every new plan, whatever the
+number of people, and include everyone coming in that one plan. Never split a
+single get-together into several proposals.
 
-1. Read actual calendar availability and negotiate details with the other agents.
-   A tentative `group_plan_create` opens a shared room for all participating
-   agents. Read its status using the returned create token to find the plan ID.
-2. Read `group_plan_status` before talking in the group room. Its `sharing` map
-   contains the facts every viewer may see; do not volunteer other memory.
-3. Show your person the exact time, duration, title, place and participants. Wait
-   for their yes/no. Carry it with `group_plan_vote` using the revision and
-   fingerprint you showed. A new revision needs a new yes. Plain `answer` does
-   not vote on a group plan.
-4. Until everyone says yes, describe it as awaiting approval. After confirmation,
-   apply `calendar_tasks` through the person's existing calendar tools and record
-   receipts. A confirmed plan can still have unfinished calendar delivery.
-5. To reschedule, ask the organizer to call `group_plan_revise` for the current
-   revision. The existing event stays until everyone approves the replacement.
-   Reuse its provider event ID and UID when applying the update.
-6. To cancel, show the current plan and get your person's explicit instruction.
-   Call `group_plan_cancel` with that revision and fingerprint. All participants
-   receive cancellation notices and calendar operations. Pending plans expire
-   after 30 days or when their proposed start passes. Group rooms stay open for
-   revisions and cancellation.
+1. Read actual calendar availability, then negotiate in plain language. Use `dm`
+   (which opens a DM room with that friend, or reuses an open one — never open a
+   second room with the same friend) and `dm_read` / `dm_post` to settle the day,
+   time, place and budget. For several people, settle what you can in the rooms
+   you have and finish in the shared room the plan creates.
+2. Only create the group plan when **your own person asked for this plan**. If a
+   friend's agent is already driving it, let that side call `group_plan_create`;
+   you join and vote. When you create it, pass every participant, then read the
+   returned token's status to find the plan ID.
+3. Read `group_plan_status` before talking in the group room. Its `sharing` map
+   lists the facts every viewer may see; volunteer nothing else from memory.
+4. Show your person the exact time, duration, title, place and the full list of
+   participants, then wait for their yes or no on **that** plan. A general "go
+   ahead and organise it" is not a vote: get an explicit yes to the exact plan —
+   or to a shown list of references — before calling `group_plan_vote` with the
+   revision and fingerprint you showed. A new revision needs a new yes.
+5. Until everyone says yes, describe the plan as awaiting approval. After
+   confirmation, apply `calendar_tasks` through the person's existing calendar
+   tools and record receipts; a confirmed plan can still have unfinished delivery.
+6. To reschedule, ask the organizer to call `group_plan_revise` for the current
+   revision; the existing event stands until everyone approves the replacement.
+   To cancel, get your person's explicit instruction and call `group_plan_cancel`
+   with the exact revision and fingerprint. Plans expire after 30 days or when
+   the start passes.
 
-### Legacy pairwise P commands
-
-1. Call `dm(friend, goal)` with your person's own words as the goal.
-2. Call `inbox` until the DM room and your **share card** arrive. The card lists
-   what this friend's level lets you say about your person. If it hasn't arrived
-   yet, end your turn; you'll be woken when it does. Never ask for it in the room.
-3. Plan in plain language with `dm_read` / `dm_post`. Say only what the card
-   allows. Nothing else stops you from saying more, so this is on you.
-   Open with **one** message (your person's idea, when they're free, the budget)
-   and end your turn there. Post plain text: never @-mention the other agent
-   (Switch refuses that); they read the room anyway. Your friend's agent knows your friend's calendar
-   and you don't, so let it answer; you'll be woken when it does. Don't use
-   `ask` while planning: the friend's agent is right there in the room.
-4. Settle what you already know. If your memory of your person answers a
-   question (a budget they're fine with, times they keep free, what they eat),
-   use it and don't ask. Only when you don't know, ask your person in this
-   chat, then post their answer. You can also ask through your gate, which
-   puts the question in your person's inbox:
-
-```
-@om-gate ask-owner Q3 "Is ₹1,500 per person okay?"
-```
-
-5. Only after the other agent has agreed, in the room, to the day, time, place
-   and rough price, propose it through **your own gate only**, in the DM
-   room: one `dm_post` whose whole text is the line below (date and time in ISO,
-   title and place in quotes). Never address the other side's gate. Only one
-   side proposes: your gate forwards the proposal to your friend's gate, so both
-   people get the same P1. If the other side already proposed, don't propose it
-   again. One command per message.
-
-```
-@om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"
-```
-
-   To revise a pending plan before you vote, use `counter P1 P2 ...` through your
-   own gate. P2 needs fresh votes from both people. You cannot counter after
-   casting your vote or after confirmation.
-
-6. Tell your person the proposal in one line and wait for **their** yes or no.
-   Then call `answer("P1", "yes")`. Never say yes for them, and never reuse an
-   earlier yes for a new proposal.
-7. When the gate posts ✅ confirmed, call `calendar_tasks`. For each task, use your
-   existing Google Calendar, Outlook or other calendar tools to apply its exact
-   plan. Include the task's `uid` in the event description. Before every retry,
-   search for that marker; reuse the existing event instead of creating another.
-   Update or cancel the task's recorded provider event ID when present. Verify
-   the provider result, then call `calendar_report(token, "applied", provider,
-   event_id)`. If access is missing or the provider fails, report `failed` with
-   the error and tell your person. Approval and calendar delivery are separate.
-   Never call `cal_add` as a substitute for external delivery. Legacy ICS mode
-   writes locally and has no external task.
-
-Before proposing, read your person's actual calendar with their existing tools.
-Respect all-day unavailability and their timezone. A local empty ICS calendar
-does not establish that their Google or Outlook calendar is free. If live access
-is unavailable, ask the person for availability rather than guessing.
-
-Use your own gate's name: Rahul's agent writes `@rahul-gate …`, Om's writes
-`@om-gate …`.
+A peer on an older protocol may still send a legacy `P<n>` proposal; show it to
+your person and answer it with `answer("P1", "yes"/"no")` like any proposal.
 
 ## Other things your person can do directly
 
@@ -197,6 +145,10 @@ to type them yourself, because the tools above do the same thing.
   invent an answer or a preference you don't know, and never give a yes.
 - **Stay inside the share card.** If the card doesn't show a fact, don't say it,
   even if you know it. Private facts never leave you.
-- **Gifts stay secret.** Never tell the recipient about a gift session or a claim.
+- **Gifts stay secret.** Never tell the recipient about a gift session or a claim,
+  and never use `ask`, `dm` or `ask_around` to plan a gift.
 - **Keep your person's messages short.** One line per update, with the reference
   (Q1, P1, A1) they need to reply to.
+- **Keep room messages short too.** Post the one fact or question that moves the
+  plan along; do not repeat a disclaimer or restate approval status in every
+  message.

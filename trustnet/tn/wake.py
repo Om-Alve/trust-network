@@ -58,6 +58,10 @@ WATCH_PROMPT_TEXT = resources.read_text(resources.WATCH_PROMPT)
 TURN_TIMEOUT = 300
 TRANSCRIPT_LINES = 16
 
+#: How long to wait after finding news before re-checking, so a burst of
+#: messages settles into a single turn instead of one turn per message.
+SETTLE_SECONDS = 2.0
+
 DIM, BOLD, CYAN, RESET = "\033[2m", "\033[1m", "\033[1;35m", "\033[0m"
 
 
@@ -235,13 +239,33 @@ def describe(report: dict) -> str:
     return "\n".join(lines)
 
 
+def merge_reports(first: dict, second: dict) -> dict:
+    """Combine two watch reports into one, so a burst of messages is one turn.
+
+    ``dm_updates`` are deduplicated by room (the later report wins); unread and
+    calendar counts take the larger of the two, since ``watch`` never consumes.
+    """
+    updates = {u["room"]: u for u in first["dm_updates"]}
+    for u in second["dm_updates"]:
+        updates[u["room"]] = u
+    return {
+        "inbox_unread": max(first["inbox_unread"], second["inbox_unread"]),
+        "dm_updates": list(updates.values()),
+        "calendar_pending": max(first["calendar_pending"], second["calendar_pending"]),
+    }
+
+
 class Runner:
-    def __init__(self, person: str, invoke, label: str, every: float, on_reply=None):
+    def __init__(
+        self, person: str, invoke, label: str, every: float, on_reply=None, settle=SETTLE_SECONDS
+    ):
         """``invoke(reply_path)`` returns ``(argv, extra_env, read)``, where
         ``read(stdout)`` gives the agent's reply. ``on_reply(text)`` (optional) is
-        called with each reply shown to the person."""
+        called with each reply shown to the person. ``settle`` is how long to wait
+        after news before re-checking, so a burst becomes one turn."""
         self.person, self.invoke, self.label, self.every = person, invoke, label, every
         self.on_reply = on_reply
+        self.settle = settle
         self.name = person.title()
         self.transcript: list[str] = []
         self.carry: list[str] = []
@@ -321,6 +345,17 @@ class Runner:
             else:
                 news = describe(report)
                 if news:
+                    # A burst of messages lands faster than one watch can settle.
+                    # Pause briefly and watch once more, then wake the agent a
+                    # single time with both reports merged.
+                    await asyncio.sleep(self.settle)
+                    try:
+                        second = await personal.watch(self.person)
+                    except Exception as exc:  # the re-check must not lose the turn
+                        self.note(f"watch failed on settle: {type(exc).__name__}")
+                    else:
+                        report = merge_reports(report, second)
+                        news = describe(report)
                     self.note("news from trust-network; waking the agent")
                     await self.turn(news + "\n\n" + WATCH_PROMPT_TEXT)
             await asyncio.sleep(self.every)
@@ -374,8 +409,9 @@ def main(person: str, args) -> int:
     """Run the agent for ``person``; ``args`` has ``agent``/``cmd``, ``model``, ``every``."""
     handle = lock(person)  # noqa: F841 — held for the process lifetime
     invoke, label = invoker(person, args.agent, args.model, args.cmd)
+    settle = getattr(args, "settle", SETTLE_SECONDS)
     try:
-        asyncio.run(Runner(person, invoke, label, args.every).run())
+        asyncio.run(Runner(person, invoke, label, args.every, settle=settle).run())
     except KeyboardInterrupt:
         pass
     return 0

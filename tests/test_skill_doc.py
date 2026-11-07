@@ -45,7 +45,7 @@ def test_skill_front_matter_is_loadable() -> None:
 
 def test_every_gate_example_parses() -> None:
     lines = _gate_lines(SKILL_TEXT)
-    assert len(lines) >= 5
+    assert len(lines) >= 4
     for line in lines:
         command = parse(line)
         assert not isinstance(command, Unknown), line

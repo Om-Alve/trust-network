@@ -15,6 +15,7 @@ except ImportError:  # pragma: no cover - the demo runs on macOS and Linux
 from trustnet.gate.commands import Answer, Dm, Quoted
 from trustnet.gate.dm import main_agent
 from trustnet.gate.facts import REPO_ROOT, load_trust, resolve_data_dir
+from trustnet.gate.messages import is_gate_traffic, join_greeting_ids
 from trustnet.gate.relay import find_home, home_name
 from trustnet.room_pool import wait_until_live
 from trustnet.switch_client import SwitchClient, SwitchError
@@ -212,12 +213,31 @@ def open_items(person):
     )
 
 
+def _latest_meaningful(messages):
+    """The newest message worth waking on, or ``None``.
+
+    Switch's automatic join greetings and gate-to-gate protocol traffic (plan
+    relays, forwarded proposals) are ignored. Both are recognised structurally —
+    by sender identity and timing relative to a ``room_join`` — never by their
+    words. ``room_join`` events themselves are not messages either.
+    """
+    greetings = join_greeting_ids(messages)
+    meaningful = [
+        m
+        for m in messages
+        if m.get("kind") != "room_join" and m.get("id") not in greetings and not is_gate_traffic(m)
+    ]
+    return max(meaningful, key=lambda m: m.get("timestamp", 0)) if meaningful else None
+
+
 async def watch(person):
     """Report what needs the agent now, without consuming the inbox.
 
-    Unread home threads, plus each active DM room whose newest message is someone
-    else's and changed since the previous watch. Only the newest DM message IDs are
-    remembered (``watch-state.json``), so a room wakes the agent once per change.
+    Unread home threads, plus each active DM/group room whose newest *meaningful*
+    message is someone else's and changed since the previous watch. Only the
+    newest meaningful message ID per room is remembered (``watch-state.json``), so
+    a room wakes the agent once per change and ignorable traffic (join greetings,
+    gate-to-gate relays) never does.
     """
     path = resolve_data_dir(person) / "watch-state.json"
     last = json.loads(path.read_text()) if path.exists() else {}
@@ -237,7 +257,10 @@ async def watch(person):
             ]
             if not messages:
                 continue
-            latest = max(messages, key=lambda m: m.get("timestamp", 0))
+            latest = _latest_meaningful(messages)
+            if latest is None:
+                newest[rid] = last.get(rid)
+                continue
             newest[rid] = latest["id"]
             if latest["id"] != last.get(rid) and latest.get("sender_name") != main_agent(person):
                 updates.append(
@@ -245,7 +268,7 @@ async def watch(person):
                         "room": rid,
                         "name": membership["room_name"],
                         "from": latest.get("sender_name"),
-                        "text": latest["body"][:280],
+                        "text": (latest.get("body") or "")[:280],
                     }
                 )
     path.parent.mkdir(parents=True, exist_ok=True)

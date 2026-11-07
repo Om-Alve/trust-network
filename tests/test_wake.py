@@ -162,3 +162,107 @@ async def test_answer_keeps_backslashes_and_refuses_an_ambiguous_proposal(tmp_pa
 
     with pytest.raises(SwitchError, match="no friend named nobody"):
         await personal.dm("om", "nobody", "plan something")
+
+
+async def test_group_room_filters_greetings_and_relays(tmp_path, monkeypatch):
+    """A group room's Switch noise never wakes the agent; a real message does.
+
+    Ways this could fail, and what the assertions catch:
+    - a join greeting (posted under a member's own name within the greeting window
+      of its ``room_join``) is reported as a new message from someone else;
+    - gate-to-gate protocol traffic (a gate addressing another gate, e.g. a
+      plan-relay envelope) is reported as a new message;
+    - a real agent message is missed, or reported again on the next watch because
+      a later greeting advanced the cursor past it;
+    - a real message followed by an ignorable greeting is not reported at all.
+    """
+    world = await build_world(tmp_path, monkeypatch=monkeypatch, people=("om", "rahul", "priya"))
+    monkeypatch.setattr(personal, "session", personal_session(world))
+    room = await world.add_room(
+        "group-gp-0123456789abcdef",
+        ["om-gate", "om-hermes", "rahul-gate", "rahul-hermes", "priya-gate", "priya-hermes"],
+    )
+
+    # Join greetings from several members and gate-to-gate relays: no update.
+    for name in ("rahul-gate", "rahul-hermes", "priya-gate", "priya-hermes"):
+        world.switch.join_greeting(room, name)
+    relay = (
+        '{"action":"offer","plan":"gp-0123456789abcdef","revision":1,"fingerprint":"'
+        + "0" * 64
+        + '","participants":["om","rahul","priya"],"content":{}}'
+    )
+    await world.gate_clients["rahul"].connect_to_room(room)
+    await world.gate_clients["rahul"].post_message(f"@om-gate plan-relay {relay}")
+    await world.gate_clients["om"].connect_to_room(room)
+    await world.gate_clients["om"].post_message(f"@rahul-gate plan-relay {relay}")
+    assert (await personal.watch("om"))["dm_updates"] == []
+
+    # A real message, followed by an ignorable greeting, is reported exactly once.
+    # The fake switch's timestamps advance one millisecond per message, so step the
+    # clock past the greeting window before the real message lands.
+    world.switch.message_seq += 3000
+    await world.agent_clients["rahul"].connect_to_room(room)
+    await world.agent_clients["rahul"].post_message("Rahul: shall we meet at 7?")
+    world.switch.join_greeting(room, "priya-hermes")
+    report = await personal.watch("om")
+    assert [u["room"] for u in report["dm_updates"]] == [room]
+    assert report["dm_updates"][0]["from"] == "rahul-hermes"
+    assert "meet at 7" in report["dm_updates"][0]["text"]
+
+    # A later greeting does not re-report the already-seen message.
+    world.switch.join_greeting(room, "priya-gate")
+    assert (await personal.watch("om"))["dm_updates"] == []
+
+
+async def test_a_burst_of_messages_settles_into_one_turn(monkeypatch):
+    """News found by ``Runner.poll`` is re-checked once and turned into one turn.
+
+    Ways this could fail, and what the assertions catch:
+    - each message in a burst wakes the agent once (a turn per message);
+    - the settle re-check is skipped, so later messages of the burst are lost;
+    - the two reports are not merged, so the turn only carries one of them;
+    - the settle re-check doubles the turn when nothing new arrived.
+    """
+    calls = 0
+    turns = []
+
+    def update(room, text):
+        return {"room": room, "name": room, "from": "rahul-hermes", "text": text}
+
+    async def watch(person):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return {
+                "inbox_unread": 0,
+                "dm_updates": [update("room-a", "first")],
+                "calendar_pending": 0,
+            }
+        if calls == 2:
+            return {
+                "inbox_unread": 0,
+                "dm_updates": [update("room-b", "second"), update("room-c", "third")],
+                "calendar_pending": 0,
+            }
+        raise SystemExit(0)
+
+    monkeypatch.setattr(personal, "watch", watch)
+    runner = wake.Runner(
+        "om",
+        lambda reply: ([sys.executable, "-c", "pass"], {}, lambda out: out),
+        "Om's agent",
+        every=0.001,
+        settle=0,
+    )
+
+    async def turn(now):
+        turns.append(now)
+
+    runner.turn = turn
+    try:
+        await runner.poll()
+    except SystemExit:
+        pass
+    assert calls == 3
+    assert len(turns) == 1
+    assert "first" in turns[0] and "second" in turns[0] and "third" in turns[0]

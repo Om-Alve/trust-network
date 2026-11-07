@@ -344,7 +344,7 @@ async def calendar_work_wakes_agent(h):
     async def watch(person):
         nonlocal polls
         polls += 1
-        if polls > 1:
+        if polls > 2:
             raise SystemExit(0)
         return {
             "inbox_unread": 0,
@@ -365,6 +365,7 @@ async def calendar_work_wakes_agent(h):
         lambda reply: ([sys.executable, "-c", code], {}, lambda out: out),
         "Calendar acceptance agent",
         every=0.001,
+        settle=0,
     )
     try:
         await runner.poll()

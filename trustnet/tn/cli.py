@@ -328,7 +328,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "wake", parents=[common], help="run any CLI agent as this person's agent"
     )
     agent = wake.add_mutually_exclusive_group(required=True)
-    from trustnet.tn.wake import PRESETS
+    from trustnet.tn.wake import PRESETS, SETTLE_SECONDS
 
     agent.add_argument("--agent", choices=list(PRESETS), help="a known agent CLI")
     agent.add_argument("--cmd", help="any agent command: prompt on stdin, reply on stdout")
@@ -337,6 +337,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     wake.add_argument("--model", help=f"model for --agent ({defaults})")
     wake.add_argument("--every", type=float, default=15.0, help="seconds between watches")
+    wake.add_argument(
+        "--settle",
+        type=float,
+        default=SETTLE_SECONDS,
+        help="seconds to wait after news before re-checking",
+    )
     wake.set_defaults(handler=_cmd_wake)
     from trustnet.tn.setup import add_commands
 

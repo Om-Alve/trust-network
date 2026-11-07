@@ -86,8 +86,9 @@ def build(person: str) -> MCPServer:
         description=(
             "Start a planning conversation with a friend: friend is a person name "
             "(rahul), goal is your person's own words. Your gate creates an agent-only "
-            "DM room, invites the other side and hands you a share card. Then poll inbox "
-            "for the room and the card, and plan there with dm_read and dm_post."
+            "DM room, invites the other side and hands you a share card. Reuse an open "
+            "room with that friend instead of opening a new one. Then poll inbox for the "
+            "room and the card, and plan there with dm_read and dm_post."
         )
     )
     async def dm(friend: str, goal: str) -> dict[str, Any]:
@@ -105,10 +106,11 @@ def build(person: str) -> MCPServer:
 
     @server.tool(
         description=(
-            "Post plain-language text into a DM room you already belong to. Stay within "
-            "your share card: the gate still enforces what it discloses, but what you "
-            "volunteer here is your judgement. Never paste secrets or facts your card "
-            "does not show."
+            "Post plain-language text into a DM room you already belong to. Keep "
+            "messages short: one fact or question per message, without repeating "
+            "disclaimers or approval status. Stay within your share card: the gate "
+            "still enforces what it discloses, but what you volunteer here is your "
+            "judgement. Never paste secrets or facts your card does not show."
         )
     )
     async def dm_post(room: str, text: str) -> dict[str, Any]:
@@ -118,7 +120,8 @@ def build(person: str) -> MCPServer:
         description=(
             "Ask listed friends one short question (at most 140 characters), e.g. 'a tent "
             "to borrow, Nov 14-16'. friends optionally selects the audience by person name; "
-            "omit it to ask everyone on the trust list. A friend's gate never dumps their "
+            "omit it to ask everyone on the trust list. Never use this for gifts or a wishlist: "
+            "gifts go through gift_ideas and claim. A friend's gate never dumps their "
             "profile facts: it routes the question to that friend's own agent, or to the "
             "friend when they opted in. Their answer arrives as an A1 question in inbox; "
             "relay it to your person. A listed item is not a promise to lend it."
@@ -208,7 +211,7 @@ def build(person: str) -> MCPServer:
         return {"token": await _call(plans.request, person, action, **payload)}
 
     @server.tool(
-        description="Draft a plan for two or more people including your person. All participants must trust each other; everyone must approve. Use existing calendar tools to establish availability first. This submits a draft, not consent."
+        description="Draft one plan for an event, including everyone taking part, whatever the number. All participants must trust each other; everyone must approve. Only create the plan when your own person asked for it; if another agent started it, let that side create it. Use existing calendar tools to establish availability first. This submits a draft, not consent."
     )
     async def group_plan_create(
         participants: list[str], start: str, minutes: int, title: str, place: str
@@ -220,7 +223,7 @@ def build(person: str) -> MCPServer:
         )
 
     @server.tool(
-        description="Relay your person's explicit yes or no for the exact group-plan revision and fingerprint they reviewed. Read them from group_plan_status. Never supply consent for them or bind an old yes to a changed plan."
+        description="Relay your person's explicit yes or no for the exact group-plan revision and fingerprint they reviewed. Vote only after your person has seen that plan's exact reference, time, place and participants and said yes to it; a general go-ahead is not a vote. Never supply consent for them or bind an old yes to a changed plan."
     )
     async def group_plan_vote(
         reference: str, vote: str, revision: int, fingerprint: str
@@ -282,13 +285,13 @@ def build(person: str) -> MCPServer:
         return _run_cli(person, "fact", "set", key, "--level", level)
 
     @server.tool(
-        description="Ask a friend gate for named facts at the DM room trust level. Read the returned room with dm_read."
+        description="Ask a friend gate for named facts at the DM room trust level. Read the returned room with dm_read. Never use ask to gather gift ideas or a wishlist: gifts go through gift_ideas and claim only."
     )
     async def ask(friend: str, fields: list[str]) -> dict[str, Any]:
         return await _call(personal.ask, person, friend, fields)
 
     @server.tool(
-        description="Get gift ideas from a friend gate using stored facts only. Suggestions fit the budget and room level; taken and over-budget items are separate. The recipient is never notified. The seal is a courtesy; workspace admins can read rooms."
+        description="Get gift ideas from a friend gate using stored facts only. Suggestions fit the budget and room level; taken and over-budget items are separate. The recipient is never notified. For a gift use only gift_ideas and claim — never ask, dm or ask_around — and never include the recipient in a group plan. The seal is a courtesy; workspace admins can read rooms."
     )
     async def gift_ideas(friend: str, occasion: str, date: str, budget: int) -> dict[str, Any]:
         return await _call(personal.gift_ideas, person, friend, occasion, date, budget)

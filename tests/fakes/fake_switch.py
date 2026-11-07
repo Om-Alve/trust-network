@@ -29,6 +29,39 @@ class FakeSwitch:
         self.clients.append(client)
         return client
 
+    def join_greeting(self, room_id: str, name: str, body: str | None = None) -> None:
+        """Record Switch's automatic join greeting under ``name``'s identity.
+
+        Switch writes a ``room_join`` marker, then posts a greeting under that same
+        member's name within milliseconds ("Hi there! Just @… me when you're
+        ready."). Timing-based rules (consent._friend_spoke, personal.watch)
+        recognise and ignore these, so tests need a way to produce them.
+        """
+        room = self.rooms[room_id]
+        self.message_seq += 1
+        join_ts = 1_700_000_000_000 + self.message_seq
+        room["messages"].append(
+            {
+                "id": str(uuid4()),
+                "sender": name,
+                "sender_name": name,
+                "kind": "room_join",
+                "body": "",
+                "timestamp": join_ts,
+            }
+        )
+        self.message_seq += 1
+        room["messages"].append(
+            {
+                "id": str(uuid4()),
+                "sender": name,
+                "sender_name": name,
+                "kind": "message",
+                "body": body or f"Hi there! Just @{name} me when you're ready.",
+                "timestamp": join_ts + 1,
+            }
+        )
+
 
 class FakeSwitchClient(Operations):
     def __init__(self, server: FakeSwitch, name: str, owner_id: str, kind: str):

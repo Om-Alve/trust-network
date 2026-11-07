@@ -10,6 +10,7 @@ from trustnet.gate import calendar, calendar_jobs, handshake, ledger, relay, sto
 from trustnet.gate import commands as c
 from trustnet.gate.dm import main_agent
 from trustnet.gate.facts import load_profile, load_trust
+from trustnet.gate.messages import join_greeting_ids
 
 
 def load(person):
@@ -127,20 +128,20 @@ async def recover(gate, *, force=True):
 async def _friend_spoke(client, room, agent):
     """Whether ``agent`` has posted in ``room`` itself.
 
-    Not counted: Switch's automatic greeting (sent under the agent's name within
-    two seconds of it joining) and Switch's notices, which start by addressing
-    whoever triggered them (``@om-hermes You're not permitted …``).
+    Not counted: Switch's automatic greeting (under the agent's name within the
+    greeting window of its join; the rule is shared with the personal watcher)
+    and Switch's notices, which start by addressing whoever triggered them
+    (``@om-hermes You're not permitted …``).
     """
     context = await client.read_context(room_id=room, limit=200)
     messages = [m for t in context.get("threads", []) for m in (t["root"], *t.get("replies", []))]
-    joined = None
+    greetings = join_greeting_ids(messages, sender=agent)
     for m in sorted(messages, key=lambda m: m.get("timestamp", 0)):
         if (m.get("sender_name") or m.get("sender")) != agent:
             continue
         if m.get("kind") == "room_join":
-            joined = m.get("timestamp", 0)
             continue
-        if joined is not None and m.get("timestamp", 0) - joined < 2_000:
+        if m.get("id") in greetings:
             continue
         if not m.get("body", "").lstrip().startswith("@"):
             return True
