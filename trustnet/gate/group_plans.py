@@ -1387,10 +1387,12 @@ def _min_yes(value, participants):
 async def _check_organizer(gate, peers):
     """The person who started the planning creates the plan, not someone invited.
 
-    When every open planning room this gate shares with the participants was
-    opened by the other side, a friend is already driving the plan: creating it
-    here would make the invitee the organizer, and only the organizer can
-    revise. With no shared room, or one this gate opened, creation is allowed.
+    The earliest open planning room this gate shares with the participants
+    shows who started the planning. When a friend opened it, that friend is
+    driving the plan, even if this side's agent then opened rooms with the rest
+    of the group: creating it here would make the invitee the organizer, and
+    only the organizer can revise. With no shared room, or when this side
+    opened the earliest one, creation is allowed.
     """
     directory = resolve_data_dir(gate.person) / "share-cards"
     if not directory.is_dir():
@@ -1404,12 +1406,14 @@ async def _check_organizer(gate, peers):
         except (OSError, ValueError):
             continue
         if card.get("room") in active and card.get("friend") in peers and card.get("opened_by"):
-            openers[card["room"]] = (card["friend"], card["opened_by"])
-    if openers and all(opener != gate.person for _, opener in openers.values()):
-        drivers = sorted({friend for friend, _ in openers.values()})
+            openers[card["room"]] = (card.get("created_at", ""), card["opened_by"])
+    if not openers:
+        return
+    _, first = min(openers.values())
+    if first != gate.person:
         raise PlanError(
-            f"{', '.join(drivers)} started planning this with you; ask their agent in "
-            "your planning room to create the group plan, then vote on it"
+            f"{first} started planning this with you; ask their agent in your "
+            "planning room to create the group plan, then vote on it"
         )
 
 

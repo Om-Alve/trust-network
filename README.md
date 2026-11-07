@@ -92,7 +92,7 @@ flowchart LR
 [uv](https://docs.astral.sh/uv/):
 
 ```sh
-uv sync --locked && make check     # Ruff and 563 tests, about 40 s
+uv sync --locked && make check     # Ruff and 584 tests, about 40 s
 cp -R examples /tmp/tn-examples
 TN_DATA_DIR=/tmp/tn-examples uv run tn -a om view-as rahul
 TN_DATA_DIR=/tmp/tn-examples uv run tn -a om view-as priya

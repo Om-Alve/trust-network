@@ -103,7 +103,7 @@ single get-together into several proposals.
    you have and finish in the shared room the plan creates.
 2. Only create the group plan when **your own person asked for this plan**. If a
    friend's agent is already driving it, let that side call `group_plan_create`;
-   you join and vote. When you create it, pass every participant, then read the
+   you join and vote, and you do not open rooms with the rest of the group. When you create it, pass every participant, then read the
    returned token's status to find the plan ID. If the event can go ahead
    without everyone (a game that needs 6 of 8 players), set `min_yes`: a no then
    means that person is out, not that the plan dies. Put anything everyone must

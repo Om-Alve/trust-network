@@ -1002,7 +1002,13 @@ async def invitee_cannot_take_over_as_organizer(root, monkeypatch):
             ),
             what="both share cards",
         )
-        await plans.request("rahul", "create", participants=["om"], content=CONTENT)
+        # Rahul's agent then opens its own room with Priya; Om still started it.
+        await personal.dm("rahul", "priya", "dinner next week")
+        await world.wait_for(
+            lambda: len(list((root / "rahul" / "share-cards").glob("*.json"))) == 2,
+            what="rahul's second share card",
+        )
+        await plans.request("rahul", "create", participants=["om", "priya"], content=CONTENT)
         await world.settle()
         assert not _state("rahul")["plans"]
         assert any("om started planning this with you" in b for b in world.home_bodies("rahul"))

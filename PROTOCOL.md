@@ -738,9 +738,10 @@ byte-identical fingerprints. A create that repeats a still-pending plan with the
 same participants, content and `min_yes` reuses that plan and its room.
 
 The person who started the planning organizes it. Each share card records who
-opened its planning room. A create is refused when every open planning room
-this gate shares with the participants was opened by the other side, with the
-reply that the friend started planning and their agent should create the plan.
+opened its planning room. A create is refused when the earliest open planning
+room this gate shares with the participants was opened by someone else, even
+if this side then opened rooms with the rest of the group, with the reply that
+the friend started planning and their agent should create the plan.
 A person's own later `dm` to that friend reuses the room and makes their side
 the opener. With no shared planning room, anyone may create the plan.
 
