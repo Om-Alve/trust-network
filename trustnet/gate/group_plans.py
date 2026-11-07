@@ -53,7 +53,6 @@ LOG = logging.getLogger(__name__)
 __all__ = [
     "EXPIRY",
     "handle",
-    "identify",
     "pending",
     "projection",
     "queue_calendar",
@@ -208,12 +207,6 @@ def summary(plan):
 # --- command recognition ----------------------------------------------------
 
 
-def identify(text):
-    """Return ``plan-request`` / ``plan-relay`` for a plan command, else ``None``."""
-    command = _command(text)
-    return command[0] if command else None
-
-
 def _command(text):
     if not isinstance(text, str):
         return None
@@ -321,7 +314,7 @@ async def _request(gate, sender, payload):
             if action == "vote":
                 await _vote(gate, sender, payload)
             else:
-                await _cancel(gate, sender, payload)
+                await _cancel(gate, payload)
         except PlanError as exc:
             await _home(gate, f"Plan {action} not accepted: {exc}.")
         return
@@ -611,7 +604,7 @@ async def _vote(gate, sender, payload):
     await recover(gate, force=False)
 
 
-async def _cancel(gate, sender, payload):
+async def _cancel(gate, payload):
     person = gate.person
     state = load(person)
     plan = _require_plan(state, payload.get("plan"))
@@ -920,7 +913,7 @@ async def _remove(gate, sender, payload, plan_id):
 # --- plan transitions -------------------------------------------------------
 
 
-def _decline(plan, by, now, gate):
+def _decline(plan, now):
     plan["candidate_declined"] = True
     if plan.get("confirmed"):
         plan["status"] = "confirmed"
@@ -1003,7 +996,7 @@ def _cancel_plan(plan, by, now, gate):
     )
 
 
-def _expire(plan, gate, now):
+def _expire(plan, now):
     if plan.get("status") != "pending":
         return False
     if (
@@ -1082,7 +1075,7 @@ def _waiting(plan):
 def _vote_transition(plan, voter, value, now, gate):
     """After recording ``voter``'s vote, decline/confirm or return a wait notice."""
     if _unreachable(plan):
-        _decline(plan, voter, now, gate)
+        _decline(plan, now)
         return None
     if _quorum_reached(plan):
         _confirm(plan, now, gate)
@@ -1101,10 +1094,8 @@ async def recover(gate, *, force=True):
     """Retry the durable outbox and expire abandoned pending plans."""
     state = load(gate.person)
     now = gate._now()
-    changed = False
     for plan in list(state["plans"].values()):
-        if _expire(plan, gate, now):
-            changed = True
+        if _expire(plan, now):
             save(gate.person, state)
         for key, job in list(plan.get("jobs", {}).items()):
             if job.get("done"):
@@ -1132,9 +1123,6 @@ async def recover(gate, *, force=True):
             else:
                 job["done"] = True
             save(gate.person, state)
-            changed = True
-    if changed:
-        save(gate.person, state)
 
 
 async def _run_job(gate, plan, job):

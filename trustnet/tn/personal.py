@@ -4,7 +4,7 @@ import asyncio
 import json
 import os
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 try:
@@ -410,10 +410,8 @@ def _write_audience_request(person: str, question: str, audience: list[str]) -> 
         except (OSError, ValueError, TypeError, AttributeError):
             expired = True
         if expired:
-            try:
+            with suppress(OSError):
                 stale.unlink()
-            except OSError:
-                pass
     number = time.time_ns() % 1_000_000_000
     for _ in range(1000):
         token = f"A{number:09d}"
@@ -485,20 +483,16 @@ async def ask(person: str, friend: str, fields: list[str]):
                 await client.connect_to_room(room)
                 await wait_until_live(client, room, line)
                 return {"room": room, "message": await client.post_message(line)}
-            existing = set(open_rooms)
             await client.connect_to_room(await home(person, client))
             await client.post_message(f"@{person}-gate ask-room {friend}")
         else:
             prefix = f"dm-{pair}-facts-request"
-            existing = set()
         for _ in range(150):
             detail = await client.get_agent_detail(client.agent_id)
             rooms = [
                 r
                 for r in detail["rooms"]
-                if r["room_name"].startswith(prefix)
-                and not r.get("archived")
-                and r["room_id"] not in existing
+                if r["room_name"].startswith(prefix) and not r.get("archived")
             ]
             if rooms:
                 room = rooms[-1]["room_id"]

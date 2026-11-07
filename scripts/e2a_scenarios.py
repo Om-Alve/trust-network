@@ -421,10 +421,6 @@ class Run:
 # ---------------------------------------------------------------- checks
 
 
-def owners_of(event_uid, state):
-    return [p for p, s in state.items() if event_uid in s["calendar"]]
-
-
 def common_checks(report) -> list[dict]:
     state, people = report["state"], report["people"]
     out = []

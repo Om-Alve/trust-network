@@ -15,7 +15,7 @@ from pathlib import Path
 from pytest import MonkeyPatch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
-from planning_flows import SCENARIOS, Planning  # noqa: E402
+from planning_flows import SCENARIOS, Planning
 
 
 async def main():

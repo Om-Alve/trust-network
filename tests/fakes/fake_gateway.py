@@ -106,7 +106,7 @@ class _GatewayHandler(BaseHTTPRequestHandler):
     server_version = "fake-switch-gateway/1"
     sys_version = ""
 
-    def log_message(self, format, *args):  # noqa: A002 - stdlib signature
+    def log_message(self, format, *args):  # stdlib signature
         pass
 
     def do_GET(self) -> None:

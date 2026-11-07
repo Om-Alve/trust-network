@@ -478,7 +478,6 @@ def _cmd_trust_locked(context: Context, args: argparse.Namespace) -> int:
             args.clear_permissions,
         )
     )
-    permissions = trust.permissions_for(person)
     if requested:
         permissions = trust.permissions.setdefault(person, PersonPermissions())
         if args.clear_permissions:
@@ -506,9 +505,7 @@ def _cmd_trust_locked(context: Context, args: argparse.Namespace) -> int:
     }
     if requested:
         payload["permissions"] = _permissions_payload(permissions)
-    if previous is None:
-        text = f"{owner} trusts {person} at {level.value}"
-    elif previous is level:
+    if previous is None or previous is level:
         text = f"{owner} trusts {person} at {level.value}"
     else:
         text = f"{owner} trusts {person}: {previous.value} → {level.value}"
@@ -878,8 +875,6 @@ def _jsonable(value: Any) -> Any:
 
 
 def _cmd_dm(context, args):
-    import asyncio
-
     from trustnet.tn.personal import dm_operate
 
     result = asyncio.run(dm_operate(context.owner(), args.room, getattr(args, "text", None)))
@@ -887,8 +882,6 @@ def _cmd_dm(context, args):
 
 
 def _cmd_gift(context, args):
-    import asyncio
-
     from trustnet.tn import personal
 
     if args.command == "gift-ideas":
@@ -913,8 +906,6 @@ def _cmd_wake(context, args):
 
 
 def _cmd_personal(context, args):
-    import asyncio
-
     from trustnet.tn import personal
 
     values = {

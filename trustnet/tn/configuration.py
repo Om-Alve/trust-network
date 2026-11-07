@@ -64,7 +64,7 @@ def checked_url(value):
         raise ValueError("Use HTTPS, or HTTP on localhost")
     if not url.hostname or url.username or url.password or url.query or url.fragment:
         raise ValueError("Server addresses cannot contain credentials, queries or fragments")
-    if url.port is not None and url.port == 0:
+    if url.port == 0:
         raise ValueError("Server ports must be between 1 and 65535")
     return value.rstrip("/")
 

@@ -224,7 +224,7 @@ def _initialize_host(context, args: argparse.Namespace) -> int:
         },
         "people": people,
     }
-    _save_config(path, config)
+    configuration.write_json(path, config)
     _write_people_mapping(people_path, people)
 
     payload = {
@@ -404,7 +404,7 @@ def _save_provisioning(config: dict[str, Any], path: Path, people: dict[str, Any
     people_path = _people_path(config)
     if people_path is not None:
         _write_people_mapping(people_path, people)
-    _save_config(path, config)
+    configuration.write_json(path, config)
 
 
 def _default_key_env(person: str) -> str:
@@ -546,7 +546,7 @@ class _HostHandler(BaseHTTPRequestHandler):
     server_version = "tn-host/1"
     sys_version = ""
 
-    def log_message(self, format, *args) -> None:  # noqa: A002 - stdlib signature
+    def log_message(self, format, *args) -> None:  # stdlib signature
         """Requests carry no tokens in the URL; still, keep the log empty."""
 
     def do_GET(self) -> None:
@@ -804,10 +804,6 @@ def _load_config() -> tuple[dict[str, Any], Path]:
         raise HostError(f"{path} is missing; run `tn host init`")
     config = configuration.read_json(path)
     return config, path
-
-
-def _save_config(path: Path, config: dict[str, Any]) -> None:
-    configuration.write_json(path, config)
 
 
 def _people_path(config: dict[str, Any]) -> Path | None:

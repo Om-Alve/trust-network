@@ -3,25 +3,13 @@
 import asyncio
 import json
 import os
-import pathlib
 import shutil
 import subprocess
 from pathlib import Path
 
 from scripts.demo_up import PEOPLE, configure, options
+from scripts.switch_users import vm_host
 from trustnet.switch_client import SwitchClient, SwitchError
-
-
-def _vm_host() -> str:
-    """The VM's ssh target: TN_VM_HOST from the environment or .env (gitignored)."""
-    if os.environ.get("TN_VM_HOST"):
-        return os.environ["TN_VM_HOST"]
-    env = pathlib.Path(__file__).resolve().parents[1] / ".env"
-    for line in env.read_text().splitlines() if env.exists() else []:
-        if line.startswith("TN_VM_HOST="):
-            return line.split("=", 1)[1].strip().strip("\"'")
-    return "om@hermes.<tailnet>.ts.net"
-
 
 STATE_FILES = (
     "ledger.jsonl",
@@ -94,7 +82,7 @@ async def archive(dry_run):
 
 def main():
     parser = options(__doc__)
-    parser.add_argument("--vm-host", default=_vm_host())
+    parser.add_argument("--vm-host", default=vm_host())
     args = parser.parse_args()
     root = configure(args)
     asyncio.run(archive(args.dry_run))

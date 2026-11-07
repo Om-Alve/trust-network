@@ -52,7 +52,6 @@ class Brief:
     """
 
     text: str
-    level: Level
     disclosed_facts: dict[str, Any]
     entries: tuple[ledger.Entry, ...]
 
@@ -116,7 +115,6 @@ def write_brief(
     )
     return Brief(
         text=text,
-        level=level,
         disclosed_facts=facts,
         entries=(*entries, calendar_entry),
     )

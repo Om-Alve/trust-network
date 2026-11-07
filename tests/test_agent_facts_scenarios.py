@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.e2e_agent_facts_scenarios import onboarding, scenario  # noqa: E402
+from scripts.e2e_agent_facts_scenarios import onboarding, scenario
 
 
 async def test_private_facts_and_consent(tmp_path):

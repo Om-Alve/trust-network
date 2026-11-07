@@ -86,9 +86,9 @@ class World:
     def rooms_named(self, prefix: str) -> list[dict]:
         return [room for room in self.switch.rooms.values() if room["name"].startswith(prefix)]
 
-    async def add_room(self, name: str, agents: list[str], owner: str | None = None) -> str:
+    async def add_room(self, name: str, agents: list[str]) -> str:
         """Create an internal room whose members are agents (and the owner user)."""
-        creator = owner or agents[0].rsplit("-", 1)[0]
+        creator = agents[0].rsplit("-", 1)[0]
         result = await self.gate_clients[creator].create_room(name, "", agents, internal_only=True)
         return result["room_id"]
 

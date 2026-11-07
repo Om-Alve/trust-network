@@ -26,4 +26,4 @@ import pytest
     ],
 )
 def test_import(module_name: str) -> None:
-    assert importlib.import_module(module_name).__name__ == module_name
+    importlib.import_module(module_name)

@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from trustnet.switch_client import SwitchClient  # noqa: E402
+from trustnet.switch_client import SwitchClient
 
 COLOURS = {"gate": "\033[2;37m", "hermes": "\033[1;36m", "rahul-hermes": "\033[1;33m"}
 RESET = "\033[0m"

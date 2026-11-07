@@ -51,6 +51,14 @@ def read_env(path: Path) -> dict[str, str]:
     return values
 
 
+def vm_host() -> str:
+    """The VM's ssh target: TN_VM_HOST from the environment or .env (gitignored)."""
+    if host := os.environ.get("TN_VM_HOST"):
+        return host
+    saved = read_env(REPO / ".env").get("TN_VM_HOST", "").strip("\"'")
+    return saved or "om@hermes.<tailnet>.ts.net"
+
+
 def set_env(path: Path, key: str, value: str) -> None:
     """Set KEY=value in a dotenv file, replacing an existing line or appending one."""
     lines = path.read_text().splitlines() if path.exists() else []

@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.switch_users import CONSOLE_ENV, login, read_env  # noqa: E402
-from trustnet.switch_client import SwitchClient  # noqa: E402
+from scripts.switch_users import CONSOLE_ENV, login, read_env
+from trustnet.switch_client import SwitchClient
 
 
 def safe(value):

@@ -347,12 +347,12 @@ def test_om_direct_mode_accepts_om_himself(om_trust: TrustList) -> None:
     assert authorize("yes", OM, "om", om_trust.consent_default) == Allowed("direct")
 
 
-def test_rahul_via_agent_mode_still_accepts_rahul_himself(rahul_trust: TrustList) -> None:
+def test_rahul_via_agent_mode_still_accepts_rahul_himself() -> None:
     decision = authorize("yes", RAHUL, "rahul", "via-agent", {"rahul-hermes"})
     assert decision == Allowed("direct")
 
 
-def test_om_direct_mode_refuses_his_own_agent(om_trust: TrustList) -> None:
+def test_om_direct_mode_refuses_his_own_agent() -> None:
     decision = authorize("yes", OM_AGENT, "om", "direct", {"om-agent"})
     assert isinstance(decision, Denied)
     assert decision.code is DenialCode.CONSENT_MODE

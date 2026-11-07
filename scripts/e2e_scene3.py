@@ -9,30 +9,18 @@ VM gate is active; never starts or stops that service.
 import asyncio
 import json
 import os
-import pathlib
 import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-from scripts.switch_users import read_env
+from scripts.switch_users import read_env, vm_host
 from trustnet.gate import ledger
 from trustnet.gate.identity import export_local, read_identities
 from trustnet.gate.policy import Identity
 from trustnet.gate.runtime import Gate
 from trustnet.switch_client import Event, SwitchClient
-
-
-def _vm_host() -> str:
-    """The VM's ssh target: TN_VM_HOST from the environment or .env (gitignored)."""
-    if os.environ.get("TN_VM_HOST"):
-        return os.environ["TN_VM_HOST"]
-    env = pathlib.Path(__file__).resolve().parents[1] / ".env"
-    for line in env.read_text().splitlines() if env.exists() else []:
-        if line.startswith("TN_VM_HOST="):
-            return line.split("=", 1)[1].strip().strip("\"'")
-    return "om@hermes.<tailnet>.ts.net"
 
 
 async def run(live=False):
@@ -54,7 +42,7 @@ async def run(live=False):
                 "ssh",
                 "-o",
                 "ConnectTimeout=10",
-                _vm_host(),
+                vm_host(),
                 "systemctl --user is-active rahul-gate.service",
             ],
             capture_output=True,

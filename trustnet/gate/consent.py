@@ -309,8 +309,6 @@ async def handle(gate, event, command, sender, mode):
             return
         who, vote, via = friend, command.agreed, command.via
     elif ref.startswith("Q"):
-        if not isinstance(command, c.Answer):
-            return
         item["status"] = "answered"
         enqueue(item, "answer", "message", text=f"{ref} answer from {person}: {command.text}")
         enqueue(item, "answer-ledger", "ledger", text=command.text.text, entry_kind="answer")

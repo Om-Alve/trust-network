@@ -1,12 +1,12 @@
 """Tests for the gate command parser: the original design §3 and §4, plus sloppy input."""
 
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from trustnet.gate.commands import (
     EXAMPLES,
-    IST,
     MAX_PLACE,
     MAX_QUESTION,
     MAX_TITLE,
@@ -35,6 +35,7 @@ from trustnet.gate.commands import (
 from trustnet.gate.facts import Level
 
 # Thursday 5 November 2026, 09:00 IST. The demo outing is Sunday the 8th.
+IST = ZoneInfo("Asia/Kolkata")
 NOW = datetime(2026, 11, 5, 9, 0, tzinfo=IST)
 OUTING = datetime(2026, 11, 8, 21, 0, tzinfo=IST)
 PLACE = "Smaaash, Indiranagar"

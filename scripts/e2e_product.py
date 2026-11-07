@@ -12,8 +12,8 @@ from pytest import MonkeyPatch
 from trustnet.gate import calendar_jobs, group_plans
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
-from planning_flows import Planning  # noqa: E402
-from product_flows import SCENARIOS  # noqa: E402
+from planning_flows import Planning
+from product_flows import SCENARIOS
 
 
 async def main():

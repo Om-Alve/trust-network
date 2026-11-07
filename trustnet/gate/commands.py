@@ -12,7 +12,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Final, Literal, TypeAlias
-from zoneinfo import ZoneInfo
 
 import dateparser
 
@@ -48,7 +47,6 @@ __all__ = [
     "parse",
 ]
 
-IST: Final[ZoneInfo] = ZoneInfo("Asia/Kolkata")
 MAX_TITLE: Final = 60
 MAX_PLACE: Final = 60
 MAX_QUESTION: Final = 140

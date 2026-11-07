@@ -32,6 +32,7 @@ from trustnet.tn import personal
 from trustnet.tn.wake import PRESETS
 
 WAKE_AGENTS = "--agent " + "|".join(PRESETS)
+RETAINED_KEYS = ("agent", "consent", "wake", "timezone", "calendar_delivery")
 
 
 def add_commands(commands, common):
@@ -140,7 +141,7 @@ def _settings(args):
     legacy = bool(saved.get("person"))
     if args.invite:
         values = _redeem(args.invite)
-        for key in ("agent", "consent", "wake", "timezone", "calendar_delivery"):
+        for key in RETAINED_KEYS:
             if key in saved:
                 values[key] = saved[key]
     elif saved and not (args.name or args.server or args.key_env):
@@ -166,7 +167,7 @@ def _settings(args):
                 identity_token=_secret(args.identity_token_env, "Identity access token: "),
             )
         if saved.get("person") == person:
-            for key in ("agent", "consent", "wake", "timezone", "calendar_delivery"):
+            for key in RETAINED_KEYS:
                 if key in saved:
                     values[key] = saved[key]
     person = values["person"]
@@ -378,8 +379,9 @@ def _mcp(settings):
         config.write_json(path, values)
 
 
-def _gate_running(settings):
-    path = Path(settings["data_dir"]) / settings["person"] / "gate.lock"
+def _lock_held(settings, filename):
+    """Whether some process holds this person's lock file."""
+    path = Path(settings["data_dir"]) / settings["person"] / filename
     if not path.exists():
         return False
     with path.open("a") as handle:
@@ -388,19 +390,15 @@ def _gate_running(settings):
         except BlockingIOError:
             return True
     return False
+
+
+def _gate_running(settings):
+    return _lock_held(settings, "gate.lock")
 
 
 def _wake_running(settings):
     """Whether some process holds this person's ``tn wake`` lock."""
-    path = Path(settings["data_dir"]) / settings["person"] / "wake.lock"
-    if not path.exists():
-        return False
-    with path.open("a") as handle:
-        try:
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            return True
-    return False
+    return _lock_held(settings, "wake.lock")
 
 
 def _start(settings):
@@ -520,7 +518,7 @@ def _service_args(settings):
     }
 
 
-def _service_env(settings):
+def _service_env():
     return {
         "TN_CONFIG_DIR": str(config.config_dir()),
         "PATH": os.environ.get("PATH", "/usr/bin:/bin:/usr/sbin:/sbin"),
@@ -553,7 +551,7 @@ def _launchd_payload(settings, role, platform):
     return {
         "Label": _unit_name(settings, role, platform),
         "ProgramArguments": args,
-        "EnvironmentVariables": _service_env(settings),
+        "EnvironmentVariables": _service_env(),
         "WorkingDirectory": str(config_dir),
         "RunAtLoad": True,
         "KeepAlive": {"SuccessfulExit": False},
@@ -563,11 +561,11 @@ def _launchd_payload(settings, role, platform):
     }
 
 
-def _systemd_unit(settings, role, platform):
+def _systemd_unit(settings, role):
     args = _service_args(settings)[role]
     environment = "".join(
         f"Environment={_systemd_value(key + '=' + value, dollar=False)}\n"
-        for key, value in _service_env(settings).items()
+        for key, value in _service_env().items()
     )
     return (
         "[Unit]\n"
@@ -686,7 +684,7 @@ def _install_service(settings):
                 _supervisor("launchctl", "load", "-w", str(paths[role]), check=True)
     else:
         for role in ("gate", "wake"):
-            _write_private(paths[role], _systemd_unit(settings, role, platform))
+            _write_private(paths[role], _systemd_unit(settings, role))
         _supervisor("systemctl", "--user", "daemon-reload", check=True)
         for role in ("gate", "wake"):
             unit = _unit_name(settings, role, platform)
@@ -715,8 +713,11 @@ def _service_stop(settings):
         return False
     platform = state["platform"]
     roles = [role for role in ("gate", "wake") if state[role]["installed"]]
-    was_live = _gate_running(settings) or _wake_running(settings)
-    was_live = was_live or any(state[role].get("active") for role in roles)
+    was_live = (
+        _gate_running(settings)
+        or _wake_running(settings)
+        or any(state[role].get("active") for role in roles)
+    )
     if platform == "launchd":
         for role in roles:
             label = _unit_name(settings, role, platform)

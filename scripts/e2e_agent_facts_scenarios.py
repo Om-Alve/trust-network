@@ -13,10 +13,10 @@ from pytest import MonkeyPatch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.e2e_facts_scenarios import personal_session, world_for  # noqa: E402
-from trustnet.gate import ledger  # noqa: E402
-from trustnet.gate.facts import load_profile, load_trust, resolve_data_dir, save_trust  # noqa: E402
-from trustnet.tn import cli, mcp, personal  # noqa: E402
+from scripts.e2e_facts_scenarios import personal_session, world_for
+from trustnet.gate import ledger
+from trustnet.gate.facts import load_profile, load_trust, resolve_data_dir, save_trust
+from trustnet.tn import cli, mcp, personal
 
 
 async def scenario(base):

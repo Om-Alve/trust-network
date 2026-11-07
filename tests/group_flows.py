@@ -81,7 +81,6 @@ import json
 from copy import deepcopy
 from datetime import datetime
 
-import pytest
 import yaml
 from scenario_harness import build_world, personal_session
 
@@ -1105,8 +1104,3 @@ SCENARIOS = [
     invitee_cannot_take_over_as_organizer,
     fingerprint_backward_compatible,
 ]
-
-
-@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda scenario: scenario.__name__)
-async def test_group_plan_scenario(scenario, tmp_path, monkeypatch):
-    await scenario(tmp_path, monkeypatch)

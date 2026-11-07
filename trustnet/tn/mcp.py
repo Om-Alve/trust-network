@@ -37,8 +37,6 @@ __all__ = ["build", "main"]
 
 SERVER_NAME = "trustnet"
 
-PENDING_TOOLS: tuple[str, ...] = ()
-
 INSTRUCTIONS = (
     "Use the setup prompt to onboard from your memory with private facts and pending review. "
     "Tools for taking part in trust-network as your person's own agent, in Switch, "
@@ -48,6 +46,22 @@ INSTRUCTIONS = (
     "on what your person tells you. Only share what your share card permits. Nothing is "
     "committed until both people say yes."
 )
+
+
+def _plan_content(
+    start: str,
+    minutes: int,
+    title: str,
+    place: str,
+    notes: str | None,
+    weekly: int | None,
+) -> dict[str, Any]:
+    content: dict[str, Any] = {"start": start, "minutes": minutes, "title": title, "place": place}
+    if notes is not None:
+        content["notes"] = notes
+    if weekly is not None:
+        content["weekly"] = weekly
+    return content
 
 
 def build(person: str) -> MCPServer:
@@ -253,11 +267,7 @@ def build(person: str) -> MCPServer:
         notes: str | None = None,
         weekly: int | None = None,
     ) -> dict[str, Any]:
-        content = {"start": start, "minutes": minutes, "title": title, "place": place}
-        if notes is not None:
-            content["notes"] = notes
-        if weekly is not None:
-            content["weekly"] = weekly
+        content = _plan_content(start, minutes, title, place, notes, weekly)
         payload: dict[str, Any] = {"participants": participants, "content": content}
         if min_yes is not None:
             payload["min_yes"] = min_yes
@@ -298,11 +308,7 @@ def build(person: str) -> MCPServer:
         notes: str | None = None,
         weekly: int | None = None,
     ) -> dict[str, Any]:
-        content = {"start": start, "minutes": minutes, "title": title, "place": place}
-        if notes is not None:
-            content["notes"] = notes
-        if weekly is not None:
-            content["weekly"] = weekly
+        content = _plan_content(start, minutes, title, place, notes, weekly)
         payload: dict[str, Any] = {
             "plan": reference,
             "revision": revision,
