@@ -101,7 +101,9 @@ TN_DATA_DIR=/tmp/tn-examples uv run tn -a om view-as priya
 Om trusts Rahul as `close` and Priya as `friend`. Rahul sees Om's neighbourhood,
 sizes and wishlist; Priya does not. Neither sees his address. The
 [verification guide](docs/verification.md) has acceptance scenarios that run in
-under a minute, and a run with two real Codex agents on a live Switch server.
+under a minute, and live runs on a Switch server: two Codex agents planning,
+real macOS background services, and Hermes writing an approved plan to Google
+Calendar.
 
 **Join a network.** A network is a group of friends sharing one Switch server.
 Its **organizer** is the person who hosts that server and the onboarding host, and
