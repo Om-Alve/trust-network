@@ -1,8 +1,6 @@
-"""Live acceptance for real launchd services and Google Calendar delivery.
+"""Live acceptance for the real launchd gate and wake services (no model calls).
 
 Failure cases, before implementation:
-
-Services stage (no model calls):
 - setup reports ready while launchd has not loaded a unit, or loaded it without
   a running process;
 - launchd runs a program other than the one its plist names, or an interpreter
@@ -19,15 +17,7 @@ Services stage (no model calls):
 - an interrupted run leaves loaded test units or processes;
 - credentials appear in the report.
 
-Calendar stage (real Codex turns and Google Calendar):
-- the Google Calendar connector is not accessible from the Codex home the wake
-  service uses;
-- unattended connector calls need approval in codex exec;
-- the script, not the launchd wake runner, performs delivery;
-- the receipt names an event that is missing or differs in title, start,
-  duration, location or UID marker;
-- the test event stays in the calendar;
-- the local ICS side differs from the plan.
+Google Calendar delivery under launchd is scripts/e2a_hermes_calendar.py.
 
 Each person is a fresh Switch user created by a private onboarding host
 (``tn host``) with the Console administrator credentials, and joins with the
@@ -39,8 +29,7 @@ and ~/.codex/config.toml are never written. The units run an isolated
 ``uv tool install`` of this checkout under the same directory: the documented
 install path, frozen at the tested commit and kept after the run.
 
-    uv run python -m scripts.e2a_live_services --stage services
-    uv run python -m scripts.e2a_live_services --stage calendar
+    uv run python -m scripts.e2a_live_services
     uv run python -m scripts.e2a_live_services --verify data/live-services-<timestamp>/report.json
 
 ``--verify`` re-checks a saved report and the private files beside it, with no
@@ -50,18 +39,15 @@ launchd, Switch or model call. Test Switch accounts remain for inspection.
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import os
 import plistlib
-import shutil
 import signal
 import socket
 import subprocess
 import sys
-import threading
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -85,7 +71,6 @@ SECRET_KEYS = frozenset(
         "OPENAI_API_KEY",
     }
 )
-GOOGLE_CALENDAR = "connector_947e0d954944416db111db556030eea6"
 ASK = (
     "import asyncio, json, sys\n"
     "from trustnet.tn import configuration, personal\n"
@@ -229,8 +214,8 @@ def free_port():
 
 
 class Live:
-    def __init__(self, output, names, server, stamp):
-        self.output, self.names, self.server, self.stamp = output, names, server, stamp
+    def __init__(self, output, names, server):
+        self.output, self.names, self.server = output, names, server
         self.env, self.evidence, self.findings = {}, {}, []
         self.invite_tokens, self.host = set(), None
         path = os.pathsep.join(
@@ -569,396 +554,15 @@ def verify_cleanup(report, output):
     assert not any(secret in text for secret in secrets(output)), "a credential is in the report"
 
 
-# ---------------------------------------------------------------------------
-# Each person's CODEX_HOME holds a copy of ~/.codex/config.toml, so tn setup's
-# `codex mcp add` edits only the copy and the user's connectors and plugins stay
-# configured, plus a symlink to ~/.codex/auth.json so a token refresh reaches the
-# user's own file. If Codex replaces the file instead of writing through the
-# link, the copies diverge; the report records whether each link survived.
-#
-# Known risk: wake.codex_command sets default_tools_approval_mode="approve" only
-# for the trust-network MCP server. If unattended codex exec needs approval for
-# Google Calendar tools, the first run fails at "A's calendar task applied": the
-# task is `failed` with the refused call in its error, or stays pending while
-# wake-service.log shows repeated turns. Codex's stderr for the read-back turns is
-# saved beside the report. The fix then belongs in wake.codex_command.
-# ---------------------------------------------------------------------------
-
-
-def connector_preflight(codex_home, timeout=240):
-    process = subprocess.Popen(
-        ["codex", "app-server"],
-        env={**os.environ, "CODEX_HOME": str(codex_home)},
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        text=True,
-    )
-    timer = threading.Timer(timeout, process.kill)
-    timer.daemon = True
-    timer.start()
-
-    def call(number, method, params):
-        process.stdin.write(json.dumps({"method": method, "id": number, "params": params}) + "\n")
-        process.stdin.flush()
-        while line := process.stdout.readline():
-            message = json.loads(line)
-            if message.get("id") == number:
-                if "error" in message:
-                    raise SystemExit(f"codex app-server {method} failed: {message['error']}")
-                return message["result"]
-        raise SystemExit(f"codex app-server closed or timed out during {method}")
-
-    found, pages = None, 0
-    try:
-        call(1, "initialize", {"clientInfo": {"name": "trust-network-e2a", "version": "1"}})
-        process.stdin.write(json.dumps({"method": "initialized"}) + "\n")
-        process.stdin.flush()
-        params = {"limit": 200, "forceRefetch": True}
-        while found is None and params:
-            pages += 1
-            page = call(1 + pages, "app/list", params)
-            found = next((app for app in page["data"] if app["id"] == GOOGLE_CALENDAR), None)
-            params = (
-                {"limit": 200, "cursor": page["nextCursor"]} if page.get("nextCursor") else None
-            )
-    finally:
-        timer.cancel()
-        process.kill()
-    if not found or not found.get("isAccessible"):
-        raise SystemExit(
-            f"Google Calendar connector {GOOGLE_CALENDAR} is "
-            + ("not listed" if not found else "listed but not accessible")
-            + f" for CODEX_HOME={codex_home} after {pages} app/list page(s). Link Google Calendar "
-            "in Codex with the signed-in ChatGPT account, then rerun --stage calendar."
-        )
-    return {key: found.get(key) for key in ("id", "name", "isAccessible", "isEnabled")}
-
-
-def linked_codex_home(path):
-    path.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(Path.home() / ".codex/config.toml", path / "config.toml")
-    (path / "auth.json").symlink_to(Path.home() / ".codex/auth.json")
-
-
-def codex_json(codex_home, workdir, prompt, schema, name):
-    """One fresh ``codex exec`` turn with a JSON-schema answer; its traces stay private."""
-    from trustnet.tn import wake
-
-    workdir.mkdir(parents=True, exist_ok=True)
-    (workdir / f"{name}.schema.json").write_text(json.dumps(schema))
-    answer = workdir / f"{name}.json"
-    result = subprocess.run(
-        [
-            "codex",
-            "exec",
-            "--skip-git-repo-check",
-            "--ephemeral",
-            "-m",
-            wake.MODELS["codex"],
-            "-s",
-            "read-only",
-            "-C",
-            str(workdir),
-            "-c",
-            "features.shell_tool=false",
-            "-c",
-            'web_search="disabled"',
-            "--output-schema",
-            str(workdir / f"{name}.schema.json"),
-            "-o",
-            str(answer),
-            "-",
-        ],  # fmt: skip
-        input=prompt,
-        env={**os.environ, "CODEX_HOME": str(codex_home)},
-        capture_output=True,
-        text=True,
-        timeout=300,
-    )
-    (workdir / f"{name}.stdout").write_text(result.stdout)
-    (workdir / f"{name}.stderr").write_text(result.stderr)
-    if result.returncode or not answer.exists():
-        raise RuntimeError(f"codex {name} turn exited {result.returncode}; see {workdir}")
-    return json.loads(answer.read_text())
-
-
-def strict(properties):
-    return {
-        "type": "object",
-        "properties": properties,
-        "required": list(properties),
-        "additionalProperties": False,
-    }
-
-
-EVENT_SCHEMA = strict(
-    {
-        "found": {"type": "boolean"},
-        **{
-            key: {"type": "string"}
-            for key in ("id", "summary", "start", "end", "location", "description", "status")
-        },
-    }
-)
-DELETE_SCHEMA = strict(
-    {"deleted": {"type": "boolean"}, "id": {"type": "string"}, "receipt": {"type": "string"}}
-)
-
-
-async def calendar(live):
-    from icalendar import Calendar
-
-    from scripts.e2a_real_agents import Acceptance, environment
-    from trustnet.gate import calendar_jobs
-    from trustnet.tn import wake
-    from trustnet.tn.configuration import apply
-
-    class OwnerTurns(Acceptance):
-        """e2a_real_agents turn driving, limited to explicit owner messages.
-
-        News turns belong to the launchd wake runners. Calling ``watch`` here
-        would move their cursor and hide the news from them.
-        """
-
-        def attach(self, person, env):
-            self.envs[person] = env
-            link = self.output / "profiles" / person
-            link.parent.mkdir(exist_ok=True)
-            link.symlink_to(Path(env["TN_CONFIG_DIR"]) / "profiles" / person)
-            invoke, label = wake.invoker(person, "codex")
-
-            def traced(reply, invoke=invoke, person=person):
-                argv, extra, reader = invoke(reply)
-                count = sum(t["person"] == person for t in self.turns)
-                trace = self.output / f"{person}-owner-turn-{count}"
-                request = trace.with_suffix(".request.json")
-                request.write_text(json.dumps({"argv": argv, "trace": str(trace)}))
-                return [sys.executable, str(self.proxy), str(request)], extra, reader
-
-            with environment(env):
-                apply(override=True)
-                self.runners[person] = wake.Runner(person, traced, label, every=2)
-
-        async def turn(self, person, message):
-            runner = self.runners[person]
-            started = time.time()
-            with environment(self.envs[person]):
-                apply(override=True)
-                before = len(runner.transcript)
-                await runner.say(message)
-            self.turns.append(
-                {
-                    "person": person,
-                    "owner_message": message,
-                    "started": started,
-                    "ended": time.time(),
-                    "transcript_delta": runner.transcript[before:],
-                }
-            )
-            if runner.carry:
-                raise RuntimeError(f"Owner turn failed for {person}; inspect its private trace")
-
-    async def wait(predicate, seconds, what):
-        deadline = time.monotonic() + seconds
-        while not predicate():
-            if time.monotonic() > deadline:
-                raise TimeoutError(f"{what} within {seconds}s")
-            await asyncio.sleep(3)
-
-    a, b = live.names
-    evidence = live.evidence
-    homes = {p: live.output / "people" / p / "codex-home" for p in live.names}
-    for home in homes.values():
-        linked_codex_home(home)
-    evidence["preflight"] = connector_preflight(homes[a])
-    live.install()
-    live.start_host()
-    title = f"trust-network E2E {live.stamp}"
-    place = "Cafe Test Room, Indiranagar"
-    start = (
-        (datetime.now(timezone.utc) + timedelta(days=3))
-        .replace(hour=9, minute=0, second=0, microsecond=0)
-        .isoformat()
-    )
-    personas = {
-        a: (
-            "Your calendar is Google Calendar through the Codex Google Calendar connector. "
-            "For a confirmed create calendar task, first search the primary calendar for the task "
-            "uid. If no event carries it, create exactly one event with the plan's title, start, "
-            "duration and place as location, with the task uid in the description. Then call "
-            "calendar_report with status applied, provider google-calendar and the event ID the "
-            "connector returned. If the connector is missing or refuses a call, call "
-            "calendar_report with status failed and the exact error. Never use cal_add."
-        ),
-        b: (
-            "Your calendar is this test's disposable local ICS file. For a confirmed create "
-            "calendar task, call cal_add with the task uid as id, then calendar_report with "
-            "provider local-ics and that exact event id."
-        ),
-    }
-    os.environ["TN_DATA_DIR"] = str(live.output / "profiles")
-    turns = OwnerTurns(live.output, live.names, ["codex", "codex"], live.base_env, start)
-    evidence["plan_input"] = {"title": title, "place": place, "start": start}
-    for person, peer, delivery in ((a, b, "agent"), (b, a, "ics")):
-        profile = live.output / "people" / person / "config" / "profiles" / person
-        profile.mkdir(parents=True)
-        (profile / "agent.md").write_text(
-            f"You are the real personal agent for isolated test person {person}. Your peer is "
-            f"{peer}. This is an acceptance run. Automatic conversation is authorized. Use only "
-            "trust-network tools and the calendar named below; do not message real contacts. "
-            "The owner has NOT approved any plan until a later explicit message says so. "
-            + personas[person]
-            + " Never report a write without a successful tool result. Do not create duplicates."
-        )
-        evidence.setdefault("setup", {})[person] = live.join(
-            person, "--calendar-delivery", delivery, "--timezone", "Asia/Kolkata"
-        )
-    for person, peer in ((a, b), (b, a)):
-        live.tn(person, "trust", peer, "friend")
-        turns.attach(person, live.env[person])
-    evidence["installed"] = until(live.all_running, 30, "units were not running after setup")
-
-    await turns.turn(
-        a,
-        f"Please propose a 30-minute plan titled exactly '{title}' with {b} at '{place}' "
-        f"starting {start}. Use group_plan_create, check status using its returned token, and "
-        "wait for my approval. Do not vote or add an event yet.",
-    )
-    await wait(lambda: all(turns.plan(p) for p in live.names), 300, "both gates hold the plan")
-    assert all(turns.plan(p)["votes"] == {} for p in live.names), "Agent invented owner consent"
-    reference = turns.plan(a)["id"]
-    await turns.turn(
-        b,
-        "Read the new group plan and use dm_post in its room to tell the other agent that the "
-        "proposed time works. Wait for my explicit approval before voting.",
-    )
-    await turns.turn(
-        a,
-        f"I approve the exact current plan {reference}. Read its revision and fingerprint and "
-        "relay my yes for that revision only.",
-    )
-    await wait(lambda: all(a in turns.plan(p)["votes"] for p in live.names), 300, "A's vote")
-    assert all(calendar_jobs.all_tasks(p) == [] for p in live.names), "one yes queued a task"
-    evidence["tasks_after_last_owner_turn_of_a"] = calendar_jobs.all_tasks(a)
-    await turns.turn(
-        b,
-        f"I approve the exact current plan {reference}. Read its current revision and "
-        "fingerprint and relay my yes.",
-    )
-    await wait(
-        lambda: all(turns.plan(p)["status"] == "confirmed" for p in live.names), 300, "confirmed"
-    )
-
-    def delivered(person):
-        tasks = calendar_jobs.all_tasks(person)
-        if tasks and tasks[0]["status"] == "failed":
-            raise AssertionError(f"{person}'s agent reported delivery failed: {tasks[0]['error']}")
-        return bool(tasks) and all(t["status"] == "applied" for t in tasks)
-
-    await wait(lambda: delivered(a), 900, "A's launchd wake runner did not deliver to Google")
-    evidence["a_task_applied_seen"] = time.time()
-    await wait(lambda: delivered(b), 600, "B's calendar task was not applied")
-    task = calendar_jobs.all_tasks(a)[0]
-    plan = turns.plan(a)
-    work = live.output / "codex-readback"
-    readback = (
-        f"Use the Google Calendar connector to get the event with id {task['event_id']} from the "
-        "primary calendar. Do not create, change or delete anything. Return its id, summary, "
-        "start and end as RFC 3339 date-times with offsets, location, description and status "
-        "exactly as the connector returns them. If it does not exist, return found false and "
-        "empty strings."
-    )
-    evidence["readback"] = codex_json(homes[a], work, readback, EVENT_SCHEMA, "readback")
-    evidence["deletion"] = codex_json(
-        homes[a],
-        work,
-        f"Use the Google Calendar connector to delete only the event with id {task['event_id']} "
-        "from the primary calendar. Return deleted true only if the connector confirmed it, the "
-        "id, and the connector's response as receipt.",
-        DELETE_SCHEMA,
-        "delete",
-    )
-    evidence["readback_after_delete"] = codex_json(
-        homes[a], work, readback, EVENT_SCHEMA, "readback-after-delete"
-    )
-    evidence["state"] = turns.snapshot()
-    evidence["plan"] = plan
-    evidence["owner_turns"] = turns.turns
-    evidence["b_events"] = [
-        str(event["UID"])
-        for event in Calendar.from_ical(evidence["state"][b]["calendar"]).walk("VEVENT")
-    ]
-    evidence["final_stop"] = {p: live.stop(p) for p in live.names}
-    evidence["codex_auth_links"] = {
-        p: (home / "auth.json").is_symlink()
-        and (home / "auth.json").resolve() == (Path.home() / ".codex/auth.json").resolve()
-        for p, home in homes.items()
-    }
-
-
-def verify_calendar(report, output):
-    from icalendar import Calendar
-
-    evidence, (a, b) = report["evidence"], report["people"]
-    assert evidence["preflight"]["isAccessible"] is True
-    for person in (a, b):
-        for role in ROLES:
-            assert running(evidence["installed"][person][role]), f"{person} {role} not running"
-    state = evidence["state"]
-    plans = [next(iter(state[p]["plans"]["plans"].values())) for p in (a, b)]
-    assert len({plan["fingerprint"] for plan in plans}) == 1, "Participants disagree"
-    plan = plans[0]
-    content = plan["content"]
-    assert plan["status"] == "confirmed" and set(plan["votes"]) == {a, b}
-    assert content["title"] == evidence["plan_input"]["title"]
-    start = datetime.fromisoformat(content["start"])
-    assert start - datetime.fromisoformat(report["started_at"]) >= timedelta(days=2)
-    assert evidence["tasks_after_last_owner_turn_of_a"] == [], "A's task existed during its turn"
-    last_a_turn = max(t["ended"] for t in evidence["owner_turns"] if t["person"] == a)
-    assert last_a_turn < evidence["a_task_applied_seen"]
-    (task,) = state[a]["calendar_jobs"]
-    assert task["status"] == "applied" and task["uid"] == plan["uid"]
-    assert task["provider"] and task["event_id"]
-    event = evidence["readback"]
-    assert event["found"] and event["id"] == task["event_id"]
-    assert event["summary"] == content["title"]
-    assert event["location"] == content["place"]
-    assert datetime.fromisoformat(event["start"]) == start
-    assert datetime.fromisoformat(event["end"]) - start == timedelta(minutes=content["minutes"])
-    assert plan["uid"] in event["description"], "the UID marker is missing from the event"
-    assert evidence["deletion"]["deleted"] and evidence["deletion"]["id"] == task["event_id"]
-    gone = evidence["readback_after_delete"]
-    assert not gone["found"] or gone["status"] == "cancelled", "the test event still exists"
-    (ics_task,) = state[b]["calendar_jobs"]
-    assert ics_task["status"] == "applied" and ics_task["provider"] == "local-ics"
-    (ics,) = Calendar.from_ical(state[b]["calendar"]).walk("VEVENT")
-    assert str(ics["UID"]) == plan["uid"] and str(ics["SUMMARY"]) == content["title"]
-    assert str(ics["LOCATION"]) == content["place"] and ics.decoded("DTSTART") == start
-    assert ics.decoded("DTEND") - ics.decoded("DTSTART") == timedelta(minutes=content["minutes"])
-    actual = output / "profiles" / b / "calendar.ics"
-    assert actual.read_text() == state[b]["calendar"], "saved ICS differs from the report"
-    for person in (a, b):
-        stopped = evidence["final_stop"][person]
-        assert all(unloaded(r) for r in stopped["units"].values()) and not stopped["processes"]
-    assert all(evidence["codex_auth_links"].values()), "a CODEX_HOME auth link was replaced"
-    verify_cleanup(report, output)
-
-
-STAGES = {"services": (services, verify_services), "calendar": (calendar, verify_calendar)}
-
-
 def main(args):
     if sys.platform != "darwin":
         raise SystemExit("This acceptance drives macOS launchd")
     started = datetime.now(timezone.utc)
     output = ROOT / "data" / ("live-services-" + started.strftime("%Y%m%dT%H%M%S"))
     output.mkdir(mode=0o700, parents=True)
-    prefix = {"services": "lsv", "calendar": "lcal"}[args.stage]
-    names = [f"{prefix}{int(started.timestamp())}{s}" for s in "ab"]
-    live = Live(output, names, args.server, started.strftime("%Y%m%dT%H%M%S"))
+    names = [f"lsv{int(started.timestamp())}{s}" for s in "ab"]
+    live = Live(output, names, args.server)
     report = {
-        "stage": args.stage,
         "started_at": started.isoformat(),
         "people": names,
         "switch": args.server,
@@ -966,13 +570,9 @@ def main(args):
         "git_head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
         "git_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], text=True)),
     }
-    stage, verify = STAGES[args.stage]
     error = None
     try:
-        if args.stage == "services":
-            stage(live)
-        else:
-            asyncio.run(stage(live))
+        services(live)
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
     finally:
@@ -980,14 +580,14 @@ def main(args):
         report.update(evidence=live.evidence, findings=live.findings)
         if error is None:
             try:
-                verify(report, output)
+                verify_services(report, output)
             except Exception as exc:
                 error = f"{type(exc).__name__}: {exc}"
         report["status"] = "FAIL" if error else "PASS"
         if error:
             report["error"] = error
         if any(secret in json.dumps(report) for secret in secrets(output) | live.invite_tokens):
-            report = {key: report[key] for key in ("stage", "started_at", "people")}
+            report = {key: report[key] for key in ("started_at", "people")}
             report.update(status="FAIL", error="a credential reached the report; evidence dropped")
         (output / "report.json").write_text(json.dumps(report, indent=2))
         print(f"{report['status']}: {output / 'report.json'}", flush=True)
@@ -998,16 +598,13 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--stage", choices=sorted(STAGES))
     parser.add_argument("--server", default="http://127.0.0.1:53330")
     parser.add_argument("--verify", type=Path, help="verify a saved report without live calls")
     args = parser.parse_args()
     if args.verify:
         report = json.loads(args.verify.read_text())
         assert report["status"] == "PASS", "The live run failed: " + report.get("error", "")
-        STAGES[report["stage"]][1](report, args.verify.parent)
-        print(f"PASS saved {report['stage']} artifact: {args.verify}")
-    elif args.stage:
-        sys.exit(main(args))
+        verify_services(report, args.verify.parent)
+        print(f"PASS saved services artifact: {args.verify}")
     else:
-        parser.error("choose --stage or --verify")
+        sys.exit(main(args))
