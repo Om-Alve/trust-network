@@ -49,7 +49,7 @@ async def run(args):
             await client.ready.wait()
             await pool.start_sync()
             try:
-                await relay.ensure_home(args.person, client)
+                await relay.ensure_home(args.person, pool)
             except Exception as exc:
                 # The gate can still serve its rooms; the next home post retries.
                 logging.getLogger(__name__).warning("home bootstrap failed: %s", type(exc).__name__)

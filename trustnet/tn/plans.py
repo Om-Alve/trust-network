@@ -17,6 +17,7 @@ import json
 import secrets
 
 from trustnet.gate import group_plans
+from trustnet.room_pool import wait_until_live
 from trustnet.tn import personal
 
 __all__ = ["list", "list_plans", "plan_status", "request", "status"]
@@ -37,6 +38,7 @@ async def request(person: str, action: str, **payload) -> str:
     async with personal.session(person) as client:
         room = await personal.home(person, client)
         await client.connect_to_room(room)
+        await wait_until_live(client, room, text)
         await client.post_message(text)
     return token
 

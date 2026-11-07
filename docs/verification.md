@@ -1,9 +1,9 @@
 # Verification
 
 The integrated changes passed `make check`: 563 pytest tests, Ruff formatting and
-lint. Acceptance runs use temporary profiles, real CLI/MCP subprocesses, and
-local Switch fixtures. No public host, live calendar account, or real login
-service was changed.
+lint. The fixture acceptance runs use temporary profiles and real CLI/MCP subprocesses.
+The live-agent acceptance below also uses real model calls and a running Switch server.
+No personal calendar or existing user profile was changed.
 
 ## Repeat acceptance
 
@@ -52,10 +52,53 @@ Each product/group scenario also saves a transcript, durable plan state, calenda
 tasks and provider receipts. The group product scenario ends with applied
 cancellation receipts for the same event IDs used during creation and update.
 
+## Run acceptance with real agents
+
+The live E2A run passed with two Codex agents using `gpt-6.1-sol`, real MCP tools,
+live Switch and production gates. Six model turns drafted one plan, sent a group
+message, relayed separate owner approvals, delivered both calendar tasks, and
+checked completed delivery again. One approval left both calendars empty.
+The final artifact contains one event per owner, with matching provider receipts,
+UIDs, titles, locations, start times and durations. Both gates were stopped afterward.
+
+The calendars are disposable local ICS files. This run does not verify Google
+Calendar or Outlook connectors. An earlier mixed Codex/OpenCode run failed when
+OpenCode exceeded its 180-second turn limit; it is not counted as a pass.
+
+Repeat with Switch Console running locally and a signed-in Codex CLI:
+
+```sh
+uv run python -m scripts.e2a_real_agents --agents codex codex
+uv run python -m scripts.e2a_real_agents --verify data/real-agents-20261107T071435/report.json
+```
+
+The runner reads the Console administrator credentials from its existing private
+environment file. It creates fresh test accounts and profiles, starts their gates,
+and stops them on completion. Test accounts remain for inspection. It preserves
+existing demo identities and agent configuration. Each run writes a private
+`data/real-agents-<timestamp>/` directory containing the report, actual calendars,
+room transcript, model traces and test credentials. Share the report rather than
+the complete directory. `--verify` checks the saved report and actual calendar
+files without another server request or model call.
+
+Successful evidence: `data/real-agents-20261107T071435/report.json`.
+
+Live testing exposed and corrected four gaps that the fixtures missed:
+
+- Doctor must open a live connection before querying gate operations.
+- Startup must keep home delivery on the pool's room connection.
+- Participant checks must resolve canonical identities from UUID-keyed exports.
+- Setup must enable cross-owner addressing for the two dedicated network agents.
+
+Plan requests also wait for the gate to become live before posting. Some Switch
+versions omit room visibility metadata; doctor reports that limitation while
+checking ownership, reachability and any visibility fields returned.
+
 ## Remaining boundaries
 
-Calendar writes are performed by the person's existing agent tools; the fixtures
-simulate provider operations. The gate records agent-reported provider receipts
+Calendar writes are performed by the person's existing agent tools. The live E2A
+verifies local ICS writes; the other fixtures simulate provider operations.
+The gate records agent-reported provider receipts
 and does not independently verify Google or Outlook. External retries require
 the agent to search for the stable UID marker before creating an event.
 

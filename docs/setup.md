@@ -18,6 +18,8 @@ standard MCP configuration to `~/.config/trust-network/mcp.json`. Setup register
 your identities, creates a private home and empty profile, starts your gate and
 configures the chosen agent. It verifies identity discovery and opens the MCP
 server before reporting success.
+Setup enables messages from other owners for its dedicated gate and personal-agent
+identities. The gate applies your trust list and sharing permissions to requests.
 Restart the agent application after setup so it loads the new connection.
 An existing OpenCode JSONC configuration needs the generated entry imported
 manually; setup refuses to create a competing configuration file.
@@ -89,6 +91,8 @@ you approve using `tn outbox approve <ref>`. Use `decline <ref>` to reject it.
 
 Run `tn doctor` to check the profile, Switch credentials, private home, trusted
 identity map, gate process and MCP server. Each failed check gives a next step.
+Some Switch versions omit room visibility metadata. Doctor reports that limitation
+and checks home ownership, reachability and any visibility fields the server returns.
 
 For an existing account without an invite, provide connection addresses and
 enter credentials at the private prompts:

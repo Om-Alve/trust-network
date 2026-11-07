@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
@@ -290,7 +291,35 @@ async def _bootstrap(settings):
         config.write_json(path, state)
         await client.aclose()
     async with personal.session(person) as client:
-        return await personal.home(person, client)
+        home = await personal.home(person, client)
+        main_id = client.agent_id
+        await client.update_agent_detail(state[person]["id"], addressing="anyone")
+    async with _gate_session(settings) as client:
+        await client.update_agent_detail(main_id, addressing="anyone")
+    return home
+
+
+@asynccontextmanager
+async def _gate_session(settings):
+    credentials = config.read_json(Path(settings["state_dir"]) / "gate-state.json")[
+        settings["person"]
+    ]
+    client = SwitchClient(
+        settings["switch_url"], credentials["id"], credentials["api_key"], timeout=5
+    )
+
+    async def drain():
+        async for _ in client.events():
+            pass
+
+    stream = asyncio.create_task(drain())
+    try:
+        await asyncio.wait_for(client.ready.wait(), 5)
+        yield client
+    finally:
+        stream.cancel()
+        await asyncio.gather(stream, return_exceptions=True)
+        await client.aclose()
 
 
 def _mcp(settings):
@@ -926,9 +955,9 @@ async def _diagnose(settings):
     gate = config.read_json(Path(settings["state_dir"]) / "gate-state.json").get(settings["person"])
     owner_id = None
     if gate:
-        client = SwitchClient(settings["switch_url"], gate["id"], gate["api_key"], timeout=5)
         try:
-            detail = await client.get_agent_detail(client.agent_id)
+            async with _gate_session(settings) as client:
+                detail = await client.get_agent_detail(client.agent_id)
             owner_id = detail.get("owner_id")
             add(
                 "server",
@@ -938,8 +967,6 @@ async def _diagnose(settings):
             )
         except Exception:
             add("server", False, "Start Switch and check its address and your registration")
-        finally:
-            await client.aclose()
     else:
         add("server", False, "Run tn setup to register your gate")
     try:
@@ -949,9 +976,22 @@ async def _diagnose(settings):
             await client.read_context(room_id=room, limit=1)
             add(
                 "home",
-                detail.get("internal_only") and detail.get("read_visibility") == "private",
+                detail.get("bridge_id") is None
+                and all(
+                    key not in detail or detail[key] == expected
+                    for key, expected in (
+                        ("internal_only", True),
+                        ("read_visibility", "private"),
+                        ("write_visibility", "private"),
+                    )
+                ),
                 "Run tn setup to repair your private home",
-                "private home is reachable",
+                "home ownership and reachability checked; visibility metadata "
+                + (
+                    "reported by server"
+                    if "read_visibility" in detail
+                    else "not exposed by this Switch version"
+                ),
             )
     except Exception:
         add("home", False, "Run tn setup and check your private-home membership")

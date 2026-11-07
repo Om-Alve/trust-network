@@ -1141,10 +1141,10 @@ def _check_participants(gate, participants):
             continue
         if trust.level_for(peer) is None:
             raise PlanError(f"{peer} is not on your trust list")
-        identity = identities.get(peer + "-gate")
-        if identity is None:
+        matches = {i for i in identities.values() if i.id == peer + "-gate"}
+        if not matches:
             raise PlanError(f"{peer}'s gate is not a known identity")
-        if identity.id != peer + "-gate" or identity.person != peer:
+        if any(identity.person != peer for identity in matches):
             raise PlanError(f"{peer}'s gate identity does not match")
 
 
