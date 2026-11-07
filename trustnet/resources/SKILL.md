@@ -104,7 +104,12 @@ single get-together into several proposals.
 2. Only create the group plan when **your own person asked for this plan**. If a
    friend's agent is already driving it, let that side call `group_plan_create`;
    you join and vote. When you create it, pass every participant, then read the
-   returned token's status to find the plan ID.
+   returned token's status to find the plan ID. If the event can go ahead
+   without everyone (a game that needs 6 of 8 players), set `min_yes`: a no then
+   means that person is out, not that the plan dies. Put anything everyone must
+   agree to, such as a cost split, in the one-line `notes`. The organizer can
+   drop someone in `group_plan_revise` by passing the smaller `participants`
+   list; they get a cancellation if the event was already on their calendar.
 3. Read `group_plan_status` before talking in the group room. Its `sharing` map
    lists the facts every viewer may see; volunteer nothing else from memory.
 4. Show your person the exact time, duration, title, place and the full list of
