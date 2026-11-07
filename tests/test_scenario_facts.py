@@ -98,7 +98,7 @@ async def test_a_dm_room_answers_at_the_lowest_friends_level(tmp_path, monkeypat
     assert any("asked for your address (private)" in note for note in notes)
 
 
-async def test_free_keeps_busy_times_but_blanks_titles_at_acquaintance(tmp_path, monkeypatch):
+async def test_free_keeps_busy_times_but_hides_titles_by_default(tmp_path, monkeypatch):
     world = await build_world(
         tmp_path,
         monkeypatch=monkeypatch,
@@ -111,11 +111,12 @@ async def test_free_keeps_busy_times_but_blanks_titles_at_acquaintance(tmp_path,
         await world.say(room, sender, "@om-gate free 2026-11-08..2026-11-09")
 
     acquaintance = world.bodies(acq)[-1]
-    friend = world.bodies(close)[-1]
-    assert "2026-11-08T17:00:00+05:30 .. 2026-11-08T19:00:00+05:30 busy" in acquaintance
+    close_friend = world.bodies(close)[-1]
+    block = "2026-11-08T17:00:00+05:30 .. 2026-11-08T19:00:00+05:30 busy"
+    assert block in acquaintance
+    assert block in close_friend
     assert "Family video call" not in acquaintance
-    assert "busy" not in friend
-    assert "Family video call" in friend
+    assert "Family video call" not in close_friend
 
 
 async def test_a_stranger_gets_silence_and_no_ledger_entry(tmp_path, monkeypatch):

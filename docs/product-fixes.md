@@ -38,6 +38,12 @@ The product runner passed four scenarios on 2026-11-07. The report is
 `data/product-e2e-20261107T045558844043Z/summary.txt`. `make check` passed 536 tests
 with formatting and lint checks. No external calendar accounts were modified.
 
+The integrated sharing pass adds a fifth product scenario for blocked pending
+approvals and gift denials. It also checks that replaying an older calendar
+operation cannot replace a later revision. `scripts/e2e_sharing.py` passed five
+sharing scenarios in `data/scenarios-sharing-20261107T051615796082Z/`; the product
+report is `data/product-e2e-20261107T051740033399Z/`. `make check` passed 549 tests.
+
 ## Outgoing messages
 
 `TN_OUTGOING=review` keeps exact outgoing DM text in an owner-local outbox until

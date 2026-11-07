@@ -156,12 +156,25 @@ async def run(live=False):
         state = gates["om"]._around_state()
         ref = next(iter(state))
         for _ in range(20):
-            if "priya" in gates["om"]._around_state()[ref]["answers"]:
+            if any(value.get("local") for value in gates["priya"]._around_state().values()):
                 break
             await settle()
-        state = gates["om"]._around_state()
-        assert "2-person tent" in state[ref]["answers"]["priya"]
+        pending_priya = next(
+            value for value in gates["priya"]._around_state().values() if value.get("local")
+        )
+        assert gates["om"]._around_state()[ref]["answers"] == {}
         if not live:
+            await gates["priya"].handle(
+                Event(
+                    homes["priya"],
+                    "priya",
+                    "user",
+                    f'@priya-gate answer {pending_priya["local"]} "2-person tent, Nov 14-16"',
+                    True,
+                )
+            )
+            await settle()
+            assert "2-person tent" in gates["om"]._around_state()[ref]["answers"]["priya"]
             pending = next(v for v in gates["rahul"]._around_state().values() if v.get("local"))
             await command("rahul", f"answer {pending['local']} no, sorry")
             assert gates["om"]._around_state()[ref]["answers"]["rahul"] == "no, sorry"

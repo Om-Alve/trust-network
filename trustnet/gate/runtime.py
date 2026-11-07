@@ -19,12 +19,20 @@ from typing import Any
 from trustnet.gate import commands as c
 from trustnet.gate import consent, dm, handshake, ledger, relay, surprise
 from trustnet.gate.calendar import busy, time_zone
-from trustnet.gate.facts import Level, load_profile, load_trust, resolve_data_dir, save_trust
+from trustnet.gate.facts import (
+    FactsError,
+    Level,
+    load_profile,
+    load_trust,
+    resolve_data_dir,
+    save_trust,
+)
 from trustnet.gate.policy import (
     DenialCode,
     Direction,
     authorize,
     calendar_view,
+    combined_permissions,
     room_level,
     visible_facts,
 )
@@ -42,6 +50,7 @@ NOT_SHARED = "not shared with you"
 
 #: One overreach note per person and field in this window.
 NOTE_COOLDOWN = timedelta(minutes=10)
+ASK_AROUND_TTL = 7 * 24 * 60 * 60
 
 #: Free text in an owner note is quoted and cut to this many characters.
 MAX_SNIPPET = 60
@@ -129,6 +138,10 @@ class Gate:
         if level is None or sender is None or sender not in members:
             LOG.info("command=unknown room=%s level=%s decision=silent", event.room_id, level)
             return
+        permissions = combined_permissions(
+            trust,
+            (member.person for member in members if member.person and member.person != self.person),
+        )
         if await surprise.handle(self, event, sender, level, room_detail):
             return
         own_side = _is_own_side(self.person, sender)
@@ -252,7 +265,7 @@ class Gate:
         if isinstance(command, c.Ask):
             values = {
                 k: surprise.owner_value(self.person, k, v, self._now()) if own_side else v
-                for k, v in visible_facts(profile, level).items()
+                for k, v in visible_facts(profile, level, permissions).items()
             }
             fields = list(dict.fromkeys(command.facts))
             disclosed = {key: values[key] for key in fields if key in values}
@@ -280,7 +293,9 @@ class Gate:
         elif isinstance(command, c.Free):
             start = datetime.combine(command.start, time.min, time_zone())
             end = datetime.combine(command.end + timedelta(days=1), time.min, time_zone())
-            blocks = calendar_view(busy(profile.calendar_path, start, end), level)
+            blocks = calendar_view(
+                busy(profile.calendar_path, start, end), level, titles=permissions.calendar_titles
+            )
             value = [
                 {"start": b.start.isoformat(), "end": b.end.isoformat(), "title": b.title}
                 for b in blocks
@@ -302,7 +317,11 @@ class Gate:
         elif isinstance(command, c.Trust):
             with fact_changes.editing(self.person):
                 trust = load_trust(self.person)
-                trust.people[command.person] = command.level
+                try:
+                    trust.grant(command.person, command.level)
+                except FactsError as exc:
+                    await self.client.post_message(f"Not recorded: {exc}")
+                    return
                 save_trust(trust, resolve_data_dir(self.person) / "trust.yaml")
             text = f"Trust for {command.person}: {command.level}"
         else:
@@ -327,19 +346,24 @@ class Gate:
     async def _around(self, event, command, sender, level, own_side, detail):
         state = self._around_state()
         if isinstance(command, c.AskAround) and own_side:
-            if level != Level.SELF or command.reference:
+            if level != Level.SELF:
+                return
+            trust = load_trust(self.person)
+            audience = await self._around_audience(command, trust)
+            if audience is None:
                 return
             ref = _next_around_ref(state)
             entry = {
                 "question": command.question.text,
-                "expires": self._now().timestamp() + 300,
+                "expires": self._now().timestamp() + ASK_AROUND_TTL,
                 "peers": {},
                 "answers": {},
+                "audience": list(audience),
             }
             state[ref] = entry
             self._save_around(state)
             memberships = (await self.client.get_agent_detail(self.client.agent_id))["rooms"]
-            for friend in load_trust(self.person).people:
+            for friend in audience:
                 name = "conn-" + "-".join(sorted((self.person, friend)))
                 room = next(
                     (
@@ -370,9 +394,11 @@ class Gate:
                     "ask-around",
                     person=self.person,
                 )
-            await relay.post_home(
-                self.person, f"{ref} asking around: {command.question}", client=self.client
-            )
+            if command.reference is None:
+                notice = f"{ref} asking around: {command.question}"
+            else:
+                notice = f"{ref} asking {', '.join(audience)}: {command.question}"
+            await relay.post_home(self.person, notice, client=self.client)
             return
         if isinstance(command, c.AskAround):
             pair = "-".join(sorted((self.person, sender.person)))
@@ -390,36 +416,38 @@ class Gate:
                 "room": event.room_id,
                 "peer": sender.person,
                 "reference": command.reference,
-                "expires": self._now().timestamp() + 300,
+                "expires": self._now().timestamp() + ASK_AROUND_TTL,
                 "question": command.question.text,
                 "answered": False,
             }
             self._save_around(state)
-            # Return permitted facts verbatim. No inference about intent or willingness to lend.
-            values = visible_facts(load_profile(self.person), level)
-            facts = {k: format_value(values[k]) for k in ("has", "recommends") if values.get(k)}
-            quoted = _quoted_reply(
-                "Profile lists, no lending promise: "
-                + "; ".join(f"{k}: {v}" for k, v in facts.items())
-                if facts
-                else ""
-            )
-            if quoted:
-                await self._around_send(state, key, quoted)
-            if not any(
+            # Never dump profile facts: route the question to the owner's own
+            # agent, or escalate to the person only when they opted in (or when
+            # there is no registered agent to ask).
+            trust = load_trust(self.person)
+            route = trust.permissions_for(sender.person).ask_around
+            if route == "off":
+                return
+            if route == "agent" and not any(
                 i.id == dm.main_agent(self.person) and i.person == self.person
                 for i in self.identities().values()
             ):
-                return
-            state[key]["answered"] = False
+                route = "person"
             local = _next_around_ref(state)
             state[key]["local"] = local
+            state[key]["route"] = route
             self._save_around(state)
-            await relay.post_home(
-                self.person,
-                f"{local} {sender.person} asks {command.question}. Reply with answer {local}.",
-                client=self.client,
-            )
+            if route == "person":
+                notice = (
+                    f"{local} {_display(sender.person)} asks {command.question}. "
+                    f"Reply with answer {local}."
+                )
+            else:
+                notice = (
+                    f"{local} {_display(sender.person)} asks {command.question}. "
+                    f"Your agent can reply with answer {local}, or ask you first."
+                )
+            await relay.post_home(self.person, notice, client=self.client)
             return
         ref = command.reference
         if own_side:
@@ -470,6 +498,62 @@ class Gate:
             f"{ref} answers to {c.Quoted(entry['question'])}:\n{summary}",
             client=self.client,
         )
+
+    async def _around_audience(self, command, trust) -> list[str] | None:
+        """The friends to ask, or ``None`` after explaining a refusal in home.
+
+        No reference means the legacy "ask every listed friend" form. A
+        reference names a short-lived owner-local request written by the CLI or
+        MCP tool before it posts; it carries the explicit audience and the exact
+        question, so a stale or forged token asks nobody.
+        """
+        if command.reference is None:
+            return [name for name in trust.people if not trust.is_blocked(name)]
+
+        request = _read_audience_request(
+            self.person, command.reference, command.question.text, self._now().timestamp()
+        )
+        if request is None:
+            await relay.post_home(
+                self.person,
+                f"{command.reference} not sent: that ask-around audience request is missing or "
+                "expired.",
+                client=self.client,
+            )
+            return None
+
+        audience: list[str] = []
+        for raw in request["audience"]:
+            if not isinstance(raw, str) or not raw.strip():
+                problem = "every audience entry must be a friend's name"
+            else:
+                key = raw.strip().lower()
+                try:
+                    if key == self.person:
+                        problem = "you cannot add yourself to an ask-around audience"
+                    elif trust.level_for(key) is None:
+                        problem = f"{key} is not a friend on your trust list"
+                    else:
+                        problem = ""
+                except FactsError as exc:
+                    problem = str(exc)
+            if problem:
+                await relay.post_home(
+                    self.person,
+                    f"{command.reference} not sent: {problem}.",
+                    client=self.client,
+                )
+                return None
+            if key not in audience:
+                audience.append(key)
+        if not audience:
+            await relay.post_home(
+                self.person,
+                f"{command.reference} not sent: the audience is empty.",
+                client=self.client,
+            )
+            return None
+        return audience
 
     async def _around_send(self, state, key, text):
         entry = state[key]
@@ -603,20 +687,33 @@ def _next_around_ref(state: dict) -> str:
     return f"A{n}"
 
 
-def _quoted_reply(text: str) -> c.Quoted | None:
-    """Fit a gate reply into one quoted line.
+def _read_audience_request(person: str, reference: str, question: str, now: float):
+    """Read and consume one owner-written audience request, or return ``None``.
 
-    A profile list can exceed the 140-character command limit. The reply is cut
-    short instead of dropped: the asker still learns something, and the person's
-    own-words answer path is unaffected.
+    The request is a local file keyed by the reference in the owner's command.
+    It must carry the same question and a fresh expiry; anything else is a
+    forged, stale or mismatched token and asks nobody.
     """
-    text = " ".join(text.split()).replace('"', "'")
-    if len(text) > c.MAX_QUESTION:
-        text = text[: c.MAX_QUESTION - 1].rstrip() + "…"
+    path = resolve_data_dir(person) / "ask-around-requests" / f"{reference}.json"
     try:
-        return c.Quoted(text)
-    except ValueError:
+        payload = json.loads(path.read_text())
+    except (OSError, ValueError):
         return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("question") != question:
+        return None
+    expires = payload.get("expires")
+    audience = payload.get("audience")
+    if isinstance(expires, bool) or not isinstance(expires, int | float) or expires < now:
+        return None
+    if not isinstance(audience, list) or not audience:
+        return None
+    try:
+        path.unlink()
+    except OSError:
+        pass
+    return {"audience": audience}
 
 
 def _is_own_side(person: str, sender) -> bool:

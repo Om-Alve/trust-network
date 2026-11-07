@@ -65,6 +65,17 @@ running the shared identity service and repairing a connection.
 Add each friend explicitly with `tn trust <name> <level>`. New profiles have no
 trusted people or shared facts. Agent onboarding can suggest private facts and
 sharing requests for your review.
+
+Trust levels have per-person exceptions. For example, `tn trust rahul close
+--deny wishlist --allow interests` hides your wishlist from Rahul while allowing
+interests. Private facts remain private. Calendar titles are hidden unless you
+explicitly add `--calendar-titles`. `tn untrust rahul` removes access;
+`tn block rahul` also requires an explicit `tn unblock rahul` before re-adding.
+These actions cannot retract information already shared.
+
+Use `tn ask-around "Anyone have a tent?" --to rahul,priya` to choose an audience.
+Recipients can set `--ask-around agent`, `person` or `off` on your trust entry.
+The gate does not automatically dump their inventory or recommendations.
 `--consent via-agent` lets your agent relay your yes or no. Without it, approval
 must come directly from your Switch user account.
 

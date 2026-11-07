@@ -220,11 +220,24 @@ def test_calendar_view_hides_titles_at_acquaintance() -> None:
     assert [block.title for block in hidden] == [""]
 
 
-@pytest.mark.parametrize("level", [Level.FRIEND, Level.CLOSE, Level.SELF])
-def test_calendar_view_keeps_titles_at_friend_and_above(level: Level) -> None:
+@pytest.mark.parametrize("level", [Level.ACQUAINTANCE, Level.FRIEND, Level.CLOSE])
+def test_calendar_view_hides_titles_from_friends_by_default(level: Level) -> None:
     blocks = busy(OM_CALENDAR, at(2026, 11, 8, 12), at(2026, 11, 8, 23))
-    assert calendar_view(blocks, level) == blocks
-    assert [block.title for block in calendar_view(blocks, level)] == ["Family video call"]
+    assert [block.title for block in calendar_view(blocks, level)] == [""]
+
+
+def test_calendar_view_keeps_the_owner_s_own_titles() -> None:
+    blocks = busy(OM_CALENDAR, at(2026, 11, 8, 12), at(2026, 11, 8, 23))
+    assert [block.title for block in calendar_view(blocks, Level.SELF)] == ["Family video call"]
+
+
+@pytest.mark.parametrize("level", [Level.ACQUAINTANCE, Level.FRIEND, Level.CLOSE, Level.SELF])
+def test_calendar_view_titles_are_a_separate_opt_in(level: Level) -> None:
+    blocks = busy(OM_CALENDAR, at(2026, 11, 8, 12), at(2026, 11, 8, 23))
+    assert calendar_view(blocks, level, titles=True) == blocks
+    assert [block.title for block in calendar_view(blocks, level, titles=True)] == [
+        "Family video call"
+    ]
 
 
 def test_calendar_view_of_an_empty_range_is_empty() -> None:

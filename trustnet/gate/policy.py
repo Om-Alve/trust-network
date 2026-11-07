@@ -31,7 +31,15 @@ from enum import StrEnum
 from typing import Any, Final, Literal
 
 from trustnet.gate.calendar import Block
-from trustnet.gate.facts import CONSENT_MODES, ConsentMode, FactsError, Level, Profile, TrustList
+from trustnet.gate.facts import (
+    CONSENT_MODES,
+    ConsentMode,
+    FactsError,
+    Level,
+    PersonPermissions,
+    Profile,
+    TrustList,
+)
 
 __all__ = [
     "Actor",
@@ -53,6 +61,7 @@ __all__ = [
     "authorize",
     "calendar_view",
     "can_set_level",
+    "combined_permissions",
     "fact_is_visible",
     "room_level",
     "visible_facts",
@@ -192,43 +201,111 @@ class Denied:
 Decision = Allowed | Denied
 
 
-def visible_facts(profile: Profile, level: Level) -> dict[str, Any]:
+def visible_facts(
+    profile: Profile,
+    level: Level,
+    permissions: PersonPermissions | None = None,
+) -> dict[str, Any]:
     """Return the facts a room at ``level`` may see, as ``{name: value}``.
 
     The §3 table: ``acquaintance`` facts at every level, ``friend`` at friend
     and close, ``close`` at close only, ``private`` never. ``self`` (the owner
-    and the owner's own agents alone) sees every fact. Values are copies, so a
-    caller cannot mutate the profile through the result.
+    and the owner's own agents alone) sees every fact. A person's explicit
+    ``allow`` adds a named field above their level; ``deny`` hides one; a deny
+    wins; neither can expose a ``private`` fact. Values are copies, so a caller
+    cannot mutate the profile through the result.
     """
     _check_view_level(level)
+    if level is Level.SELF:
+        return {name: copy.deepcopy(fact.value) for name, fact in profile.facts.items()}
+    permissions = permissions or PersonPermissions()
     return {
         name: copy.deepcopy(fact.value)
         for name, fact in profile.facts.items()
-        if fact_is_visible(fact.level, level)
+        if fact_is_visible(
+            fact.level,
+            level,
+            allowed=name in permissions.allow,
+            denied=name in permissions.deny,
+        )
     }
 
 
-def fact_is_visible(fact_level: Level, level: Level) -> bool:
-    """Whether a fact tagged ``fact_level`` is shared in a room at ``level``."""
+def combined_permissions(trust: TrustList, people: Iterable[str]) -> PersonPermissions:
+    """The permissions safe for a reply every person in a room can see.
+
+    One viewer uses their own settings. In a room with several friends, an
+    allow must hold for everyone and any deny applies, so an exception granted
+    to one person cannot leak through a shared room. Titles need every viewer's
+    opt-in.
+    """
+    if not isinstance(trust, TrustList):
+        raise PolicyError(f"trust must be a TrustList, not {trust!r}")
+    allow: set[str] | None = None
+    deny: set[str] = set()
+    titles: bool | None = None
+    seen = False
+    for person in people:
+        if not isinstance(person, str) or not person.strip():
+            raise PolicyError(f"a permission viewer must be a person name, not {person!r}")
+        permissions = trust.permissions_for(person)
+        seen = True
+        allow = set(permissions.allow) if allow is None else allow & permissions.allow
+        deny |= permissions.deny
+        titles = (
+            permissions.calendar_titles
+            if titles is None
+            else titles and permissions.calendar_titles
+        )
+    if not seen:
+        return PersonPermissions()
+    return PersonPermissions(
+        allow=allow or set(),
+        deny=deny,
+        calendar_titles=bool(titles),
+    )
+
+
+def fact_is_visible(
+    fact_level: Level,
+    level: Level,
+    *,
+    allowed: bool = False,
+    denied: bool = False,
+) -> bool:
+    """Whether a fact tagged ``fact_level`` is shared in a room at ``level``.
+
+    ``denied`` always wins. ``allowed`` is the owner's per-person exception for
+    a field above the room level, but it never reveals a ``private`` fact.
+    """
     _check_view_level(level)
     if not isinstance(fact_level, Level) or not fact_level.is_fact_tag:
         raise PolicyError(f"a fact tag must be a fact level, not {fact_level!r}")
+    if not isinstance(allowed, bool) or not isinstance(denied, bool):
+        raise PolicyError("allowed and denied must be true or false")
     if level is Level.SELF:
         return True
+    if denied:
+        return False
+    if allowed:
+        return fact_level is not Level.PRIVATE
     return fact_level.rank <= level.rank
 
 
-def calendar_view(blocks: Iterable[Block], level: Level) -> list[Block]:
+def calendar_view(blocks: Iterable[Block], level: Level, *, titles: bool = False) -> list[Block]:
     """Return ``blocks`` as a room at ``level`` may see them.
 
-    Busy times are visible at every level; event titles only at friend and
-    close (and to the owner). At acquaintance each block keeps its times and
-    loses its title.
+    Busy times are visible at every level. Event titles are hidden from friends
+    by default and appear only when the owner opted that person in with
+    ``titles=True`` (``PersonPermissions.calendar_titles``). The owner's own
+    ``self`` view always keeps its titles.
     """
     _check_view_level(level)
-    if level is Level.ACQUAINTANCE:
-        return [Block(block.start, block.end, "") for block in blocks]
-    return list(blocks)
+    if not isinstance(titles, bool):
+        raise PolicyError("titles must be true or false")
+    if level is Level.SELF or titles:
+        return list(blocks)
+    return [Block(block.start, block.end, "") for block in blocks]
 
 
 def room_level(owner: str, participants: Iterable[Identity], trust: TrustList) -> Level | None:

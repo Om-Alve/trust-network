@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Final
 
-from trustnet.gate.calendar import Block, busy, time_zone
+from trustnet.gate.calendar import busy, time_zone
 from trustnet.gate.facts import FactsError, Level, Profile, TrustList
 from trustnet.gate.policy import calendar_view, visible_facts
 
@@ -175,7 +175,8 @@ def view_as(
             days=days,
         )
 
-    allowed = visible_facts(profile, level)
+    permissions = trust.permissions_for(name)
+    allowed = visible_facts(profile, level, permissions)
     hidden = _hidden_items(claims, moment)
     rows: list[FactRow] = []
     for fact_name in profile.facts:
@@ -185,22 +186,16 @@ def view_as(
             rows.append(FactRow(fact_name, False))
 
     blocks = busy(profile.calendar_path, window[0], window[1])
-    shown = calendar_view(blocks, level)
+    shown = calendar_view(blocks, level, titles=permissions.calendar_titles)
     return ViewAsResult(
         person=name,
         level=level,
         rows=tuple(rows),
         calendar=tuple(CalendarRow(block.start, block.end, block.title) for block in shown),
-        titles_visible=_titles_visible(level, moment),
+        titles_visible=permissions.calendar_titles,
         window=window,
         days=days,
     )
-
-
-def _titles_visible(level: Level, moment: datetime) -> bool:
-    """Ask the policy, rather than repeat its rule, whether titles survive."""
-    probe = Block(moment, moment + timedelta(minutes=1), "probe")
-    return list(calendar_view([probe], level)) == [probe]
 
 
 def _hidden_items(claims: Iterable[Claim], now: datetime) -> frozenset[str]:

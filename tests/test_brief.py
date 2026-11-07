@@ -23,6 +23,7 @@ from trustnet.gate.commands import Quoted
 from trustnet.gate.facts import (
     EXAMPLES_DIR,
     Level,
+    PersonPermissions,
     Profile,
     TrustList,
     load_profile_file,
@@ -161,14 +162,20 @@ def test_private_values_never_appear_at_any_level(profile: Profile, om_trust: Tr
         assert "**address**" not in text
 
 
-def test_calendar_titles_follow_the_policy(profile: Profile) -> None:
-    acquaintance = TrustList(people={"friend": Level.ACQUAINTANCE})
-    text, _ = build_brief(profile, acquaintance, "friend", "dm-om-friend-x", GOAL, DAYS)
-    assert "Family video call" not in text
-    assert "17:00–19:00" in text
+def test_calendar_titles_are_hidden_by_default_at_every_level(profile: Profile) -> None:
+    for level in (Level.ACQUAINTANCE, Level.FRIEND, Level.CLOSE):
+        trust = TrustList(people={"friend": level})
+        text, _ = build_brief(profile, trust, "friend", "dm-om-friend-x", GOAL, DAYS)
+        assert "Family video call" not in text
+        assert "17:00–19:00" in text
 
-    friend = TrustList(people={"friend": Level.FRIEND})
-    text, _ = build_brief(profile, friend, "friend", "dm-om-friend-x", GOAL, DAYS)
+
+def test_calendar_titles_are_a_separate_opt_in(profile: Profile) -> None:
+    trust = TrustList(
+        people={"friend": Level.FRIEND},
+        permissions={"friend": PersonPermissions(calendar_titles=True)},
+    )
+    text, _ = build_brief(profile, trust, "friend", "dm-om-friend-x", GOAL, DAYS)
     assert "Family video call" in text
 
 
@@ -281,7 +288,7 @@ def test_write_brief_records_every_fact_and_the_calendar(
         {
             "start": "2026-11-08T17:00:00+05:30",
             "end": "2026-11-08T19:00:00+05:30",
-            "title": "Family video call",
+            "title": "",
         }
     ]
     assert brief.entries == tuple(entries)

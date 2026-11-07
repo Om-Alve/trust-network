@@ -32,7 +32,7 @@ async def main():
                 status, error = "FAIL", traceback.format_exc()
             artifact = {**harness.snapshot(), "status": status, "error": error}
             artifact["calendar_jobs"] = {
-                p: __import__("trustnet.gate.calendar_jobs", fromlist=["pending"]).pending(p)
+                p: __import__("trustnet.gate.calendar_jobs", fromlist=["all_tasks"]).all_tasks(p)
                 for p in harness.clients
             }
             (directory / "transcript.json").write_text(json.dumps(artifact, indent=2, default=str))

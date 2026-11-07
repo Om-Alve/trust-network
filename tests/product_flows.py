@@ -59,6 +59,9 @@ async def calendar_revisions(h):
     second = calendar_jobs.queue("om", "P89", changed, action="update", uid="stable-event")
     assert second["event_id"] == "outlook-17"
     assert second["uid"] == first["uid"]
+    replayed = calendar_jobs.queue("om", "P88", plan, uid="stable-event")
+    assert replayed["token"] == second["token"]
+    assert calendar_jobs.pending("om")[0]["action"] == "update"
     try:
         calendar_jobs.report("om", first["token"], "applied", "outlook", "outlook-17")
     except ValueError as exc:
@@ -129,4 +132,52 @@ async def reviewed_outgoing(h):
         raise AssertionError("Revoked friendship retained outgoing access")
 
 
-SCENARIOS = [agent_calendar_delivery, calendar_revisions, all_day_availability, reviewed_outgoing]
+async def blocked_approval_and_gift_permissions(h):
+    import json
+
+    from trustnet.gate import fact_changes
+    from trustnet.gate.facts import Level, PersonPermissions, load_trust, save_trust
+
+    pending = fact_changes.suggest("om", "sam", "friend", trust=True)
+    trust = load_trust("om")
+    trust.block("sam")
+    trust.permissions["rahul"] = PersonPermissions(deny={"wishlist", "interests", "sizes"})
+    save_trust(trust, h.root / "om" / "trust.yaml")
+    try:
+        fact_changes.decide("om", pending["ref"], True)
+    except ValueError as exc:
+        assert "blocked" in str(exc)
+    else:
+        raise AssertionError("A stale trust review approved a blocked person")
+    await h.send(h.homes["om"], "om", "@om-gate trust sam close")
+    assert load_trust("om").level_for("sam") is None
+    # A rejected approval must not poison future local edits.
+    assert fact_changes.suggest("om", "alex", "friend", trust=True)["status"] == "pending"
+    request = {
+        "friend": "om",
+        "token": "a" * 32,
+        "action": "ideas",
+        "occasion": "birthday",
+        "date": "2026-11-20",
+        "budget": 3000,
+    }
+    await h.send(
+        h.homes["rahul"], "rahul-hermes", "@rahul-gate gift-request " + json.dumps(request)
+    )
+    result = next(
+        body
+        for body in h.bodies(h.homes["rahul"])
+        if body.startswith("gift-result " + "a" * 32 + " ")
+    )
+    payload = json.loads(result.removeprefix("gift-result " + "a" * 32 + " "))
+    assert payload == {"suggestions": [], "taken": [], "over_budget": []}
+    assert load_trust("om").level_for("rahul") is Level.CLOSE
+
+
+SCENARIOS = [
+    agent_calendar_delivery,
+    calendar_revisions,
+    all_day_availability,
+    reviewed_outgoing,
+    blocked_approval_and_gift_permissions,
+]

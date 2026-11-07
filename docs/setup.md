@@ -1,5 +1,10 @@
 # Join a shared server
 
+You need macOS or Linux, Python 3.12, uv, and an installed, signed-in personal
+agent. The repository does not run a public service. An organizer operates Switch
+and the onboarding host, then supplies each person's invite. To start a new
+network, use the organizer instructions below first.
+
 Install from the checkout and redeem the organizer's invite:
 
 ```sh
@@ -41,7 +46,18 @@ Review those suggestions before approving wider visibility. The `--consent
 via-agent` option lets the agent relay your yes/no. Omit it for direct approval
 from your Switch user account. You can change it later with `tn setup --consent
 direct`. A confirmed plan is queued automatically into each person's
-local ICS calendar; the agent must not add it a second time.
+calendar delivery queue. In agent mode, the agent uses its existing calendar
+tools and reports the provider event ID. Legacy ICS mode writes a local file;
+it does not synchronize a provider calendar. Ask your agent to read actual
+availability before planning, including all-day events and the correct timezone.
+
+Approval and delivery are separate. The agent's `status` and `calendar_tasks`
+tools show unfinished work. Missing calendar access must produce a visible
+failure, not an assurance that an event was created.
+
+For optional exact-text review of outgoing DM messages, add `TN_OUTGOING=review`
+to the MCP environment. Review with `tn outbox list` and release only the text
+you approve using `tn outbox approve <ref>`. Use `decline <ref>` to reject it.
 
 ## Repair a connection
 
@@ -63,6 +79,12 @@ Do not mix a saved connection with environment variables for a different server.
 Use a separate `TN_CONFIG_DIR` for a different person or server.
 
 # Configure the organizer's host
+
+The organizer must already have a reachable Switch server. The root README links
+to Switch's installation instructions. Trust-network does not install Switch.
+You also need an HTTPS reverse proxy and a service manager for the onboarding
+host. Invite recipients do not need the administrator credentials or database
+access described here.
 
 Run one onboarding host beside the existing Switch server. Keep its configuration
 separate from a person's profile:
@@ -112,6 +134,15 @@ asyncpg .`, or set `TN_IDENTITY_PYTHON` to an environment that already contains 
 A separately maintained trusted export can be served with `--identity-mode file
 --identity-map /absolute/path/identities.json` during host initialization. That
 file must be refreshed whenever server identities or membership change.
+
+## Where data lives
+
+Each person's profile, credentials, approvals and delivery tasks stay on their
+gate machine. Disclosed facts and conversation messages also pass through the
+shared Switch server. Its administrator can read workspace rooms, including
+gift rooms; a surprise seal is not encryption against the administrator.
+Calendar credentials stay in the personal agent's existing calendar connection.
+If the gate machine sleeps, requests cannot be processed there until it returns.
 
 ## Repeat verification
 

@@ -17,6 +17,7 @@ from trustnet.gate.calendar import busy
 from trustnet.gate.facts import (
     EXAMPLES_DIR,
     Level,
+    PersonPermissions,
     Profile,
     TrustList,
     load_profile_file,
@@ -140,11 +141,23 @@ def test_a_stranger_sees_no_calendar_even_when_the_owner_is_busy(
 # --------------------------------------------------------------------------
 
 
-def test_calendar_keeps_titles_for_a_close_friend(rahul_view) -> None:
-    assert rahul_view.titles_visible is True
-    titles = {row.title for row in rahul_view.calendar}
-    assert titles == {"Spanish class", "Family video call", "Badminton"}
-    assert "Family video call" in rahul_view.render()
+def test_calendar_hides_titles_for_a_close_friend_by_default(rahul_view) -> None:
+    assert rahul_view.titles_visible is False
+    assert {row.title for row in rahul_view.calendar} == {""}
+    assert "Family video call" not in rahul_view.render()
+    assert "no titles" in rahul_view.render()
+
+
+def test_calendar_titles_are_opt_in_per_person(profile: Profile) -> None:
+    trust = TrustList(
+        people={"rahul": Level.CLOSE},
+        permissions={"rahul": PersonPermissions(calendar_titles=True)},
+    )
+    view = view_as(profile, trust, "rahul", now=NOW)
+
+    assert view.titles_visible is True
+    assert "Family video call" in {row.title for row in view.calendar}
+    assert "Family video call" in view.render()
 
 
 def test_calendar_hides_titles_at_acquaintance(profile: Profile, rahul_view) -> None:
@@ -160,8 +173,12 @@ def test_calendar_hides_titles_at_acquaintance(profile: Profile, rahul_view) -> 
     assert "Family video call" not in view.render()
 
 
-def test_calendar_window_follows_now_and_days(profile: Profile, om_trust: TrustList) -> None:
-    view = view_as(profile, om_trust, "rahul", now=NOW, days=1)
+def test_calendar_window_follows_now_and_days(profile: Profile) -> None:
+    trust = TrustList(
+        people={"rahul": Level.CLOSE},
+        permissions={"rahul": PersonPermissions(calendar_titles=True)},
+    )
+    view = view_as(profile, trust, "rahul", now=NOW, days=1)
     assert view.window[0] == NOW
     assert view.window[1] == datetime(2026, 11, 6, 12, 0, tzinfo=IST)
     assert [row.title for row in view.calendar] == ["Spanish class"]

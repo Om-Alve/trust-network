@@ -27,6 +27,9 @@ def _table(connection):
         "CREATE TABLE IF NOT EXISTS calendar_tasks "
         "(uid TEXT PRIMARY KEY, token TEXT NOT NULL, value TEXT NOT NULL)"
     )
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS calendar_operations (token TEXT PRIMARY KEY, uid TEXT NOT NULL)"
+    )
 
 
 def queue(person, ref, plan, action="create", uid=None):
@@ -37,9 +40,18 @@ def queue(person, ref, plan, action="create", uid=None):
     token = hashlib.sha256(content.encode()).hexdigest()
     with database(person) as connection:
         _table(connection)
+        connection.execute("BEGIN IMMEDIATE")
         row = connection.execute("SELECT value FROM calendar_tasks WHERE uid=?", (uid,)).fetchone()
         previous = json.loads(row[0]) if row else {}
         if previous.get("token") == token:
+            return previous
+        if previous:
+            connection.execute(
+                "INSERT OR IGNORE INTO calendar_operations VALUES (?, ?)", (previous["token"], uid)
+            )
+        if connection.execute(
+            "SELECT 1 FROM calendar_operations WHERE token=?", (token,)
+        ).fetchone():
             return previous
         item = {
             "uid": uid,
@@ -55,18 +67,22 @@ def queue(person, ref, plan, action="create", uid=None):
         connection.execute(
             "INSERT OR REPLACE INTO calendar_tasks VALUES (?, ?, ?)", (uid, token, json.dumps(item))
         )
+        connection.execute("INSERT OR IGNORE INTO calendar_operations VALUES (?, ?)", (token, uid))
     return item
 
 
-def pending(person, *, due_only=False):
+def all_tasks(person):
     with database(person) as connection:
         _table(connection)
         rows = connection.execute("SELECT value FROM calendar_tasks ORDER BY rowid").fetchall()
+    return [json.loads(row[0]) for row in rows]
+
+
+def pending(person, *, due_only=False):
     return [
         item
-        for row in rows
-        if (item := json.loads(row[0]))["status"] != "applied"
-        and (not due_only or item.get("retry_at", 0) <= time.time())
+        for item in all_tasks(person)
+        if item["status"] != "applied" and (not due_only or item.get("retry_at", 0) <= time.time())
     ]
 
 
@@ -81,6 +97,7 @@ def report(person, token, status, provider="", event_id="", error=""):
         raise ValueError("Calendar receipt is too long")
     with database(person) as connection:
         _table(connection)
+        connection.execute("BEGIN IMMEDIATE")
         row = connection.execute(
             "SELECT value FROM calendar_tasks WHERE token=?", (token,)
         ).fetchone()

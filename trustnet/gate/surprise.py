@@ -184,7 +184,9 @@ async def handle(gate, event, sender, level, detail):
         command = c.parse(event.text, now=gate._now())
     except c.ParseError:
         return True  # no general handler and no owner note in a gift room
-    values = visible_facts(load_profile(person), level)
+    values = visible_facts(
+        load_profile(person), level, load_trust(person).permissions_for(sender.person)
+    )
     taken = read(person, "claims.json")
     if isinstance(command, c.GiftIdeas):
         if event.room_id in sessions:

@@ -28,8 +28,10 @@ from trustnet.gate.facts import (
     Fact,
     FactsError,
     Level,
+    PersonPermissions,
     Profile,
     TrustList,
+    field_key,
     load_profile,
     load_trust,
     resolve_data_dir,
@@ -153,7 +155,49 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     trust.add_argument("person_name", metavar="person")
     trust.add_argument("level", metavar="level")
+    trust.add_argument(
+        "--allow",
+        action="append",
+        metavar="FIELD[,FIELD]",
+        help="share named fields above this person's level (deny still wins)",
+    )
+    trust.add_argument(
+        "--deny",
+        action="append",
+        metavar="FIELD[,FIELD]",
+        help="hide named fields from this person regardless of level",
+    )
+    trust.add_argument(
+        "--calendar-titles",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="opt this person in to event titles (default: hidden)",
+    )
+    trust.add_argument(
+        "--ask-around",
+        choices=["agent", "person", "off"],
+        default=None,
+        help="who hears this friend's ask-around: your agent, you, or nobody",
+    )
+    trust.add_argument(
+        "--clear-permissions",
+        action="store_true",
+        help="reset allow/deny, calendar titles and ask-around routing before applying flags",
+    )
     trust.set_defaults(handler=_cmd_trust)
+
+    for name, help_text in (
+        ("untrust", "remove a person from your trust list"),
+        ("block", "remove a person and remember a block until an explicit unblock"),
+        ("unblock", "lift a block without re-adding the person"),
+    ):
+        sub = commands.add_parser(name, parents=[common], help=help_text)
+        sub.add_argument("person_name", metavar="person")
+        sub.set_defaults(handler=_cmd_trust_removal, action=name)
+    blocked = commands.add_parser(
+        "blocked", parents=[common], help="list people blocked from your trust list"
+    )
+    blocked.set_defaults(handler=_cmd_blocked)
 
     fact = commands.add_parser(
         "fact",
@@ -258,6 +302,12 @@ def _build_parser() -> argparse.ArgumentParser:
         sub = commands.add_parser(name, parents=[common])
         if name == "ask-around":
             sub.add_argument("question")
+            sub.add_argument(
+                "--to",
+                action="append",
+                metavar="PERSON[,PERSON]",
+                help="ask only these friends (default: everyone on your trust list)",
+            )
         if name == "answer":
             sub.add_argument("id")
             sub.add_argument("text")
@@ -404,10 +454,40 @@ def _cmd_trust(context: Context, args: argparse.Namespace) -> int:
 def _cmd_trust_locked(context: Context, args: argparse.Namespace) -> int:
     owner = context.owner()
     trust = load_trust(owner)
+    if trust.is_blocked(args.person_name):
+        person = args.person_name.strip().lower()
+        raise CliError(f"{person} is blocked; run `tn unblock {person}` first")
     previous = trust.level_for(args.person_name)  # validates the name
     level = _parse_level(args.level, viewer=True)
-    person = args.person_name.strip().lower()
-    trust.people[person] = level
+    person = trust.grant(args.person_name, level)
+
+    requested = any(
+        (
+            args.allow is not None,
+            args.deny is not None,
+            args.calendar_titles is not None,
+            args.ask_around is not None,
+            args.clear_permissions,
+        )
+    )
+    permissions = trust.permissions_for(person)
+    if requested:
+        permissions = trust.permissions.setdefault(person, PersonPermissions())
+        if args.clear_permissions:
+            permissions.allow.clear()
+            permissions.deny.clear()
+            permissions.calendar_titles = False
+            permissions.ask_around = "agent"
+        if args.allow is not None:
+            permissions.allow = _field_names(args.allow)
+        if args.deny is not None:
+            permissions.deny = _field_names(args.deny)
+        if args.calendar_titles is not None:
+            permissions.calendar_titles = args.calendar_titles
+        if args.ask_around is not None:
+            permissions.ask_around = args.ask_around
+        if permissions.is_default():
+            trust.permissions.pop(person, None)
     save_trust(trust, resolve_data_dir(owner) / TRUST_FILENAME)
 
     payload = {
@@ -416,12 +496,88 @@ def _cmd_trust_locked(context: Context, args: argparse.Namespace) -> int:
         "level": level.value,
         "previous": previous.value if previous is not None else None,
     }
+    if requested:
+        payload["permissions"] = _permissions_payload(permissions)
     if previous is None:
         text = f"{owner} trusts {person} at {level.value}"
     elif previous is level:
         text = f"{owner} trusts {person} at {level.value}"
     else:
         text = f"{owner} trusts {person}: {previous.value} → {level.value}"
+    if requested:
+        text += _permissions_summary(permissions)
+    return context.emit(payload, text)
+
+
+def _field_names(values: list[str] | None) -> set[str]:
+    """Parse repeated/comma-separated field flags into a normalized set."""
+    names: set[str] = set()
+    for value in values or []:
+        for part in value.replace(" ", ",").split(","):
+            if part.strip():
+                names.add(field_key(part))
+    return names
+
+
+def _permissions_payload(permissions: PersonPermissions) -> dict[str, Any]:
+    return {
+        "allow": sorted(permissions.allow),
+        "deny": sorted(permissions.deny),
+        "calendar_titles": permissions.calendar_titles,
+        "ask_around": permissions.ask_around,
+    }
+
+
+def _permissions_summary(permissions: PersonPermissions) -> str:
+    parts: list[str] = []
+    if permissions.allow:
+        parts.append("allow " + ", ".join(sorted(permissions.allow)))
+    if permissions.deny:
+        parts.append("deny " + ", ".join(sorted(permissions.deny)))
+    parts.append("titles " + ("on" if permissions.calendar_titles else "off"))
+    parts.append("ask-around " + permissions.ask_around)
+    return " · " + "; ".join(parts)
+
+
+def _cmd_trust_removal(context: Context, args: argparse.Namespace) -> int:
+    from trustnet.gate.fact_changes import editing
+
+    owner = context.owner()
+    with editing(owner):
+        trust = load_trust(owner)
+        person = args.person_name.strip().lower()
+        if not person:
+            raise CliError("a person is required")
+        if args.action == "untrust":
+            if trust.is_blocked(person):
+                raise CliError(f"{person} is blocked; run `tn unblock {person}` first")
+            if person not in trust.people:
+                raise CliError(f"{person} is not on {owner}'s trust list")
+            trust.people.pop(person, None)
+            trust.permissions.pop(person, None)
+            text = f"{owner} no longer trusts {person}"
+        elif args.action == "block":
+            trust.block(person)
+            text = f"{owner} blocked {person}; run `tn unblock {person}` before adding them again"
+        else:
+            trust.unblock(person)
+            text = f"{owner} unblocked {person}; add them again with `tn trust {person} <level>`"
+        save_trust(trust, resolve_data_dir(owner) / TRUST_FILENAME)
+        payload = {
+            "owner": owner,
+            "person": person,
+            "action": args.action,
+            "blocked": trust.is_blocked(person),
+            "people": sorted(trust.people),
+        }
+    return context.emit(payload, text)
+
+
+def _cmd_blocked(context: Context, args: argparse.Namespace) -> int:
+    owner = context.owner()
+    trust = load_trust(owner)
+    payload = {"owner": owner, "blocked": list(trust.blocked)}
+    text = ", ".join(trust.blocked) if trust.blocked else f"{owner} has no blocked people"
     return context.emit(payload, text)
 
 
@@ -760,10 +916,30 @@ def _cmd_personal(context, args):
         "answer": (getattr(args, "id", None), getattr(args, "text", None)),
         "dm": (getattr(args, "friend", None), getattr(args, "goal", None)),
     }
-    result = asyncio.run(
-        getattr(personal, args.command.replace("-", "_"))(context.owner(), *values[args.command])
-    )
+    if args.command == "ask-around":
+        audience = _audience_option(getattr(args, "to", None))
+        result = asyncio.run(
+            personal.ask_around(context.owner(), values["ask-around"][0], audience=audience)
+        )
+    else:
+        result = asyncio.run(
+            getattr(personal, args.command.replace("-", "_"))(
+                context.owner(), *values[args.command]
+            )
+        )
     return context.emit(result, json.dumps(result, ensure_ascii=False))
+
+
+def _audience_option(values: list[str] | None) -> list[str] | None:
+    """Turn repeated/comma-separated ``--to`` values into one audience list."""
+    if values is None:
+        return None
+    names: list[str] = []
+    for value in values:
+        for name in value.replace(" ", ",").split(","):
+            if name.strip():
+                names.append(name.strip())
+    return names
 
 
 if __name__ == "__main__":

@@ -313,12 +313,80 @@ async def dm_post(person, room, text):
     return await dm_operate(person, room, text)
 
 
-async def ask_around(person: str, question: str):
-    """Ask the owner gate to fan out a quoted question to listed friends."""
+#: How long an audience request may wait for the gate to read it.
+ASK_AROUND_REQUEST_TTL = 120
+
+
+def _around_audience(person: str, audience) -> list[str] | None:
+    """Validate an explicit audience, or ``None`` for the legacy all-friends form."""
+    if audience is None:
+        return None
+    values = [audience] if isinstance(audience, str) else list(audience)
+    names: list[str] = []
+    for raw in values:
+        if not isinstance(raw, str) or not raw.strip():
+            raise SwitchError("an ask-around audience must be a list of person names")
+        if raw.strip().lower() == person:
+            raise SwitchError("you cannot ask yourself")
+        friend = known_friend(person, raw)
+        if friend not in names:
+            names.append(friend)
+    if not names:
+        raise SwitchError("an ask-around needs at least one friend in its audience")
+    return names
+
+
+def _write_audience_request(person: str, question: str, audience: list[str]) -> str:
+    """Persist the audience for one gate command and return its ``A<digits>`` token.
+
+    The gate and this tool share the owner's data directory. The token travels
+    in the normal fixed command; the gate consumes the matching file and asks
+    only that audience. A missing or stale file fails closed at the gate.
+    """
+    directory = resolve_data_dir(person) / "ask-around-requests"
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    now = _now()
+    for stale in directory.glob("A*.json"):
+        try:
+            payload = json.loads(stale.read_text())
+            expired = float(payload.get("expires", 0)) < now
+        except (OSError, ValueError, TypeError, AttributeError):
+            expired = True
+        if expired:
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+    number = time.time_ns() % 1_000_000_000
+    for _ in range(1000):
+        token = f"A{number:09d}"
+        if not (directory / f"{token}.json").exists():
+            break
+        number = (number + 1) % 1_000_000_000
+    else:  # pragma: no cover - a full billion-token namespace cannot be reached
+        raise SwitchError("could not allocate an ask-around request token")
+    payload = {
+        "question": question,
+        "audience": audience,
+        "expires": now + ASK_AROUND_REQUEST_TTL,
+    }
+    from trustnet.gate.storage import atomic_write
+
+    atomic_write(directory / f"{token}.json", json.dumps(payload))
+    return token
+
+
+async def ask_around(person: str, question: str, audience=None):
+    """Ask the owner gate a quoted question, optionally only an explicit audience."""
     quoted = Quoted(question)
+    names = _around_audience(person, audience)
+    token = _write_audience_request(person, quoted.text, names) if names is not None else None
     async with session(person) as client:
         await client.connect_to_room(await home(person, client))
-        return await client.post_message(f"@{person}-gate ask-around {quoted}")
+        prefix = f"@{person}-gate ask-around "
+        if token:
+            prefix += f"{token} "
+        return await client.post_message(prefix + str(quoted))
 
 
 async def ask(person: str, friend: str, fields: list[str]):

@@ -136,6 +136,24 @@ def test_trust_rejects_levels_a_room_cannot_sit_at(data_dir: Path, run, level: s
     assert (data_dir / "om" / TRUST_FILENAME).read_bytes() == before
 
 
+def test_ask_around_forwards_an_optional_audience(data_dir: Path, run, monkeypatch) -> None:
+    calls: list[tuple[str, str, list[str] | None]] = []
+
+    async def fake_ask_around(person: str, question: str, audience=None):
+        calls.append((person, question, audience))
+        return {"event_id": "evt"}
+
+    monkeypatch.setattr("trustnet.tn.personal.ask_around", fake_ask_around)
+
+    code, _out, err = run(
+        "--as", "om", "ask-around", "a tent to borrow", "--to", "rahul", "--to", "priya"
+    )
+
+    assert code == 0
+    assert err == ""
+    assert calls == [("om", "a tent to borrow", ["rahul", "priya"])]
+
+
 # ---------------------------------------------------------------------------
 # fact get
 # ---------------------------------------------------------------------------
@@ -394,7 +412,8 @@ def test_view_as_speaks_json(data_dir: Path, run) -> None:
     assert facts["address"]["visible"] is False
     assert facts["wishlist"]["visible"] is True
     assert facts["wishlist"]["value"][0]["item"] == "Lego Millennium Falcon"
-    assert payload["titles_visible"] is True
+    assert payload["titles_visible"] is False
+    assert all(row["title"] == "" for row in payload["calendar"])
     assert set(payload["window"]) == {"start", "end"}
 
 

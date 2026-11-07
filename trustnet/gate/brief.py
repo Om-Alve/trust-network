@@ -155,9 +155,14 @@ def _compose(
     start = datetime.combine(start_day, time.min, tzinfo=time_zone())
     end = datetime.combine(end_day + timedelta(days=1), time.min, tzinfo=time_zone())
 
-    facts = visible_facts(profile, level)
+    permissions = trust.permissions_for(friend_key)
+    facts = visible_facts(profile, level, permissions)
     try:
-        blocks = calendar_view(busy(profile.calendar_path, start, end), level)
+        blocks = calendar_view(
+            busy(profile.calendar_path, start, end),
+            level,
+            titles=permissions.calendar_titles,
+        )
     except CalendarError as exc:
         raise BriefError(str(exc)) from None
 

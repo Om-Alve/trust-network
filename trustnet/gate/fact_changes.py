@@ -62,10 +62,15 @@ def _recover(person, state):
             save_profile(profile, resolve_data_dir(person) / FACTS_FILENAME)
         else:
             trust = load_trust(person)
+            if trust.is_blocked(key):
+                item["status"] = "declined"
+                item["reason"] = "Person was blocked before approval completed"
+                _save(person, state)
+                continue
             before = trust.level_for(key)
             if (before.value if before else "unlisted") not in {item["before"], item["after"]}:
                 raise FactsError(f"{ref} conflicts with an interrupted approval")
-            trust.people[key] = after
+            trust.grant(key, after)
             save_trust(trust, resolve_data_dir(person) / "trust.yaml")
         _record(person, ref, key, item["before"], item["after"])
         item["status"] = "approved"
@@ -125,11 +130,18 @@ def add(person, key, value):
     return {"fact": key, "level": "private", "created": True}
 
 
-def _audience(person, level):
+def _audience(person, level, key):
+    trust = load_trust(person)
     return [
         f"{name} ({tag.value})"
-        for name, tag in sorted(load_trust(person).people.items())
-        if fact_is_visible(level, tag)
+        for name, tag in sorted(trust.people.items())
+        if not trust.is_blocked(name)
+        and fact_is_visible(
+            level,
+            tag,
+            allowed=key in trust.permissions_for(name).allow,
+            denied=key in trust.permissions_for(name).deny,
+        )
     ]
 
 
@@ -151,7 +163,10 @@ def suggest(person, key, level, reason="", *, trust=False):
             # Reuse the trust-list name validation.
             if len(key) > 64:
                 raise FactsError("person name must be at most 64 characters")
-            before = load_trust(person).level_for(key)
+            trust_list = load_trust(person)
+            if trust_list.is_blocked(key):
+                raise FactsError(f"{key} is blocked; unblock them before suggesting trust")
+            before = trust_list.level_for(key)
             key = key.strip().lower()
             if key == person:
                 raise FactsError("cannot suggest trusting yourself")
@@ -174,7 +189,7 @@ def suggest(person, key, level, reason="", *, trust=False):
                 return {"status": "applied", "fact": key, "level": level.value}
             item = {
                 "before": before.value,
-                "audience": _audience(person, level),
+                "audience": _audience(person, level, key),
                 "fingerprint": _fingerprint(fact),
             }
             prefix = "F"
@@ -252,11 +267,15 @@ def decide(person, refs, approve, *, sender=None):
                         fact is None
                         or fact.level.value != item["before"]
                         or _fingerprint(fact) != item["fingerprint"]
-                        or _audience(person, after) != item["audience"]
+                        or _audience(person, after, key) != item["audience"]
                     ):
                         raise FactsError(f"{ref} changed; request a fresh review")
                 else:
                     trust = load_trust(person)
+                    if trust.is_blocked(key):
+                        raise FactsError(
+                            f"{key} is blocked; unblock them and request a fresh review"
+                        )
                     before = trust.level_for(key)
                     if (before.value if before else "unlisted") != item["before"]:
                         raise FactsError(f"{ref} changed; request a fresh review")

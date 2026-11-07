@@ -116,16 +116,16 @@ def build(person: str) -> MCPServer:
 
     @server.tool(
         description=(
-            "Ask all your person's listed friends one short question (at most 140 "
-            "characters), e.g. 'a tent to borrow, Nov 14-16'. Your gate fans it out to "
-            "their gates, which return the friends' own quoted words about relevant "
-            "things they have or recommend, or ask their own person. You decide which "
-            "answers are relevant; a listed item is not a promise to lend it. Answers "
-            "arrive as A1 questions in inbox; relay them to your person."
+            "Ask listed friends one short question (at most 140 characters), e.g. 'a tent "
+            "to borrow, Nov 14-16'. friends optionally selects the audience by person name; "
+            "omit it to ask everyone on the trust list. A friend's gate never dumps their "
+            "profile facts: it routes the question to that friend's own agent, or to the "
+            "friend when they opted in. Their answer arrives as an A1 question in inbox; "
+            "relay it to your person. A listed item is not a promise to lend it."
         )
     )
-    async def ask_around(question: str) -> dict[str, Any]:
-        return await _call(personal.ask_around, person, question)
+    async def ask_around(question: str, friends: list[str] | None = None) -> dict[str, Any]:
+        return await _call(personal.ask_around, person, question, friends)
 
     @server.tool(
         description=(
@@ -195,6 +195,9 @@ def build(person: str) -> MCPServer:
                 if ref.startswith("P")
             ],
             "calendar_pending": calendar_jobs.pending(person),
+            "calendar_receipts": [
+                t for t in calendar_jobs.all_tasks(person) if t["status"] == "applied"
+            ],
             "outgoing_review": outgoing.pending(person),
             "privacy": "Gate tool disclosures are enforced. Automatic conversation text depends on the agent; use outgoing review for owner approval of exact text.",
         }

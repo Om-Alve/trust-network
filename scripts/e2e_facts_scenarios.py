@@ -150,7 +150,8 @@ async def facts_free_and_stranger(base: Path) -> dict:
         checks["friend_free"] = world.bodies(close)[-1]
         assert "busy" in checks["acquaintance_free"]
         assert "Family video call" not in checks["acquaintance_free"]
-        assert "Family video call" in checks["friend_free"]
+        assert "busy" in checks["friend_free"]
+        assert "Family video call" not in checks["friend_free"]
 
         probe = await world.add_room("probe", ["om-gate", "eve-hermes"])
         ledger_before = len(ledger.read("om"))
@@ -301,6 +302,12 @@ async def gifts_and_claims(base: Path) -> dict:
             await world.stop()
 
 
+def _local_question(world, person: str):
+    return next(
+        value for value in world.gates[person]._around_state().values() if value.get("local")
+    )
+
+
 async def ask_around(base: Path) -> dict:
     async with world_for(base, "around") as world:
         old_session = personal.session
@@ -310,42 +317,47 @@ async def ask_around(base: Path) -> dict:
             await personal.ask_around("om", "a tent to borrow, Nov 14-16")
             await world.wait_for(
                 lambda: any(
-                    len(entry.get("answers", {})) == 2
+                    entry.get("question") == "a tent to borrow, Nov 14-16"
                     for entry in world.gates["om"]._around_state().values()
                 ),
-                what="both friends' answers",
+                what="the ask-around fan-out",
             )
             ref, entry = next(
                 (ref, entry)
                 for ref, entry in world.gates["om"]._around_state().items()
-                if len(entry.get("answers", {})) == 2
+                if entry.get("question") == "a tent to borrow, Nov 14-16"
             )
+            assert entry.get("answers") == {}
+            await world.wait_for(
+                lambda: all(_local_question(world, person) for person in ("rahul", "priya")),
+                what="both home questions",
+            )
+            assert all(
+                "Profile lists" not in message["body"]
+                for room in world.rooms_named("conn-om-")
+                for message in room["messages"]
+            )
+
+            rahul = _local_question(world, "rahul")
+            priya = _local_question(world, "priya")
+            await personal.answer("rahul", rahul["local"], "no, sorry")
+            await personal.answer(
+                "priya", priya["local"], "Priya has a 2-person tent, no promise to lend"
+            )
+            await world.wait_for(
+                lambda: len(world.gates["om"]._around_state()[ref].get("answers", {})) == 2,
+                what="both own-side answers",
+            )
+            entry = world.gates["om"]._around_state()[ref]
             assert set(entry["answers"]) == {"rahul", "priya"}
             assert "2-person tent" in entry["answers"]["priya"]
             assert "2-person tent" not in entry["answers"]["rahul"]
-
-            pending = next(
-                value
-                for value in world.gates["rahul"]._around_state().values()
-                if value.get("local")
-            )
-            await world.say(
-                world.homes["rahul"],
-                "rahul-hermes",
-                f'@rahul-gate answer {pending["local"]} "no, sorry"',
-            )
-            await world.wait_for(
-                lambda: (
-                    world.gates["om"]._around_state()[ref]["answers"].get("rahul") == "no, sorry"
-                ),
-                what="own words",
-            )
 
             expected = dict(world.gates["om"]._around_state()[ref]["answers"])
             probe = await world.add_room("probe-forged", ["om-gate", "rahul-gate"])
             await world.say(probe, "rahul-gate", f'@om-gate answer {ref} "forged"')
             assert world.bodies(probe) == ["Not allowed."]
-            world.clock.advance(minutes=6)
+            world.clock.advance(minutes=8 * 24 * 60)
             await world.say(
                 entry["peers"]["rahul"], "rahul-gate", f'@om-gate answer {ref} "too late"'
             )
@@ -378,21 +390,27 @@ async def around_long_list(base: Path) -> dict:
             await personal.ask_around("om", "a tent to borrow, Nov 14-16")
             await world.wait_for(
                 lambda: any(
-                    "priya" in entry.get("answers", {})
+                    entry.get("question") == "a tent to borrow, Nov 14-16"
                     for entry in world.gates["om"]._around_state().values()
                 ),
-                what="Priya's long reply",
+                what="the ask-around fan-out",
             )
             entry = next(
                 entry
                 for entry in world.gates["om"]._around_state().values()
-                if "priya" in entry.get("answers", {})
+                if entry.get("question") == "a tent to borrow, Nov 14-16"
             )
-            reply = entry["answers"]["priya"]
-            assert reply.startswith("Profile lists, no lending promise: has: ")
-            assert len(reply) <= 140 and reply.endswith("…")
+            assert entry.get("answers") == {}
+            assert all(
+                long_item not in message["body"]
+                for room in world.rooms_named("conn-om-")
+                for message in room["messages"]
+            )
             return {
-                "checks": {"reply": reply, "length": len(reply)},
+                "checks": {
+                    "answers": entry.get("answers", {}),
+                    "profile_dumped": False,
+                },
                 "transcripts": {"world": world.transcript()},
             }
         finally:

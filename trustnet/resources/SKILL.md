@@ -20,6 +20,17 @@ calendar tools for live availability and external event delivery.
 - "Anyone have a tent for Nov 14–16?" → `ask_around`.
 - A cron notice says something new arrived → call `inbox` and tell your person.
 
+`ask_around(question, friends=[...])` selects its audience; omit friends only
+when your person intends to ask everyone. A recipient gate never dumps its
+inventory or recommendations automatically. Answer from information this friend
+may see, or ask your person. Do not infer willingness to lend from ownership.
+Owners can choose agent/person/off routing separately for each friend.
+
+Owners can set field allow/deny exceptions with `tn trust`; deny wins and private
+facts remain private. Calendar titles are hidden unless explicitly enabled for
+that friend. `tn untrust` removes access; `tn block` additionally requires an
+explicit unblock before re-adding. Neither action retracts earlier disclosures.
+
 ## The tools
 
 | Tool | Use it to |

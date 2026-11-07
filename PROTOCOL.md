@@ -134,8 +134,8 @@ All commands are one line. The leading `@<person>-gate` is the addressee. The
 parser also accepts a fenced code block, smart quotes, and a trailing `.,;:!`,
 and the verb is case-insensitive. Free text is always a double-quoted string,
 at most 140 characters, with no double quote inside, one line. A gate treats
-quoted text as data and always shows it quoted. Dates go through `dateparser`
-in `Asia/Kolkata` and prefer the future; always send ISO.
+quoted text as data and always shows it quoted. Dates go through `dateparser` in the configured `TN_TIMEZONE`
+(legacy default `Asia/Kolkata`) and prefer the future; send ISO with an offset.
 
 A command that is a known verb written badly gets `Invalid command. ...` back
 (a `ParseError`; the gate then notes overreach if the sender is the other
@@ -179,7 +179,7 @@ applies the trust level of the room, not of the sender.
 
 | Command | Example | Notes |
 | --- | --- | --- |
-| `free <date\|range>` | `@om-gate free 2026-11-08..2026-11-09` | Busy blocks for each day in the inclusive range. Titles are shown at `friend` and `close`, and blanked at `acquaintance`. |
+| `free <date\|range>` | `@om-gate free 2026-11-08..2026-11-09` | Busy blocks for each day in the inclusive range. Titles are hidden unless the owner opts this person in with `calendar_titles`. |
 | `ask <fact> [<fact> ...]` | `@om-gate ask diet interests` | Values at the room level, or `<fact>: not shared with you`. A fact that is hidden and a fact that does not exist look the same. |
 | `ask-owner Q<n> "<question>"` | `@om-gate ask-owner Q3 "Is ₹1,500 per person okay?"` | Sent by an agent to its own gate. Puts the question in the owner's home room. |
 | `propose P<n> <start> <duration> "<title>" @ "<place>"` | `@om-gate propose P1 2026-11-08T21:00 2h "Bowling + dinner" @ "Smaaash, Indiranagar"` | Sent by an agent to its **own** gate in the DM room. Title and place: 60 characters at most; the place only `[A-Za-z0-9 ,.'&-]`; the title has no quotes or `@`. Duration: 1 minute to 24 hours (`2h`, `90m`). The start must have a timezone (parsed as IST if none). |
@@ -325,8 +325,10 @@ side that sent it, notes it as overreach to its owner; it then accepts
     and stops the room's limit counter. The gate that receives the second vote
     from the peer also archives the room; an archived room accepts nothing
     except `consent`, so the last relay still lands.
-11. Both approvals enqueue an idempotent event in each owner's ICS calendar.
-    Agents do not need a separate `cal_add` call for a confirmed proposal.
+11. Both approvals enqueue a calendar operation for each owner. In agent mode,
+    `calendar_tasks` returns the exact approved operation; the owner's existing
+    calendar tools apply it and `calendar_report` records the provider event ID.
+    Legacy ICS mode writes locally. Approval does not establish provider delivery.
 
 A changed plan is a new proposal with the next number. `consent` that arrives
 for a proposal that is not pending (already decided) does not change it.
@@ -362,8 +364,7 @@ again. Persisted peers remain compatible until a new hello changes their version
    raises an overreach note in the owner's home room, at most one per person and
    field per 10 minutes: `Rahul's side asked for your address (private)` or
    `... (not a field you have)`.
-4. `free <date|range>` returns busy blocks. At `acquaintance` the titles are
-   blanked; at `friend` and `close` they are shown.
+4. `free <date|range>` returns busy blocks. Titles are blanked unless the owner opts each viewer in.
 5. Every value shown goes in the ledger: field, value, to whom, room, time.
    The owner reads it with `ledger`, and previews what a friend can learn with
    `view-as <person>`.
@@ -408,15 +409,16 @@ The seal is a courtesy: workspace admins can read rooms.
    person for its own ask-arounds and the local questions it puts to its person) and, for every friend on the trust list,
    finds or creates `conn-<a>-<b>` and posts `@<friend>-gate ask-around A<n>
    "<question>"`. It posts `A<n> asking around: "<question>"` to home. The
-   question expires after 5 minutes.
+   question expires after seven days.
 3. Each friend's gate accepts it only from the friend's own gate in
-   `conn-<pair>`. It replies on its own, from facts at that level: the `has`
-   and `recommends` facts, prefixed `Profile lists, no lending promise:`.
-   A reply longer than 140 characters is cut short with `…` rather than
-   dropped. It also puts a local `A<m>` question in its owner's home so the
-   person can answer in their own words.
+   `conn-<pair>`. It never automatically dumps profile facts. The recipient's
+   per-person `ask_around` preference chooses `agent` (default), `person`, or
+   `off`. With no registered personal agent it escalates to the person.
+   Explicit audiences use `ask_around(question, friends=[...])` or
+   `tn ask-around "..." --to rahul,priya`. The tool writes a short-lived local
+   audience request; the gate consumes it and refuses stale or missing requests.
 4. Replies arrive as `answer A<n> "<text>"` in the same conn room. The asker's
-   gate accepts one per friend, before expiry, and posts the collected answers
+   gate retains the latest answer per friend, before expiry, and posts the collected answers
    in home. Each reply is ledgered.
 5. A friend's `answer A<m> "..."` from their own side is checked against the
    room membership and trust list again before it is sent.
@@ -427,7 +429,8 @@ The seal is a courtesy: workspace admins can read rooms.
 
 - **Fixed forms plus quoted free text.** Anything crossing a gate boundary is a
   parsed command. Free text is quoted, one line, capped at 140 characters with
-  no double quote, so it cannot become an instruction.
+  no double quote, so command parsing is unambiguous. This does not prevent a
+  language model from interpreting the content as instructions.
 - **Identity from Switch.** Senders and room members come from Switch metadata.
   A claimed name is ignored. Owner and agent ownership is re-read on every
   command, and the gate stays silent on any mismatch.
@@ -435,8 +438,8 @@ The seal is a courtesy: workspace admins can read rooms.
   gives any person in it, counting the owners of every agent in the room,
   except the owner and the owner's own agents. Someone not on the list means
   the gate says nothing. A room with only the owner's side is `self`.
-- **Level table.** Busy times at every level; event titles at `friend` and
-  `close`; facts tagged `acquaintance`, `friend` or `close` at that level and
+- **Level table.** Busy times at every level; event titles require each viewer's
+  explicit opt-in; facts tagged `acquaintance`, `friend` or `close` at that level and
   above; `private` never.
 - **Owner commands are the owner's.** `trust`, `view-as` and `ledger` are never
   accepted from an agent, and no owner command is accepted across the boundary
@@ -464,7 +467,7 @@ The seal is a courtesy: workspace admins can read rooms.
   most one per person and field per 10 minutes. In a gift room it is logged and
   not posted.
 - **Ledger.** Every disclosure is logged: field, value, to whom, room, time.
-- **Room limits.** A DM room closes after 20 main-agent turns or 30 minutes,
+- **Room limits.** A DM room closes after 20 main-agent turns or seven days,
   whichever comes first: the gate posts a summary to home and archives it.
 
 **Left to the agent's judgement:**
@@ -529,7 +532,8 @@ configure Codex yourself, set that.
 card with `inbox`; plan with `dm_read` and `dm_post` in plain text; ask its person
 only what it does not know; propose through **its own gate** with one
 `dm_post` of the `propose` line; wait for its person's yes or no and call
-`answer`; when the gate posts ✅, call `cal_add`. Never answer for the person.
+`answer`; when the gate posts ✅, apply `calendar_tasks` through existing
+calendar tools and record receipts with `calendar_report`. Never answer for the person.
 
 **Evidence.** Om's Hermes planned with Priya's Codex agent end to end on
 2026-11-06 (14:44 IST): Priya's agent offered Mon 9 Nov 19:30, the two settled a
@@ -555,11 +559,14 @@ have the plan. (The confirmation text now says `via agent`.) The transcript is
   told to use a new number for any change, but nothing assigns them.
 - **Agent-side leaks.** What an agent says in the DM room is its own
   judgement. The gate cannot stop it.
-- **Room limits.** 20 agent turns or 30 minutes. A plan that needs a person who
+- **Room limits.** 20 agent turns or seven days. A plan that needs a person who
   answers slowly can hit the time limit.
-- **Ask-around expires** after 5 minutes. Gift sessions after 10.
+- **Ask-around expires** after seven days. Gift sessions after 10.
 - **Connections.** A gate anchors the newest 24 open rooms.
-- **Calendars.** Both approvals enqueue an idempotent local ICS event. Remote calendar provider adapters are not implemented.
+- **Calendars.** New connections delegate delivery to the personal agent through
+  durable tasks and receipts. Existing unconfigured profiles retain local ICS.
+  The gate does not need Google or Outlook adapters. External writes rely on the
+  agent searching for the stable UID marker before retrying.
 - **Switch is trusted.** Identity and membership come from Switch. A
   compromised Switch, or an admin, can read every room, including gift rooms.
 - **A pre-handshake gate** reads `hello` as an unknown command.
@@ -622,8 +629,9 @@ consent. Startup and periodic recovery replay unfinished work. Each owner runs
 one gate process. Existing coordination JSON is imported into owner-local SQLite
 once; JSON remains a readable projection, not an editing interface.
 
-Two yeses automatically enqueue the owner's ICS event with a stable UID. Calendar
-writes and approval ledger entries are idempotent. Switch messages and documents
+Two yeses automatically enqueue the owner's calendar operation with a stable UID.
+Local ICS writes and approval ledger entries are idempotent. External provider
+writes require a marker lookup before retrying and a receipt after success. Switch messages and documents
 may be delivered more than once after an interrupted acknowledgment.
 
 A counter is `counter P<old> P<new> <start> <duration> "<title>" @ "<place>"`.
@@ -631,3 +639,34 @@ It must reference a pending plan in the same room, use a fresh ID, and come from
 an initiator who has not voted on the old plan. The old plan becomes superseded;
 its votes cannot confirm the replacement. Both people approve the new plan.
 The peer gate must advertise `counter` capability.
+
+## Calendar tasks and outgoing review
+
+`calendar_tasks()` lists unfinished operations with `uid`, immutable operation
+`token`, `action`, exact `plan`, and any previous provider/event ID. The agent
+uses its configured calendar tools and puts the stable UID in the description.
+It searches by UID before retrying after an interrupted write.
+`calendar_report(token, status, provider, event_id, error)` acknowledges only the
+current operation. Applied receipts require a provider and event ID; failures
+remain visible and use a retry delay. These are agent reports, rather than
+independent provider verification by the gate. `status` separates pending votes,
+calendar delivery and outgoing review. Tasks survive consuming the inbox.
+
+`TN_OUTGOING=review` stores exact `dm_post` text without sending. The owner's
+`tn outbox list`, `approve <ref>` or `decline <ref>` commands resolve it. No MCP
+release tool exists. Automatic mode still relies on agent judgement; local shell
+access and separate messaging tools are trusted and can bypass this tool-level
+review. The gate never claims to classify free-form messages for private meaning.
+
+## Per-person sharing and blocking
+
+`tn trust rahul close --deny wishlist --allow interests --calendar-titles` sets
+field exceptions and explicit title access. Denials override allows; a private
+fact remains private. A shared room combines the most restrictive permissions
+of all viewers. `view-as`, share cards, direct asks, calendar replies and gift
+suggestions apply the same per-person policy.
+
+`tn untrust rahul` removes the friendship. `tn block rahul` also records a block,
+which requires `tn unblock rahul` before any explicit re-add. Pending trust
+approvals cannot override a block. Removing access cannot retract information
+already received, including prior conversation messages.
