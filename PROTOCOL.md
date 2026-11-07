@@ -109,6 +109,7 @@ agent's own gate command produces (section 5).
 | `conn-<a>-<b>` | the gate that needs it first | `<a>-gate`, `<b>-gate` | The gate-to-gate channel. Names are the two person names, sorted: `conn-om-priya`. Carries `hello`, `join-dm`, and ask-around. |
 | `dm-<a>-<b>-<slug>` | the gate that received `dm` | `<a>-gate`, `<b>-gate`, `<a>-hermes`, `<b>-hermes` | Where the two agents plan, in plain language. `<slug>` is the goal, lower-cased, reduced to `[a-z0-9-]`, 32 characters at most (`plan` if empty); a numeric suffix keeps names unique. The gates sit in it to relay proposals and consent. Archived when the plan is confirmed, or at the room limits (section 8). |
 | `gift-<asker>-<for>-<slug>` | the asker's gate | the two gates only | Surprise-mode gift ideas and claims. Agents are not members. Private read and write visibility, archived when the session ends or expires. |
+| `ask-<a>-<b>-<n>` | the asker's gate | `<asker>-gate`, `<asker>-hermes`, `<friend>-gate` | Quiet fact-request room for `ask`. The friend's gate joins on `join-ask` and answers `ask` and `free` at the room level, but never invites its own agent, writes no share card and posts no planning notice. One open room per pair is reused. |
 
 Every room is created `internal_only`.
 
@@ -148,7 +149,8 @@ Sent from the person's `<person>-home` room.
 
 | Command | Example | Who may send | Notes |
 | --- | --- | --- | --- |
-| `dm <person> "<goal>"` | `@om-gate dm rahul "something fun Sunday evening, not pricey"` | owner, or any of the owner's agents | Opens a planning room with a listed friend. Ignored if the friend is not on the trust list. |
+| `dm <person> "<goal>"` | `@om-gate dm rahul "something fun Sunday evening, not pricey"` | owner, or any of the owner's agents | Opens a planning room with a listed friend, or reuses the open one with that friend (the gate posts `Planning continues with <friend> in <room>`). Ignored if the friend is not on the trust list. |
+| `ask-room <person>` | `@om-gate ask-room rahul` | owner, or any of the owner's agents | Opens a quiet fact-request room with a listed friend (7c). The MCP `ask` tool sends it. |
 | `ask-around "<question>"` | `@om-gate ask-around "tent to borrow, Nov 14-16"` | owner, or the owner's agents | Fans a question out to every listed friend's gate (section 7e). |
 | `yes P<n>` / `no P<n>` | `@om-gate yes P1` | owner's Switch user; or `<person>-hermes` if consent mode is `via-agent` | Records the owner's vote on a proposal. |
 | `answer <Q<n>\|P<n>\|A<n>> "<text>"` | `@om-gate answer Q3 "yes, up to ₹1,500"` | same as `yes`/`no` | `Q#`: answers a question. `P#`: text must be `yes` or `no`. `A#`: answers an ask-around question from a friend. |
@@ -167,6 +169,7 @@ in the right room.
 | --- | --- | --- | --- |
 | `hello trust-network/<major>[.<minor>] <capability,...>` | `@rahul-gate hello trust-network/1 hello,join-dm,free,ask,propose,consent,ask-around,gift-ideas,claim` | the friend's gate | `conn-<a>-<b>` |
 | `join-dm <room> "<goal>"` | `@rahul-gate join-dm dm-om-rahul-sun "something fun Sunday evening"` | the friend's gate | `conn-<a>-<b>` |
+| `join-ask <room>` | `@rahul-gate join-ask ask-om-rahul-1` | the friend's gate | `conn-<a>-<b>` |
 | `consent P<n> yes\|no via-agent\|direct <sha256>` | `@rahul-gate consent P1 yes via-agent 2f749caf9dd6cbd99a2062e33534cad46b8f634eb2b2925e60a68b15cfa87cc4` (the last field is the SHA-256 of the card text; see 7a) | the friend's gate | the `dm-` room the proposal belongs to |
 | `propose P<n> <card>` (forwarded) | `@rahul-gate propose P1 2026-11-08T21:00:00+05:30 120m "Bowling + dinner" @ "Smaaash, Indiranagar"` | the friend's gate | `dm-<a>-<b>-*` |
 | `ask-around A<n> "<question>"` | `@rahul-gate ask-around A1 "tent to borrow, Nov 14-16"` | the friend's gate | `conn-<a>-<b>` |
@@ -217,8 +220,8 @@ see:
 ```
 
 The capability list is comma-separated, lower-case words and hyphens only.
-v1 gates advertise: `hello, join-dm, free, ask, propose, consent, ask-around,
-gift-ideas, claim`.
+v1 gates advertise: `hello, join-dm, join-ask, free, ask, propose, counter,
+consent, ask-around, gift-ideas, claim, group-plans`.
 
 **When it is sent.** The gate opening a planning room says hello in
 `conn-<a>-<b>` immediately before `join-dm`. The receiving gate records the
@@ -241,6 +244,18 @@ string, the major version, the capability list, the room and the time.
   to its owner: `Didn't open a planning room with <Friend>: <reason>.`
 - A `propose` forwarded by the peer gate is refused with the handshake reason
   without a compatible hello.
+- `join-ask` gets the same check as `join-dm`; the asker's gate says hello right
+  before it, so a first fact request between two gates still works.
+
+Three capabilities change what this gate sends:
+
+- `counter`: a counter proposal is sent only to a peer that advertised it.
+- `join-ask`: `ask` uses a quiet `ask-` room unless the peer said hello without
+  advertising it, in which case it falls back to a planning DM.
+- `group-plans`: a group plan that uses `min_yes`, `notes` or participant
+  removal is sent only when every peer advertised it. A peer that never said
+  hello is greeted in its `conn-` room first, and the request is refused with
+  "send the same request again in a few seconds" so the retry finds its answer.
 
 **A `hello` that is not the handshake form is an unknown command**, not a
 malformed one: "@om-gate hello there" gets the command list, exactly as it did
@@ -251,9 +266,9 @@ as "something that isn't a command").
 should send `trust-network/1` forms and not use commands outside the v1
 capability list, or refuse to plan with it. A v1 gate that receives
 `trust-network/2` records the hello but refuses `join-dm` and forwarded
-proposals from that peer. Capability lists are advisory in v1: they are
-recorded and never read to gate behaviour. A v2 should add capabilities to the
-list rather than change the meaning of v1 commands.
+proposals from that peer. Other capabilities are recorded and only read for
+the three above. A v2 should add capabilities to the list rather than change
+the meaning of v1 commands.
 
 **Current limits.** Ask-around and gift rooms do not check the handshake yet. A
 pre-handshake gate reads `hello` as an unknown command and, if it is the other
@@ -363,7 +378,9 @@ again. Persisted peers remain compatible until a new hello changes their version
 3. For every fact that was asked for but not shown, the other side's request
    raises an overreach note in the owner's home room, at most one per person and
    field per 10 minutes: `Rahul's side asked for your address (private)` or
-   `... (not a field you have)`.
+   `... (not a field you have)`. A fact marked `quiet: true` in `facts.yaml` is
+   the owner's exception: a hidden request for it is recorded in the ledger as a
+   `request` entry and raises no real-time note.
 4. `free <date|range>` returns busy blocks. Titles are blanked unless the owner opts each viewer in.
 5. Every value shown goes in the ledger: field, value, to whom, room, time.
    The owner reads it with `ledger`, and previews what a friend can learn with
@@ -371,6 +388,16 @@ again. Persisted peers remain compatible until a new hello changes their version
 
 `ask` in a DM room answers at the DM room's level, which is the lowest level
 among the friends present.
+
+The MCP `ask` tool does not use a planning DM. It sends `ask-room <friend>`, and
+the asker's gate opens an `ask-<pair>-<n>` room with its own agent and the
+friend's gate, then sends `join-ask <room>` in the connection room. The
+friend's gate verifies the sender, room name, fresh membership and level as for
+`join-dm`, but never invites its own agent and posts nothing home, so a friend
+asking about a wishlist before a birthday does not reach the recipient's agent.
+Later asks reuse the pair's open `ask-` room. Before this, a live run of four
+friends pooling for a gift leaked the surprise: the recipient's agent was
+invited into the facts room and told her who was asking.
 
 ### 7d. Gifts (surprise mode)
 
@@ -499,9 +526,13 @@ You need two things.
    still enforces the same rules on the message.
 2. **Something that wakes the agent.** An agent only acts when it gets a
    message, and nothing in Switch sends one when the other side replies. Poll
-   `tn --as <person> watch`: it reports unread home items and each DM room whose
-   newest message is someone else's and changed since the last watch. It does
-   not consume the inbox.
+   `tn --as <person> watch`: it reports unread home items and each DM or group
+   room whose newest meaningful message is someone else's and changed since the
+   last watch. Switch's automatic join greeting (a message under a member's own
+   name within two seconds of its `room_join`) and gate-to-gate traffic (a gate
+   addressing another gate) are not meaningful; both rules are structural. It
+   does not consume the inbox. `tn wake` waits `--settle` seconds (default 2)
+   after news and watches once more, so a burst of messages is one agent turn.
 
 **Hermes** does this with a cron job every minute whose pre-check script
 (`scripts/hermes/tn-inbox-watch.sh`) runs `tn --json watch`. It wakes the agent
@@ -691,12 +722,28 @@ uses UTC so the fingerprint is independent of each person's display timezone.
 Every person's vote, revision request and cancellation must name the exact
 revision and fingerprint they reviewed. Missing or stale values are refused.
 Each gate accepts only its own person's vote or an authenticated peer gate's own
-vote. Every participant must vote yes before any calendar operation is queued.
+vote. By default every participant must vote yes before any calendar operation
+is queued.
 
-Only the organizer may draft a replacement, which preserves participants and
-clears all candidate votes. A previous confirmation remains effective until the
-replacement is unanimously approved; a declined or expired replacement keeps
-the original event. Updates and cancellations reuse the same stable calendar
+A plan may set a quorum `min_yes` (2 up to the participant count; the default
+is the full count, the unanimous rule). Every participant must still vote. The
+plan confirms once everyone has voted and the yes count reaches `min_yes`, and
+it declines as soon as the no votes make `min_yes` unreachable. A no marks that
+participant out: calendar operations are queued only for yes voters, and the
+confirmation and status list who is in and who is out. Content may carry a
+one-line `notes` field (at most 140 characters, no double quote or line break),
+such as a cost split, which everyone approves and every card shows. `min_yes`
+and `notes` join the fingerprint only when used, so plans that use neither keep
+byte-identical fingerprints. A create that repeats a still-pending plan with the
+same participants, content and `min_yes` reuses that plan and its room.
+
+Only the organizer may draft a replacement, which clears all candidate votes.
+It may drop participants: the new list must be a subset that still includes the
+organizer and has at least two people. Removed participants' gates receive a
+`remove` relay, their copy ends as `removed`, and if the plan had been confirmed
+for them they get a calendar cancellation for the same UID. A previous
+confirmation remains effective until the replacement is approved; a declined or
+expired replacement keeps the original event. Updates and cancellations reuse the same stable calendar
 UID and provider event ID. Any participant may cancel through their own consent
 mode. Cancellation before confirmation creates no calendar event. Pending plans
 expire after 30 days or when the proposed start passes; group rooms are retained
