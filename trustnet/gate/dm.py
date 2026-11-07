@@ -23,6 +23,24 @@ async def setup(gate, friend, goal, room=None):
     pair = "-".join(sorted((person, friend)))
     if room is None:
         detail = await client.get_agent_detail(client.agent_id)
+        # Reuse an open, unarchived, not-limit-closed planning room with this
+        # friend instead of opening another: an agent that calls dm() repeatedly
+        # with slightly different goal wording must not sprawl one room per call.
+        existing = next(
+            (
+                r["room_id"]
+                for r in detail.get("rooms", [])
+                if r["room_name"].startswith(f"dm-{pair}-")
+                and not r.get("archived")
+                and not (r["room_id"] in gate.watches and gate.watches[r["room_id"]].closed)
+            ),
+            None,
+        )
+        if existing is not None:
+            await relay.post_home(
+                person, f"Planning continues with {friend} in {existing}", client=client
+            )
+            return
         conn = next(
             (
                 r["room_id"]

@@ -30,6 +30,7 @@ GROUP_PLANS = "group-plans"
 CAPABILITIES = (
     "hello",
     "join-dm",
+    "join-ask",
     "free",
     "ask",
     "propose",

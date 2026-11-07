@@ -75,7 +75,7 @@ OWNER_DIRECT_COMMANDS: Final[frozenset[str]] = frozenset({"yes", "no", "answer"}
 OWNER_ONLY_COMMANDS: Final[frozenset[str]] = frozenset({"trust", "view-as", "ledger"})
 
 # Commands the owner or any of the owner's own agents may use (outbound form).
-OWNER_AGENT_COMMANDS: Final[frozenset[str]] = frozenset({"dm", "ask-around"})
+OWNER_AGENT_COMMANDS: Final[frozenset[str]] = frozenset({"dm", "ask-room", "ask-around"})
 
 # Commands another gate may send; the handler applies the room level.
 CROSS_BOUNDARY_COMMANDS: Final[frozenset[str]] = frozenset(
@@ -86,7 +86,9 @@ OWNER_COMMANDS: Final[frozenset[str]] = (
     OWNER_DIRECT_COMMANDS | OWNER_ONLY_COMMANDS | OWNER_AGENT_COMMANDS
 )
 KNOWN_COMMANDS: Final[frozenset[str]] = (
-    OWNER_COMMANDS | CROSS_BOUNDARY_COMMANDS | {"join-dm", "consent", "around-reply", "hello"}
+    OWNER_COMMANDS
+    | CROSS_BOUNDARY_COMMANDS
+    | {"join-dm", "join-ask", "consent", "around-reply", "hello"}
 )
 
 DecisionMode = Literal["direct", "via-agent", "cross-boundary"]
@@ -377,7 +379,7 @@ def authorize(
     if name not in KNOWN_COMMANDS:
         return Denied(DenialCode.UNKNOWN_COMMAND, f"unknown command {name!r}")
 
-    if name in {"join-dm", "consent", "around-reply", "hello"}:
+    if name in {"join-dm", "join-ask", "consent", "around-reply", "hello"}:
         pair = "-".join(sorted((owner_key, sender.person or "")))
         if (
             sender.kind is SenderKind.AGENT
@@ -392,7 +394,15 @@ def authorize(
         return Denied(DenialCode.NOT_OWNER_AGENT, "gate relay requires the matching connection")
 
     if direction is Direction.INBOUND:
-        if name in OWNER_DIRECT_COMMANDS or name in OWNER_ONLY_COMMANDS or name == "dm":
+        if (
+            name in OWNER_DIRECT_COMMANDS
+            or name in OWNER_ONLY_COMMANDS
+            or name
+            in {
+                "dm",
+                "ask-room",
+            }
+        ):
             return Denied(
                 DenialCode.OWNER_COMMAND,
                 f"{name} is an owner command and is never accepted across the boundary",

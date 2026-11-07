@@ -54,6 +54,7 @@ class Kind(StrEnum):
     PROPOSAL = "proposal"
     GIFT = "gift"
     ASK_AROUND = "ask-around"
+    REQUEST = "request"
 
 
 KINDS: Final[frozenset[str]] = frozenset(kind.value for kind in Kind)

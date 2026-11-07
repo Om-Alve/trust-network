@@ -322,7 +322,7 @@ async def dm_operate(person, room, text=None):
         rooms = [r for r in detail["rooms"] if room in (r["room_id"], r["room_name"])]
         if (
             not rooms
-            or not rooms[0]["room_name"].startswith(("dm-", "group-"))
+            or not rooms[0]["room_name"].startswith(("dm-", "group-", "ask-"))
             or rooms[0].get("archived")
         ):
             raise SwitchError("An active DM membership is required")
@@ -448,30 +448,67 @@ async def ask_around(person: str, question: str, audience=None):
 
 
 async def ask(person: str, friend: str, fields: list[str]):
-    """Ask a friend's gate through a DM at its room trust level."""
+    """Ask a friend's gate for facts, quietly when the friend's gate allows it.
+
+    A facts request must not read as a planning DM. The asker's own gate opens a
+    dedicated ``ask-<pair>-*`` room (asker's gate, asker's agent, friend's gate
+    only), or reuses the pair's open one, so the friend's agent is never invited
+    and the friend's home gets no planning notice. Only a friend whose gate said
+    hello without advertising ``join-ask`` falls back to the legacy
+    ``dm "Facts request"`` room.
+    """
+    from trustnet.gate import handshake
     from trustnet.gate.commands import Ask
 
     command = Ask(facts=tuple(fields))
     friend = known_friend(person, friend)
-    await dm(person, friend, "Facts request")
     pair = "-".join(sorted((person, friend)))
+    line = f"@{friend}-gate ask {' '.join(command.facts)}"
+    peer = handshake.peer(person, friend)
+    # A gate that never said hello gets one right before join-ask, so only a peer
+    # known to lack join-ask takes the planning-DM path that invites its agent.
+    use_ask_room = peer is None or "join-ask" in peer.get("capabilities", [])
+    if not use_ask_room:
+        await dm(person, friend, "Facts request")
     async with session(person) as client:
+        if use_ask_room:
+            prefix = f"ask-{pair}-"
+            detail = await client.get_agent_detail(client.agent_id)
+            open_rooms = [
+                r["room_id"]
+                for r in detail["rooms"]
+                if r["room_name"].startswith(prefix) and not r.get("archived")
+            ]
+            if open_rooms:
+                # One fact-request room per pair: rooms are never archived, and a
+                # gate stays connected to at most 24 rooms.
+                room = open_rooms[-1]
+                await client.connect_to_room(room)
+                await wait_until_live(client, room, line)
+                return {"room": room, "message": await client.post_message(line)}
+            existing = set(open_rooms)
+            await client.connect_to_room(await home(person, client))
+            await client.post_message(f"@{person}-gate ask-room {friend}")
+        else:
+            prefix = f"dm-{pair}-facts-request"
+            existing = set()
         for _ in range(150):
             detail = await client.get_agent_detail(client.agent_id)
             rooms = [
                 r
                 for r in detail["rooms"]
-                if r["room_name"].startswith(f"dm-{pair}-facts-request") and not r.get("archived")
+                if r["room_name"].startswith(prefix)
+                and not r.get("archived")
+                and r["room_id"] not in existing
             ]
             if rooms:
                 room = rooms[-1]["room_id"]
                 await client.connect_to_room(room)
-                line = f"@{friend}-gate ask {' '.join(command.facts)}"
                 await wait_until_live(client, room, line)
                 result = await client.post_message(line)
                 return {"room": room, "message": result}
             await asyncio.sleep(0.1)
-    raise SwitchError("Timed out waiting for facts DM membership")
+    raise SwitchError("Timed out waiting for facts room membership")
 
 
 async def _gift(person, friend, action, **values):
