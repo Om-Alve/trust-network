@@ -393,16 +393,6 @@ class Live:
         payload = self.tn(person, "stop")
         until(lambda: not processes(person), 20, f"{person} processes remained after tn stop")
         units = {role: observe(person, role) for role in ROLES}
-        claimed = [r for r in ROLES if payload.get("service", {}).get(r, {}).get("active")]
-        if claimed and all(unloaded(r) for r in units.values()):
-            finding = (
-                "tn --json stop reports service.<role>.active true for "
-                + " and ".join(claimed)
-                + " although launchctl no longer has the units; stop_command returns the "
-                "service state read before stopping"
-            )
-            if finding not in self.findings:
-                self.findings.append(finding)
         return {
             "result": payload,
             "units": units,
@@ -566,6 +556,10 @@ def verify_services(report, output):
             assert stopped["processes"] == [], f"{phase}: {person} processes remained"
             assert stopped["doctor"]["automation_ready"] is False
             for role, unit in stopped["units"].items():
+                reported = stopped["result"]["service"][role]
+                assert reported["installed"] and reported["active"] is False, (
+                    f"{phase}: tn stop reported {person} {role} as {reported}"
+                )
                 assert unit["plist_exists"] and unit["run_at_load"], (
                     f"{phase}: {person} {role} plist is gone, so a bare tn setup cannot restart it"
                 )

@@ -744,14 +744,13 @@ def stop_command(context, args):
     settings = config.read_json(config.config_dir() / "config.json")
     if not settings:
         return context.emit({"stopped": False}, "No managed gate is running.")
-    service = _service_state(settings)
     was_wake = _wake_running(settings)
     stopped = _stop(settings)
     payload = {
         "stopped": stopped,
         "gate_running": _gate_running(settings),
         "wake_running": _wake_running(settings),
-        "service": service,
+        "service": _service_state(settings),
         "stopped_wake": was_wake and not _wake_running(settings),
     }
     if stopped:
