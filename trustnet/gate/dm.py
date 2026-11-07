@@ -15,6 +15,41 @@ def main_agent(person):
     return person + relay.AGENT_SUFFIX
 
 
+async def _connection_room(client, person, friend, detail=None):
+    pair = "-".join(sorted((person, friend)))
+    detail = detail or await client.get_agent_detail(client.agent_id)
+    conn = next(
+        (
+            r["room_id"]
+            for r in detail.get("rooms", [])
+            if r["room_name"] == "conn-" + pair and not r.get("archived")
+        ),
+        None,
+    )
+    if conn is not None:
+        return conn
+    result = await client.create_room(
+        "conn-" + pair, "Gate connection", [person + "-gate"], internal_only=True
+    )
+    conn = result.get("room_id", result.get("id"))
+    await client.connect_to_room(conn)
+    await client.invite_agent_to_room(conn, friend + "-gate")
+    return conn
+
+
+async def _ask_peer_to_join(gate, friend, room, goal):
+    """Say hello, then post ``join-dm`` so the friend's gate sets up its side.
+
+    A gate only plans in a room it has a session in and a watch for. That holds
+    for a room this side just created and for one it reuses after a restart.
+    """
+    client, person = gate.client, gate.person
+    conn = await _connection_room(client, person, friend)
+    await handshake.say(gate, conn, friend)
+    await client.connect_to_room(conn)
+    await client.post_message(f"@{friend}-gate join-dm {room} {goal}")
+
+
 async def setup(gate, friend, goal, room=None):
     client, person = gate.client, gate.person
     trust = load_trust(person)
@@ -47,38 +82,23 @@ async def setup(gate, friend, goal, room=None):
             await relay.post_home(
                 person, f"Planning continues with {friend} in {existing}", client=client
             )
-            return
-        conn = next(
-            (
-                r["room_id"]
-                for r in detail.get("rooms", [])
-                if r["room_name"] == "conn-" + pair and not r.get("archived")
-            ),
-            None,
-        )
-        if conn is None:
+            room = existing
+            await _ask_peer_to_join(gate, friend, room, goal)
+        else:
+            slug = re.sub("[^a-z0-9]+", "-", goal.text.lower()).strip("-")[:32] or "plan"
+            names = {r["room_name"] for r in detail.get("rooms", [])}
+            name = f"dm-{pair}-{slug}"
+            base, suffix = name, 2
+            while name in names:
+                name = f"{base}-{suffix}"
+                suffix += 1
             result = await client.create_room(
-                "conn-" + pair, "Gate connection", [person + "-gate"], internal_only=True
+                name, "Main agents planning", [person + "-gate"], internal_only=True
             )
-            conn = result.get("room_id", result.get("id"))
-            await client.connect_to_room(conn)
-            await client.invite_agent_to_room(conn, friend + "-gate")
-        slug = re.sub("[^a-z0-9]+", "-", goal.text.lower()).strip("-")[:32] or "plan"
-        names = {r["room_name"] for r in detail.get("rooms", [])}
-        name = f"dm-{pair}-{slug}"
-        base, suffix = name, 2
-        while name in names:
-            name = f"{base}-{suffix}"
-            suffix += 1
-        result = await client.create_room(
-            name, "Main agents planning", [person + "-gate"], internal_only=True
-        )
-        room = result.get("room_id", result.get("id"))
-        await client.connect_to_room(room)
-        await client.invite_agent_to_room(room, friend + "-gate")
-        await handshake.say(gate, conn, friend)
-        await client.connect_to_room(conn)
-        await client.post_message(f"@{friend}-gate join-dm {room} {goal}")
+            room = result.get("room_id", result.get("id"))
+            await client.connect_to_room(room)
+            await client.invite_agent_to_room(room, friend + "-gate")
+            await _ask_peer_to_join(gate, friend, room, goal)
     else:
         detail = await client.get_room_detail(room)
         if not detail.get("name", detail.get("room_name", "")).startswith(f"dm-{pair}-"):

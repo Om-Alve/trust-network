@@ -195,3 +195,47 @@ async def test_second_dm_reuses_the_open_room(tmp_path, monkeypatch):
         assert any(first["id"] in body for body in world.home_bodies("om"))
     finally:
         await world.stop()
+
+
+async def test_reused_dm_room_still_answers_commands(tmp_path, monkeypatch):
+    """A reused planning room keeps working after a restart.
+
+    The live Scene 1 run found this: ``dm`` reported "Planning continues" and
+    returned before registering the room, so a gate that restarted between the
+    two calls had no watch for that room and never answered a proposal there
+    (the ``propose`` reply never appeared and the run timed out).
+
+    Ways this can fail:
+    - the reused room has no ``ConversationWatch``, so the gate ignores its
+      addressed commands entirely;
+    - the gate registers the watch but does not connect to the room, so Switch
+      delivers nothing to it;
+    - the share card is missing or still names the other side as the opener.
+    """
+    world = await _ask_world(tmp_path, monkeypatch)
+    await world.start()
+    try:
+        await personal.dm("om", "rahul", "something fun Sunday evening")
+        await world.wait_for(
+            lambda: len(world.rooms_named("dm-om-rahul-")) == 1,
+            what="the first planning room",
+        )
+        room = world.rooms_named("dm-om-rahul-")[0]["id"]
+
+        # Restart Om's gate, which is what a fresh Scene 1 profile starts from.
+        world.gates["om"].watches.clear()
+        await personal.dm("om", "rahul", "the same plan, reworded")
+        await world.wait_for(
+            lambda: any(
+                "Planning continues with rahul" in body for body in world.home_bodies("om")
+            ),
+            what="the reuse notice",
+        )
+        assert room in world.gates["om"].watches, "the reused room has no watch"
+
+        watch = world.gates["om"].watches[room]
+        await watch.turn("Om likes bowling. Sunday at 9pm?")
+        card = world.tmp / "om" / "share-cards" / f"{room}.json"
+        assert card.exists() and json.loads(card.read_text())["opened_by"] == "om"
+    finally:
+        await world.stop()

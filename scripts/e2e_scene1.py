@@ -18,6 +18,7 @@ from trustnet.gate.__main__ import read_identities
 from trustnet.gate.identity import export_local
 from trustnet.gate.relay import post_home
 from trustnet.gate.runtime import Gate
+from trustnet.room_pool import RoomPool
 from trustnet.switch_client import SwitchClient
 from trustnet.tn.personal import session
 
@@ -44,8 +45,16 @@ async def main():
         export_local(map_path)
         return read_identities(map_path)
 
-    gates = {p: Gate(p, c, identities) for p, c in clients.items()}
+    # One connection per open room, as the production gate does: Switch delivers a
+    # room's addressed messages only to a session connected to that room.
+    pools = {p: RoomPool(c, name=p + "-gate") for p, c in clients.items()}
+    gates = {p: Gate(p, pools[p], identities) for p in clients}
+    for pool in pools.values():
+        pool.start()
     tasks = [asyncio.create_task(g.run()) for g in gates.values()]
+    for p, pool in pools.items():
+        await clients[p].ready.wait()
+        await pool.start_sync()
     steps = []
 
     async def cli(p, *args):
@@ -77,7 +86,7 @@ async def main():
         for p, c in clients.items():
             async with session(p):
                 pass
-            await post_home(p, "Scene 1 CLI verification starting", client=c)
+            await post_home(p, "Scene 1 CLI verification starting", client=pools[p])
             detail = await c.get_agent_detail(c.agent_id)
             home = next(
                 r["room_id"] for r in detail["rooms"] if r["room_name"].lstrip("#") == p + "-home"
@@ -85,7 +94,7 @@ async def main():
             await c.invite_agent_to_room(home, p + "-hermes")
             for membership in detail["rooms"]:
                 if not membership.get("archived"):
-                    await c.connect_to_room(membership["room_id"])
+                    await pools[p].anchor(membership["room_id"])
         await cli("om", "dm", "rahul", str(time.time_ns()) + " Sunday bowling dinner")
         await wait_for(lambda: bool(gates["om"].watches))
         room = next(iter(gates["om"].watches))
@@ -102,19 +111,29 @@ async def main():
         await wait_for(lambda: "P1" in coordination("rahul"))
         await cli("rahul", "dm-post", room, '@om-gate answer P1 "Om says yes"')
         assert coordination("om")["P1"]["votes"] == {}
-        await cli("om", "answer", "P1", "Om says yes")
+        # The CLI refuses a proposal answer that is not yes or no before the gate sees it.
+        refused = await asyncio.to_thread(
+            subprocess.run,
+            ["uv", "run", "tn", "--as", "om", "answer", "P1", "Om says yes"],
+            capture_output=True,
+            text=True,
+        )
+        assert refused.returncode != 0 and "yes" in refused.stderr.lower(), refused.stderr[:300]
+        steps.append({"person": "om", "argv": ("answer", "P1", "Om says yes"), "refused": True})
         assert coordination("om")["P1"]["votes"] == {}
         # A same-owner gate is not the registered personal agent.
         async with gates["om"]._dispatch_lock:
             await clients["om"].connect_to_room(room)
             await clients["om"].post_message('@om-gate answer P1 "yes"')
         await asyncio.sleep(1)
+        await pools["om"].heal(room)  # the forged post took the room's session
         assert coordination("om")["P1"]["votes"] == {}
         # Even a genuine peer gate cannot approve a different plan digest.
         async with gates["rahul"]._dispatch_lock:
             await clients["rahul"].connect_to_room(room)
             await clients["rahul"].post_message("@om-gate consent P1 yes via-agent " + "0" * 64)
         await asyncio.sleep(1)
+        await pools["rahul"].heal(room)
         assert coordination("om")["P1"]["votes"] == {}
         await cli("om", "answer", "P1", "yes")
         await wait_for(lambda: "om" in coordination("rahul")["P1"]["votes"])
@@ -154,8 +173,8 @@ async def main():
         for t in tasks:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-        for c in clients.values():
-            await c.aclose()
+        for pool in pools.values():
+            await pool.aclose()
 
 
 if __name__ == "__main__":
