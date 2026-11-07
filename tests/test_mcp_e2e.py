@@ -58,6 +58,9 @@ TOOLS = {
     "fact_share_decline",
     "trust_suggest",
     "review",
+    "calendar_tasks",
+    "calendar_report",
+    "status",
 }
 
 

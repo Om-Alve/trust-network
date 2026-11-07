@@ -18,7 +18,7 @@ from typing import Any
 
 from trustnet.gate import commands as c
 from trustnet.gate import consent, dm, handshake, ledger, relay, surprise
-from trustnet.gate.calendar import TIME_ZONE, busy
+from trustnet.gate.calendar import busy, time_zone
 from trustnet.gate.facts import Level, load_profile, load_trust, resolve_data_dir, save_trust
 from trustnet.gate.policy import (
     DenialCode,
@@ -50,7 +50,7 @@ MAX_SNIPPET = 60
 class Gate:
     def __init__(self, person, client, identities, *, clock=None, gift_room=None):
         self.person, self.client, self.identities = person, client, identities
-        self._clock: Callable[[], datetime] = clock or (lambda: datetime.now(TIME_ZONE))
+        self._clock: Callable[[], datetime] = clock or (lambda: datetime.now(time_zone()))
         self._gift_room = gift_room or relay.is_gift_room
         self.watches = {
             path.stem: ConversationWatch(path.stem, person, client, persistent=True)
@@ -278,8 +278,8 @@ class Gate:
                 overreach.append((f"fact:{key}", note))
             text = "\n".join(lines)
         elif isinstance(command, c.Free):
-            start = datetime.combine(command.start, time.min, TIME_ZONE)
-            end = datetime.combine(command.end + timedelta(days=1), time.min, TIME_ZONE)
+            start = datetime.combine(command.start, time.min, time_zone())
+            end = datetime.combine(command.end + timedelta(days=1), time.min, time_zone())
             blocks = calendar_view(busy(profile.calendar_path, start, end), level)
             value = [
                 {"start": b.start.isoformat(), "end": b.end.isoformat(), "title": b.title}
@@ -546,8 +546,8 @@ class Gate:
         if not isinstance(value, datetime):
             raise TypeError("the gate clock must return a datetime")
         if value.tzinfo is None or value.utcoffset() is None:
-            return value.replace(tzinfo=TIME_ZONE)
-        return value.astimezone(TIME_ZONE)
+            return value.replace(tzinfo=time_zone())
+        return value.astimezone(time_zone())
 
     async def _timeouts(self):
         while True:

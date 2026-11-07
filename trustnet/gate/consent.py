@@ -6,7 +6,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 
-from trustnet.gate import calendar, handshake, ledger, relay, storage
+from trustnet.gate import calendar, calendar_jobs, handshake, ledger, relay, storage
 from trustnet.gate import commands as c
 from trustnet.gate.dm import main_agent
 from trustnet.gate.facts import load_profile
@@ -70,14 +70,18 @@ async def recover(gate, *, force=True):
                     await relay.post_home(gate.person, job["text"], client=gate.client)
                 elif kind == "calendar":
                     plan = item["plan"]
-                    calendar.add_event(
-                        load_profile(gate.person).calendar_path,
-                        datetime.fromisoformat(plan["start"]),
-                        timedelta(minutes=plan["minutes"]),
-                        plan["title"],
-                        plan["place"],
-                        uid=f"trustnet-{gate.person}-{ref}-{digest(item['card'])}",
-                    )
+                    uid = f"trustnet-{gate.person}-{ref}-{digest(item['card'])}"
+                    if calendar_jobs.delivery_mode(gate.person) == "agent":
+                        calendar_jobs.queue(gate.person, ref, plan, uid=uid)
+                    else:
+                        calendar.add_event(
+                            load_profile(gate.person).calendar_path,
+                            datetime.fromisoformat(plan["start"]),
+                            timedelta(minutes=plan["minutes"]),
+                            plan["title"],
+                            plan["place"],
+                            uid=uid,
+                        )
                 elif kind == "document":
                     await gate.client.connect_to_room(item["room"])
                     await gate.client.create_room_document(

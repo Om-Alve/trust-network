@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Final
 
-from trustnet.gate.calendar import TIME_ZONE, Block, busy
+from trustnet.gate.calendar import Block, busy, time_zone
 from trustnet.gate.facts import FactsError, Level, Profile, TrustList
 from trustnet.gate.policy import calendar_view, visible_facts
 
@@ -267,9 +267,9 @@ def _person_name(person: str) -> str:
 
 def _as_ist(value: datetime | None, label: str) -> datetime:
     if value is None:
-        return datetime.now(TIME_ZONE)
+        return datetime.now(time_zone())
     if not isinstance(value, datetime):
         raise ViewAsError(f"{label} must be a datetime, not {value!r}")
     if value.tzinfo is None or value.utcoffset() is None:
-        return value.replace(tzinfo=TIME_ZONE)
-    return value.astimezone(TIME_ZONE)
+        return value.replace(tzinfo=time_zone())
+    return value.astimezone(time_zone())

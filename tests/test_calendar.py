@@ -139,7 +139,7 @@ END:VEVENT
     ]
 
 
-def test_busy_skips_all_day_transparent_and_cancelled_events(tmp_path: Path) -> None:
+def test_busy_blocks_all_day_but_skips_transparent_and_cancelled_events(tmp_path: Path) -> None:
     path = write_calendar(
         tmp_path / "skips.ics",
         """
@@ -178,7 +178,7 @@ END:VEVENT
     )
 
     assert busy(path, at(2026, 11, 8), at(2026, 11, 9)) == [
-        Block(at(2026, 11, 8, 16), at(2026, 11, 8, 17), "Real plan"),
+        Block(at(2026, 11, 8), at(2026, 11, 9), "Holiday + Real plan"),
     ]
 
 

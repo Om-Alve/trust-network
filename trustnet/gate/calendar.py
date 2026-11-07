@@ -1,4 +1,4 @@
-"""Busy blocks and event writing for the demo's ``.ics`` fixture calendars.
+"""Busy blocks and event writing for local ``.ics`` calendars.
 
 The gate only ever needs two things from a calendar: what its owner is busy
 with (so a friend's agent can propose a time) and a place to put a plan both
@@ -7,9 +7,8 @@ second.
 
 Decisions this module makes, so the rest of the gate can rely on them:
 
-- **Time zone.** Every ``datetime`` that goes in or comes out is aware and in
-  ``Asia/Kolkata``. A floating (naive) calendar time is read as India time; an
-  aware time is converted.
+- **Time zone.** Every ``datetime`` is aware, using ``TN_TIMEZONE`` or the legacy
+  ``Asia/Kolkata`` default. Floating times use that configured zone.
 - **Half-open blocks.** A :class:`Block` covers ``start`` up to but not
   including ``end``, so 19:00–20:00 and 20:00–21:00 only touch, they don't
   overlap.
@@ -20,9 +19,8 @@ Decisions this module makes, so the rest of the gate can rely on them:
   title joins the distinct titles of its events in time order with ``" + "``
   (e.g. ``"Cricket + Dinner"``); a run of events that share one title keeps
   that title unchanged.
-- **Skipped events.** All-day events (``VALUE=DATE``, no time of day),
-  ``TRANSP:TRANSPARENT`` events (marked free) and ``STATUS:CANCELLED`` events
-  are not busy. They carry no time the envoys could propose around.
+- **All-day events.** Opaque all-day events block their local calendar dates.
+  ``TRANSP:TRANSPARENT`` and ``STATUS:CANCELLED`` events do not block time.
 - **Recurrence.** Weekly/monthly rules are expanded with
   ``recurring-ical-events``; every occurrence is clipped and merged like a
   normal event.
@@ -35,6 +33,7 @@ existing event. Re-adding the same ``uid`` is a no-op, which is what makes
 from __future__ import annotations
 
 import fcntl
+import os
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -47,6 +46,11 @@ from icalendar import Calendar, Event
 __all__ = ["Block", "CalendarError", "TIME_ZONE", "add_event", "busy"]
 
 TIME_ZONE = ZoneInfo("Asia/Kolkata")
+
+
+def time_zone():
+    return ZoneInfo(os.environ.get("TN_TIMEZONE", "Asia/Kolkata"))
+
 
 MERGE_SEPARATOR = " + "
 
@@ -104,8 +108,12 @@ def busy(path: str | Path, start: datetime, end: datetime) -> list[Block]:
         if span is None:
             continue
         event_start, event_end = span
-        if not isinstance(event_start, datetime) or not isinstance(event_end, datetime):
-            continue  # all-day event: no time of day to propose around
+        if not isinstance(event_start, datetime):
+            event_start = datetime.combine(event_start, datetime.min.time(), time_zone())
+        if not isinstance(event_end, datetime):
+            event_end = datetime.combine(event_end, datetime.min.time(), time_zone())
+            if event_end <= event_start:
+                event_end = event_start + timedelta(days=1)
         clipped_start = max(_as_ist(event_start, "start"), range_start)
         clipped_end = min(_as_ist(event_end, "end"), range_end)
         if clipped_end <= clipped_start:
@@ -172,8 +180,8 @@ def _as_ist(value: datetime, label: str) -> datetime:
     if not isinstance(value, datetime):
         raise CalendarError(f"{label} must be a datetime, not {value!r}")
     if value.tzinfo is None or value.utcoffset() is None:
-        return value.replace(tzinfo=TIME_ZONE)
-    return value.astimezone(TIME_ZONE)
+        return value.replace(tzinfo=time_zone())
+    return value.astimezone(time_zone())
 
 
 def _as_duration(value: timedelta | int | float) -> timedelta:
@@ -231,7 +239,11 @@ def _span(event: Event) -> tuple[date | datetime, date | datetime] | None:
     end = event.decoded("DTEND", None)
     if not isinstance(end, date | datetime):
         duration = event.decoded("DURATION", None)
-        end = start + duration if isinstance(duration, timedelta) else start
+        end = (
+            start + duration
+            if isinstance(duration, timedelta)
+            else (start if isinstance(start, datetime) else start + timedelta(days=1))
+        )
     return start, end
 
 

@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 import dateparser
 
+from trustnet.gate.calendar import time_zone
 from trustnet.gate.facts import Level
 
 __all__ = [
@@ -429,10 +430,10 @@ def parse(text: str, *, now: datetime | None = None) -> Command:
 
 def _clock(now: datetime | None) -> datetime:
     if now is None:
-        return datetime.now(IST)
+        return datetime.now(time_zone())
     if now.tzinfo is None:
-        return now.replace(tzinfo=IST)
-    return now.astimezone(IST)
+        return now.replace(tzinfo=time_zone())
+    return now.astimezone(time_zone())
 
 
 def _err(command: str, message: str, raw: str) -> ParseError:
@@ -615,7 +616,7 @@ _BARE_DAY: Final = re.compile(r"\d{1,2}")
 
 def _dateparser(text: str, *, now: datetime) -> datetime | None:
     settings = {
-        "TIMEZONE": "Asia/Kolkata",
+        "TIMEZONE": str(time_zone()),
         "RETURN_AS_TIMEZONE_AWARE": True,
         "PREFER_DATES_FROM": "future",
         "RELATIVE_BASE": now,
@@ -638,7 +639,7 @@ def _parse_day(text: str, *, now: datetime, raw: str, command: str) -> date:
             f"could not read the date {text!r} (try 2026-11-08 or Sun 9pm)",
             raw,
         )
-    value = parsed.astimezone(IST).date() if parsed.tzinfo else parsed.date()
+    value = parsed.astimezone(time_zone()).date() if parsed.tzinfo else parsed.date()
     if not _sane_year(value, now=now):
         raise _err(command, f"could not read the date {text!r}", raw)
     return value
@@ -653,8 +654,8 @@ def _parse_moment(text: str, *, now: datetime, raw: str, command: str) -> dateti
             raw,
         )
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=IST)
-    parsed = parsed.astimezone(IST)
+        parsed = parsed.replace(tzinfo=time_zone())
+    parsed = parsed.astimezone(time_zone())
     if not _sane_year(parsed.date(), now=now):
         raise _err(command, f"could not read the date and time {text!r}", raw)
     return parsed

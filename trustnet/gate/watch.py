@@ -11,7 +11,7 @@ from trustnet.gate.relay import post_home
 # Both Hermes wake on a 1-minute watcher and wait on their people, so 10 minutes was
 # too short for one plan; 30 minutes still bounds an agent-to-agent loop.
 MAX_TURNS = 20
-MAX_SECONDS = 1800
+MAX_SECONDS = 7 * 24 * 60 * 60
 
 
 class ConversationWatch:

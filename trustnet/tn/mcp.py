@@ -144,6 +144,63 @@ def build(person: str) -> MCPServer:
 
     @server.tool(
         description=(
+            "List unfinished approved calendar operations. Use your existing Google Calendar, "
+            "Outlook or other calendar tools. Before retrying, search for the stable uid marker "
+            "in the event description to avoid duplicates. Create/update/cancel only the exact "
+            "approved plan; put uid in the event description. Report provider event ID after success. "
+            "Read your live calendar for availability; local ICS is not a synced calendar."
+        )
+    )
+    async def calendar_tasks() -> list[dict[str, Any]]:
+        from trustnet.gate import calendar_jobs
+
+        return calendar_jobs.pending(person)
+
+    @server.tool(
+        description=(
+            "Report an approved calendar operation after using your existing provider tools. "
+            "Use status applied with provider and event_id only after verifying the write, or "
+            "failed with error if access or delivery fails. Never claim calendar delivery from "
+            "plan approval alone. token must match the current task revision."
+        )
+    )
+    async def calendar_report(
+        token: str, status: str, provider: str = "", event_id: str = "", error: str = ""
+    ) -> dict[str, Any]:
+        from trustnet.gate import calendar_jobs
+
+        try:
+            return calendar_jobs.report(person, token, status, provider, event_id, error)
+        except ValueError as exc:
+            raise ToolError(str(exc)) from None
+
+    @server.tool(
+        description="Read local planning and delivery status. Distinguishes approvals, provider receipts, failed calendar operations and messages awaiting owner review."
+    )
+    async def status() -> dict[str, Any]:
+        from trustnet.gate import calendar_jobs, consent
+        from trustnet.tn import outgoing
+
+        return {
+            "plans": [
+                {
+                    "ref": ref,
+                    "status": item["status"],
+                    "plan": item.get("plan"),
+                    "waiting_for": sorted(
+                        set((person, item["friend"])) - set(item.get("votes", {}))
+                    ),
+                }
+                for ref, item in consent.load(person).items()
+                if ref.startswith("P")
+            ],
+            "calendar_pending": calendar_jobs.pending(person),
+            "outgoing_review": outgoing.pending(person),
+            "privacy": "Gate tool disclosures are enforced. Automatic conversation text depends on the agent; use outgoing review for owner approval of exact text.",
+        }
+
+    @server.tool(
+        description=(
             "Make one of your person's facts more private only: acquaintance, friend, "
             "close or private, moving toward private. Use fact_share_request to ask your person "
             "before loosening; this tool refuses it."

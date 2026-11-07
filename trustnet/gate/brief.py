@@ -13,7 +13,7 @@ from jinja2 import DictLoader, Environment, StrictUndefined, TemplateError
 
 from trustnet import resources
 from trustnet.gate import ledger
-from trustnet.gate.calendar import TIME_ZONE, Block, CalendarError, busy
+from trustnet.gate.calendar import Block, CalendarError, busy, time_zone
 from trustnet.gate.commands import Quoted
 from trustnet.gate.facts import FactsError, Level, Profile, TrustList
 from trustnet.gate.policy import calendar_view, visible_facts
@@ -152,8 +152,8 @@ def _compose(
 
     quoted_goal = _as_quoted(goal)
     start_day, end_day = _date_range(date_range)
-    start = datetime.combine(start_day, time.min, tzinfo=TIME_ZONE)
-    end = datetime.combine(end_day + timedelta(days=1), time.min, tzinfo=TIME_ZONE)
+    start = datetime.combine(start_day, time.min, tzinfo=time_zone())
+    end = datetime.combine(end_day + timedelta(days=1), time.min, tzinfo=time_zone())
 
     facts = visible_facts(profile, level)
     try:
@@ -209,7 +209,7 @@ def _date_range(date_range: tuple[date, date]) -> tuple[date, date]:
 
 def _as_day(value: date) -> date:
     if isinstance(value, datetime):
-        return value.astimezone(TIME_ZONE).date() if value.tzinfo else value.date()
+        return value.astimezone(time_zone()).date() if value.tzinfo else value.date()
     if isinstance(value, date):
         return value
     raise BriefError(f"a date range needs dates, not {value!r}")

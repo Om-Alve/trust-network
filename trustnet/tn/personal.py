@@ -189,9 +189,14 @@ def open_items(person):
             items.append({"ref": ref, "kind": "question", "question": v["card"]})
         elif person not in v.get("votes", {}):
             items.append({"ref": ref, "kind": "proposal", "with": v["friend"], "plan": v["card"]})
+    from trustnet.gate import calendar_jobs
     from trustnet.gate.fact_changes import review
 
-    return items + review(person)
+    return (
+        items
+        + review(person)
+        + [{"kind": "calendar", **task} for task in calendar_jobs.pending(person)]
+    )
 
 
 async def watch(person):
@@ -231,7 +236,10 @@ async def watch(person):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch(mode=0o600)
     path.write_text(json.dumps(newest))
-    return {"inbox_unread": len(unread), "dm_updates": updates}
+    from trustnet.gate import calendar_jobs
+
+    tasks = calendar_jobs.pending(person, due_only=True)
+    return {"inbox_unread": len(unread), "dm_updates": updates, "calendar_pending": len(tasks)}
 
 
 def known_friend(person: str, friend: str) -> str:
@@ -277,6 +285,13 @@ async def dm_operate(person, room, text=None):
         if not rooms or not rooms[0]["room_name"].startswith("dm-") or rooms[0].get("archived"):
             raise SwitchError("An active DM membership is required")
         rid = rooms[0]["room_id"]
+        card_path = resolve_data_dir(person) / "share-cards" / f"{rid}.json"
+        if card_path.exists():
+            friend = json.loads(card_path.read_text())["friend"]
+            if load_trust(person).level_for(friend) is None:
+                raise ValueError(
+                    "This friendship is no longer trusted; open a new room after restoring trust"
+                )
         await client.connect_to_room(rid)
         if text is not None:
             await wait_until_live(client, rid, text)
@@ -289,6 +304,12 @@ async def dm_read(person, room):
 
 
 async def dm_post(person, room, text):
+    from trustnet.tn import outgoing
+
+    if outgoing.mode(person) == "review":
+        # Check membership before retaining a draft for an arbitrary room.
+        await dm_operate(person, room)
+        return outgoing.draft(person, room, text)
     return await dm_operate(person, room, text)
 
 

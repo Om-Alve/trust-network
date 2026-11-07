@@ -7,6 +7,7 @@ Naive calendar times use Asia/Kolkata.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import re
@@ -288,10 +289,34 @@ def _build_parser() -> argparse.ArgumentParser:
     from trustnet.tn.setup import add_commands
 
     add_commands(commands, common)
+
+    outbox = commands.add_parser(
+        "outbox", parents=[common], help="review exact outgoing agent messages"
+    )
+    outbox.add_argument("action", choices=("list", "approve", "decline"), default="list", nargs="?")
+    outbox.add_argument("ref", nargs="?")
+    outbox.set_defaults(handler=_cmd_outbox)
     from trustnet.tn.host import add_commands as add_host_commands
 
     add_host_commands(commands, common)
     return parser
+
+
+def _cmd_outbox(context, args):
+    from trustnet.tn import outgoing
+
+    person = context.owner()
+    if args.action == "list":
+        items = outgoing.pending(person)
+        return context.emit({"pending": items}, json.dumps(items, ensure_ascii=False, indent=2))
+    if not args.ref:
+        raise CliError("Supply the outgoing reference you reviewed")
+    item = (
+        asyncio.run(outgoing.release(person, args.ref))
+        if args.action == "approve"
+        else outgoing.decline(person, args.ref)
+    )
+    return context.emit(item, f"{item['ref']}: {item['status']}")
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -10,8 +10,8 @@ description: Plan with friends, find gifts and ask around for your person throug
 You are your person's own agent. Every friend has their own agent and their own
 **gate**: our code, no LLM, that holds that person's private facts and answers
 only at the trust level its owner set (acquaintance < friend < close). You act in
-Switch as `<person>-hermes` through the `trust-network` tools. You have no shell
-and no files; these tools are all you need.
+Switch as `<person>-hermes` through the `trust-network` tools. Use your existing
+calendar tools for live availability and external event delivery.
 
 ## When to use
 
@@ -31,7 +31,8 @@ and no files; these tools are all you need.
 | `ask(friend, fields)` | Ask a friend's gate for named facts (`diet`, `interests`, …) at the room's level. |
 | `gift_ideas(friend, occasion, date, budget)` / `claim(friend, item)` | Surprise-safe gift ideas from stored facts; the friend is never asked. |
 | `ask_around(question)` | One short question (≤140 chars) to all your person's friends. |
-| `cal_add(...)` | Add a separate event to your person's calendar. Confirmed proposals are automatic. |
+| `calendar_tasks()` / `calendar_report(...)` | Deliver approved events through your existing calendar tools, then record the provider event ID or a failure. |
+| `cal_add(...)` | Add a separate local ICS event. This does not write Google Calendar or Outlook. |
 | `fact_set(key, level)` | Make one of your person's facts *more* private. Use an F ref and explicit consent to loosen one. |
 
 ## Remember facts and onboard from memory
@@ -116,9 +117,21 @@ F1` or `tn review --approve F1 T1`, or their own Switch user says
 6. Tell your person the proposal in one line and wait for **their** yes or no.
    Then call `answer("P1", "yes")`. Never say yes for them, and never reuse an
    earlier yes for a new proposal.
-7. When the gate posts ✅ confirmed, it automatically queues the ICS event.
-   Do not call `cal_add` again for that proposal. Delivery retries after an
-   interruption with the same event UID.
+7. When the gate posts ✅ confirmed, call `calendar_tasks`. For each task, use your
+   existing Google Calendar, Outlook or other calendar tools to apply its exact
+   plan. Include the task's `uid` in the event description. Before every retry,
+   search for that marker; reuse the existing event instead of creating another.
+   Update or cancel the task's recorded provider event ID when present. Verify
+   the provider result, then call `calendar_report(token, "applied", provider,
+   event_id)`. If access is missing or the provider fails, report `failed` with
+   the error and tell your person. Approval and calendar delivery are separate.
+   Never call `cal_add` as a substitute for external delivery. Legacy ICS mode
+   writes locally and has no external task.
+
+Before proposing, read your person's actual calendar with their existing tools.
+Respect all-day unavailability and their timezone. A local empty ICS calendar
+does not establish that their Google or Outlook calendar is free. If live access
+is unavailable, ask the person for availability rather than guessing.
 
 Use your own gate's name: Rahul's agent writes `@rahul-gate …`, Om's writes
 `@om-gate …`.
