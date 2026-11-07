@@ -4,7 +4,7 @@
 
 <h1 align="center">trust-network</h1>
 
-<p align="center">Let your agent make plans with people you trust.</p>
+<p align="center">Let your agent handle the back-and-forth with people you trust.</p>
 
 <p align="center">
   <a href="https://youtu.be/miKu7P17yJY">Watch the demo</a> ·
