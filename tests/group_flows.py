@@ -255,6 +255,9 @@ async def consensus_and_calendar(root, monkeypatch):
         assert call["plan"]["minutes"] == 120
         assert call["plan"]["title"] == CONTENT["title"]
         assert datetime.fromisoformat(call["plan"]["start"]).tzinfo is not None
+    for person in ("om", "rahul", "priya"):
+        assert all(job["done"] for job in _plan(person, plan_id)["jobs"].values()), person
+    assert len(world.switch.rooms[plan["room"]]["documents"]) == 1
 
     assert not any(item["id"] == plan_id for item in group_plans.pending("om"))
     await _vote(world, "priya", plan_id)  # late duplicate vote

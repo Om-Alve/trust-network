@@ -153,6 +153,8 @@ class FakeSwitchClient(Operations):
                 "oldest_timestamp": None,
             }
         if name == "create_room_document":
+            if any(doc["name"] == a["name"] for doc in room["documents"].values()):
+                raise ValueError(f"A room-scoped document named {a['name']!r} already exists")
             did = str(uuid4())
             room["documents"][did] = dict(a, creator=self.name)
             return {"document_id": did}

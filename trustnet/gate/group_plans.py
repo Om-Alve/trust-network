@@ -853,13 +853,15 @@ def _confirm(plan, now, gate):
         "home",
         text=_confirmed_text(plan),
     )
-    _job(
-        plan,
-        f"document-{revision}-{fingerprint[:8]}",
-        "document",
-        doc_id=f"group-plan-{plan['id']}-{revision}",
-        text=_confirmed_text(plan),
-    )
+    if gate.person == plan["coordinator"]:
+        # Switch allows one document per name in a room; it belongs to the organizer.
+        _job(
+            plan,
+            f"document-{revision}-{fingerprint[:8]}",
+            "document",
+            doc_id=f"group-plan-{plan['id']}-{revision}",
+            text=_confirmed_text(plan),
+        )
 
 
 def _cancel_plan(plan, by, now):
