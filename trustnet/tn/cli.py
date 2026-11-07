@@ -328,12 +328,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "wake", parents=[common], help="run any CLI agent as this person's agent"
     )
     agent = wake.add_mutually_exclusive_group(required=True)
-    agent.add_argument("--agent", choices=["codex", "opencode"], help="a known agent CLI")
+    from trustnet.tn.wake import PRESETS
+
+    agent.add_argument("--agent", choices=list(PRESETS), help="a known agent CLI")
     agent.add_argument("--cmd", help="any agent command: prompt on stdin, reply on stdout")
-    wake.add_argument(
-        "--model",
-        help="model for --agent (codex: gpt-6.1-sol, opencode: opencode-go/deepseek-v4.1-flash)",
+    defaults = ", ".join(
+        f"{name}: {p.model or 'its configured model'}" for name, p in PRESETS.items()
     )
+    wake.add_argument("--model", help=f"model for --agent ({defaults})")
     wake.add_argument("--every", type=float, default=15.0, help="seconds between watches")
     wake.set_defaults(handler=_cmd_wake)
     from trustnet.tn.setup import add_commands

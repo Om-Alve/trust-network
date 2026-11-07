@@ -29,6 +29,9 @@ from trustnet.gate.identity import IdentitySource
 from trustnet.switch_client import SwitchClient
 from trustnet.tn import configuration as config
 from trustnet.tn import personal
+from trustnet.tn.wake import PRESETS
+
+WAKE_AGENTS = "--agent " + "|".join(PRESETS)
 
 
 def add_commands(commands, common):
@@ -41,7 +44,7 @@ def add_commands(commands, common):
     setup.add_argument("--key-env")
     setup.add_argument("--identity-url")
     setup.add_argument("--identity-token-env")
-    setup.add_argument("--agent", choices=("manual", "codex", "claude", "opencode"))
+    setup.add_argument("--agent", choices=("manual", "claude", *PRESETS))
     setup.add_argument(
         "--consent",
         choices=("direct", "via-agent"),
@@ -50,7 +53,7 @@ def add_commands(commands, common):
     setup.add_argument(
         "--wake",
         action="store_true",
-        help="configure a tn wake runner for the selected codex/opencode agent (does not launch it)",
+        help=f"configure a tn wake runner for {WAKE_AGENTS} (does not launch it)",
     )
     setup.add_argument("--wake-model", help="model override for the configured wake runner")
     setup.add_argument(
@@ -230,8 +233,8 @@ def _wake_settings(args, values, person, agent):
             raise ValueError("--wake-external needs a short description of the poller")
         return {"mode": "external", "external": description}
     if args.wake:
-        if agent not in ("codex", "opencode"):
-            raise ValueError("--wake needs --agent codex or --agent opencode")
+        if agent not in PRESETS:
+            raise ValueError(f"--wake needs {WAKE_AGENTS}")
         if not shutil.which(agent):
             raise ValueError(f"Install {agent} before configuring its wake runner")
         every = 15.0 if args.wake_every is None else args.wake_every
@@ -260,9 +263,7 @@ def _wake_settings(args, values, person, agent):
         }
     saved = values.get("wake")
     if args.background_service and not (isinstance(saved, dict) and saved.get("mode") == "runner"):
-        raise ValueError(
-            "--background-service needs a wake runner: pass --agent codex --wake or --agent opencode --wake"
-        )
+        raise ValueError(f"--background-service needs a wake runner: pass {WAKE_AGENTS} --wake")
     return saved
 
 
@@ -525,7 +526,13 @@ def _service_env(settings):
         "PATH": os.environ.get("PATH", "/usr/bin:/bin:/usr/sbin:/sbin"),
         **{
             key: os.environ[key]
-            for key in ("CODEX_HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR")
+            for key in (
+                "CODEX_HOME",
+                "XDG_CONFIG_HOME",
+                "OPENCODE_CONFIG",
+                "OPENCODE_CONFIG_DIR",
+                "HERMES_HOME",
+            )
             if os.environ.get(key)
         },
     }
@@ -655,9 +662,7 @@ def _install_service(settings):
     platform = _service_platform(required=True)
     wake = settings.get("wake") or {}
     if wake.get("mode") != "runner":
-        raise ValueError(
-            "A background service needs a tn wake runner; pass --agent codex --wake (or --agent opencode --wake)"
-        )
+        raise ValueError(f"A background service needs a tn wake runner; pass {WAKE_AGENTS} --wake")
     if not shutil.which(wake.get("agent", "")):
         raise ValueError(f"Install {wake.get('agent')} before installing its wake service")
     directory = _service_dir(platform)
@@ -853,7 +858,7 @@ def _next_steps(settings, service=None):
         )
     else:
         steps.append(
-            "Pick an automation path: tn setup --agent codex --wake (or --agent opencode --wake), or declare an "
+            f"Pick an automation path: tn setup {WAKE_AGENTS} --wake, or declare an "
             'external poller with --wake-external "description".'
         )
     steps.append("Run: tn doctor   (self-check; connection and automation are reported separately)")
@@ -1068,7 +1073,7 @@ async def _diagnose(settings):
         add(
             "wake-config",
             installed,
-            f"Install {agent or 'the configured agent'} or rerun tn setup --agent codex --wake (or --agent opencode --wake)",
+            f"Install {agent or 'the configured agent'} or rerun tn setup {WAKE_AGENTS} --wake",
             f"tn wake runner: {_wake_command(settings)}",
         )
         add(
@@ -1090,7 +1095,7 @@ async def _diagnose(settings):
         add(
             "wake-config",
             False,
-            "No wake runner configured. Run tn setup --agent codex --wake (or --agent opencode --wake), or declare an "
+            f"No wake runner configured. Run tn setup {WAKE_AGENTS} --wake, or declare an "
             'external poller with --wake-external "description"',
         )
         add(

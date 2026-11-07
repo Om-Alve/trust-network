@@ -513,7 +513,7 @@ async def scenario_calendar_fields(url: str, root: Path) -> None:
     code, _, err = await run_cli(
         base_env(config_dir, "lin"), "setup", "--wake", "--json", expected=1
     )
-    assert "needs --agent codex or --agent opencode" in err
+    assert "--wake needs --agent codex|opencode|hermes" in err
     record(
         "S4 new profiles default to agent delivery; legacy profiles keep ICS",
         "PASS",
@@ -748,7 +748,9 @@ async def scenario_opencode_connectors(root: Path) -> None:
     )
     workdir = root / "s7-work"
     workdir.mkdir()
-    _, extra = wake.opencode_command("mira", "opencode-go/deepseek-v4.1-flash", workdir)
+    _, extra, _ = wake.opencode_command(
+        "mira", "opencode-go/deepseek-v4.1-flash", workdir / "reply.txt"
+    )
     env = {k: v for k, v in clean_env().items() if not k.startswith("OPENCODE_")}
     env.update(
         HOME=str(home),

@@ -8,6 +8,7 @@ agent on news, and it lets the person talk to their agent by typing.
 
     tn --as priya wake --agent codex
     tn --as om wake --agent opencode                # DeepSeek through OpenCode
+    tn --as om wake --agent hermes                  # the model Hermes is set up with
     tn --as priya wake --cmd "my-agent --stdin"     # any other framework
 
 Each turn's prompt carries the person's persona (``agent.md`` in their data
@@ -27,8 +28,11 @@ Ways this can go wrong, and what the runner does:
   the second;
 - the agent has nothing for the person → it replies ``[SILENT]`` and nothing is
   printed;
-- the presets disable shell/file/web tools while keeping the person's configured
-  MCP connectors available for calendar work. Those connectors are trusted tools.
+- the Codex and OpenCode presets disable shell/file/web tools while keeping the
+  person's configured MCP connectors available for calendar work. Those
+  connectors are trusted tools. The Hermes preset keeps only its terminal and
+  skills, because its Google Workspace skill is a script the terminal runs; a
+  Hermes turn can therefore do anything the person's shell can.
 """
 
 from __future__ import annotations
@@ -41,7 +45,9 @@ import shlex
 import sys
 import tempfile
 import threading
+from collections.abc import Callable
 from pathlib import Path
+from typing import NamedTuple
 
 from trustnet import resources
 from trustnet.gate.facts import resolve_data_dir
@@ -80,7 +86,11 @@ def _tn() -> str:
     return str(Path(sys.executable).with_name("tn"))
 
 
-def codex_command(person: str, model: str, workdir: Path, reply: Path) -> list[str]:
+#: ``(argv, extra_env, read)`` for one agent turn; ``read(stdout)`` gives the reply.
+Command = tuple[list[str], dict[str, str], Callable[[str], str]]
+
+
+def codex_command(person: str, model: str, reply: Path) -> Command:
     """``codex exec`` with trust-network added to the user's own configuration.
 
     ``--ignore-user-config`` used to isolate the turn, but it also removed every
@@ -89,9 +99,9 @@ def codex_command(person: str, model: str, workdir: Path, reply: Path) -> list[s
     trust-network server, its tool approval, the shell and web search.
     """
     table = ",".join(f"{k}={json.dumps(v)}" for k, v in _mcp_env().items())
-    return [
+    argv = [
         "codex", "exec", "--skip-git-repo-check", "--ephemeral",
-        "-m", model, "-s", "read-only", "-C", str(workdir),
+        "-m", model, "-s", "read-only", "-C", str(reply.parent),
         "-c", "features.shell_tool=false", "-c", 'web_search="disabled"',
         "-c", f"mcp_servers.trust-network.command={json.dumps(_tn())}",
         "-c", f'mcp_servers.trust-network.args=["--as","{person}","mcp"]',
@@ -99,6 +109,7 @@ def codex_command(person: str, model: str, workdir: Path, reply: Path) -> list[s
         "-c", f"mcp_servers.trust-network.env={{{table}}}",
         "-o", str(reply), "-",
     ]  # fmt: skip
+    return argv, {}, lambda _out: reply.read_text() if reply.exists() else ""
 
 
 #: OpenCode's own tools an agent here must not have: it reaches its person only
@@ -109,8 +120,9 @@ OPENCODE_DENY = (
 )  # fmt: skip
 
 
-def opencode_command(person: str, model: str, workdir: Path) -> tuple[list[str], dict]:
+def opencode_command(person: str, model: str, reply: Path) -> Command:
     """Overlay the trust-network entry while retaining the user's connectors."""
+    workdir = reply.parent
     workdir.mkdir(parents=True, exist_ok=True)
     (workdir / "opencode.json").write_text(
         json.dumps(
@@ -129,7 +141,7 @@ def opencode_command(person: str, model: str, workdir: Path) -> tuple[list[str],
         )
     )
     argv = ["opencode", "run", "--standalone", "--format", "json", "-m", model]
-    return argv, {}
+    return argv, {}, opencode_reply
 
 
 def opencode_reply(stdout: str) -> str:
@@ -153,6 +165,57 @@ def opencode_reply(stdout: str) -> str:
         if isinstance(text, str) and text:
             parts.setdefault(str(part.get("messageID", "")), []).append(text)
     return "".join(list(parts.values())[-1]) if parts else ""
+
+
+#: Hermes reads managed-scope config from here; it outranks ~/.hermes/config.yaml.
+HERMES_MANAGED_DEFAULT = Path("/etc/hermes")
+
+
+def hermes_command(person: str, model: str | None, reply: Path) -> Command:
+    """``hermes chat`` with trust-network layered over the user's own Hermes.
+
+    Hermes merges its managed scope (``HERMES_MANAGED_DIR``) over
+    ``~/.hermes/config.yaml`` key by key, so this turn adds one MCP server and
+    narrows the toolsets while the person's home, Google credentials, skills
+    and other MCP servers stay where they are. The calendar skill runs scripts,
+    so unlike the Codex and OpenCode presets the terminal stays enabled.
+    """
+    if os.environ.get("HERMES_MANAGED_DIR") or HERMES_MANAGED_DEFAULT.is_dir():
+        raise RuntimeError(
+            "A Hermes managed scope is already configured; tn wake will not replace "
+            "administrator policy. Add trust-network to it and use --cmd instead."
+        )
+    overlay = reply.parent / "hermes-managed"
+    overlay.mkdir(parents=True, exist_ok=True)
+    server = {"command": _tn(), "args": ["--as", person, "mcp"], "env": _mcp_env()}
+    (overlay / "config.yaml").write_text(
+        json.dumps(
+            {
+                # Hermes builds the tool list once discovery ends or this bound passes.
+                "mcp_discovery_timeout": 60,
+                "platform_toolsets": {"cli": ["terminal", "skills"]},
+                "mcp_servers": {"trust-network": server},
+            }
+        )
+    )
+    # Hermes takes a one-shot prompt only as an argument; the runner writes it to stdin.
+    script = 'exec hermes chat -Q --source tool "$@" -q "$(cat)"'
+    argv = ["/bin/sh", "-c", script, "hermes", *(["-m", model] if model else [])]
+    return argv, {"HERMES_MANAGED_DIR": str(overlay)}, lambda out: out
+
+
+class Preset(NamedTuple):
+    label: str
+    #: ``None`` keeps the model the person configured in that agent.
+    model: str | None
+    command: Callable[[str, str | None, Path], Command]
+
+
+PRESETS = {
+    "codex": Preset("Codex", "gpt-6.1-sol", codex_command),
+    "opencode": Preset("OpenCode", "opencode-go/deepseek-v4.1-flash", opencode_command),
+    "hermes": Preset("Hermes", None, hermes_command),
+}
 
 
 def describe(report: dict) -> str:
@@ -297,32 +360,14 @@ def lock(person: str):
     return handle
 
 
-MODELS = {"codex": "gpt-6.1-sol", "opencode": "opencode-go/deepseek-v4.1-flash"}
-
-
 def invoker(person: str, agent: str | None, model: str | None = None, cmd: str | None = None):
-    """``(invoke, label)`` for a known agent CLI (``codex``, ``opencode``) or any ``cmd``."""
-    if agent == "codex":
-        model = model or MODELS[agent]
-
-        def invoke(reply):
-            argv = codex_command(person, model, reply.parent, reply)
-            return argv, {}, lambda _out: reply.read_text() if reply.exists() else ""
-
-        return invoke, f"{person.title()}'s agent (Codex)"
-    if agent == "opencode":
-        model = model or MODELS[agent]
-
-        def invoke(reply):
-            argv, env = opencode_command(person, model, reply.parent)
-            return argv, env, opencode_reply
-
-        return invoke, f"{person.title()}'s agent (OpenCode)"
-
-    def invoke(reply):
-        return shlex.split(cmd), {}, lambda out: out
-
-    return invoke, f"{person.title()}'s agent"
+    """``(invoke, label)`` for an agent in ``PRESETS`` or any ``cmd``."""
+    if agent is None:
+        return (lambda reply: (shlex.split(cmd), {}, lambda out: out)), f"{person.title()}'s agent"
+    preset = PRESETS[agent]
+    model = model or preset.model
+    label = f"{person.title()}'s agent ({preset.label})"
+    return (lambda reply: preset.command(person, model, reply)), label
 
 
 def main(person: str, args) -> int:

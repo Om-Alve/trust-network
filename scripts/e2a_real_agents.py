@@ -409,7 +409,7 @@ async def main(args):
         "agents": dict(zip(names, args.agents)),
         "switch": args.server,
         "calendar_backend": "real disposable local ICS files",
-        "models": {agent: wake.MODELS[agent] for agent in args.agents},
+        "models": {agent: wake.PRESETS[agent].model for agent in args.agents},
         "git_head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
     }
     try:
@@ -440,7 +440,7 @@ if __name__ == "__main__":
     parser.add_argument("--server", default="http://127.0.0.1:53330")
     parser.add_argument("--verify", type=Path, help="verify a saved report without calling agents")
     parser.add_argument(
-        "--agents", nargs=2, choices=("codex", "opencode"), default=["codex", "codex"]
+        "--agents", nargs=2, choices=tuple(wake.PRESETS), default=["codex", "codex"]
     )
     args = parser.parse_args()
     if args.verify:
