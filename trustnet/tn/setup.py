@@ -678,6 +678,7 @@ def _install_service(settings):
         for role in ("gate", "wake"):
             label = _unit_name(settings, role, platform)
             _supervisor("launchctl", "bootout", f"{LAUNCHD_DOMAIN}/{os.getuid()}/{label}")
+            _supervisor("launchctl", "enable", f"{LAUNCHD_DOMAIN}/{os.getuid()}/{label}")
             result = _supervisor(
                 "launchctl", "bootstrap", f"{LAUNCHD_DOMAIN}/{os.getuid()}", str(paths[role])
             )
@@ -708,7 +709,7 @@ def _install_service(settings):
 
 
 def _service_stop(settings):
-    """Stop installed user services; leave their unit files in place."""
+    """Stop and disable installed user services; tn setup re-enables their unit files."""
     state = _service_state(settings)
     if not state["installed"]:
         return False
@@ -719,6 +720,7 @@ def _service_stop(settings):
     if platform == "launchd":
         for role in roles:
             label = _unit_name(settings, role, platform)
+            _supervisor("launchctl", "disable", f"{LAUNCHD_DOMAIN}/{os.getuid()}/{label}")
             result = _supervisor("launchctl", "bootout", f"{LAUNCHD_DOMAIN}/{os.getuid()}/{label}")
             if result.returncode:
                 _supervisor("launchctl", "unload", "-w", str(_unit_path(settings, role, platform)))

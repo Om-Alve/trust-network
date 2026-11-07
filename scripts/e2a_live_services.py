@@ -29,6 +29,11 @@ and ~/.codex/config.toml are never written. The units run an isolated
 ``uv tool install`` of this checkout under the same directory: the documented
 install path, frozen at the tested commit and kept after the run.
 
+After each tn stop the script bootstraps every plist left in
+~/Library/LaunchAgents, as launchd does at login, and requires launchd to refuse
+it. The test labels stay in launchd's disabled database (launchctl
+print-disabled), which has no command to remove an entry.
+
     uv run python -m scripts.e2a_live_services
     uv run python -m scripts.e2a_live_services --verify data/live-services-<timestamp>/report.json
 
@@ -136,6 +141,18 @@ def launchd_print(text):
     return fields, arguments
 
 
+def launchd_disabled(label):
+    """This label's entry in launchd's persistent disabled database, which login honours."""
+    listing = subprocess.run(
+        ["launchctl", "print-disabled", DOMAIN], capture_output=True, text=True
+    ).stdout
+    for line in listing.splitlines():
+        name, separator, value = line.strip().partition(" => ")
+        if separator and name.strip('"') == label:
+            return value
+    return None
+
+
 def observe(person, role):
     label = f"ai.trustnetwork.{person}.{role}"
     plist = LAUNCH_AGENTS / f"{label}.plist"
@@ -149,6 +166,8 @@ def observe(person, role):
         "label": label,
         "plist": str(plist),
         "plist_exists": plist.exists(),
+        "run_at_load": payload.get("RunAtLoad"),
+        "launchd_disabled": launchd_disabled(label),
         "program_arguments": payload.get("ProgramArguments"),
         "keep_alive": payload.get("KeepAlive"),
         "throttle_interval": payload.get("ThrottleInterval"),
@@ -390,7 +409,25 @@ class Live:
             "processes": processes(person),
             "plists_remaining": [r["plist"] for r in units.values() if r["plist_exists"]],
             "doctor": self.tn(person, "doctor", expected=None),
+            "login_load": self.login_load(person, units),
         }
+
+    def login_load(self, person, units):
+        """Bootstrap each remaining plist as launchd does for LaunchAgents at login."""
+        attempts = {}
+        for role, unit in units.items():
+            if not unit["plist_exists"]:
+                continue
+            result = subprocess.run(
+                ["launchctl", "bootstrap", DOMAIN, unit["plist"]], capture_output=True, text=True
+            )
+            time.sleep(2)
+            attempts[role] = {
+                "returncode": result.returncode,
+                "stderr": result.stderr.strip(),
+                "after": observe(person, role),
+            }
+        return attempts
 
     def instances(self, person):
         commands = [p["command"] for p in processes(person)]
@@ -444,13 +481,6 @@ class Live:
                     name: tail(config / name) for name in ("gate-service.log", "wake-service.log")
                 }
         self.evidence["cleanup"] = record
-        if record["plists_removed"]:
-            self.findings.append(
-                "tn stop unloads the units but leaves their plists in ~/Library/LaunchAgents "
-                "(by design in setup._service_stop). launchd loads every plist there at the next "
-                "login and both have RunAtLoad, so a stopped gate and wake runner start again "
-                "after logout or reboot. Cleanup removed: " + ", ".join(record["plists_removed"])
-            )
 
 
 def services(live):
@@ -535,6 +565,17 @@ def verify_services(report, output):
             assert all(unloaded(r) for r in stopped["units"].values()), f"{phase}: unit loaded"
             assert stopped["processes"] == [], f"{phase}: {person} processes remained"
             assert stopped["doctor"]["automation_ready"] is False
+            for role, unit in stopped["units"].items():
+                assert unit["plist_exists"] and unit["run_at_load"], (
+                    f"{phase}: {person} {role} plist is gone, so a bare tn setup cannot restart it"
+                )
+                assert unit["launchd_disabled"] == "disabled", (
+                    f"{phase}: launchd would load {person} {role} at the next login"
+                )
+                login = stopped["login_load"][role]
+                assert login["returncode"] != 0 and unloaded(login["after"]), (
+                    f"{phase}: bootstrapping the stopped {person} {role} plist loaded it"
+                )
     for person in names:
         doctor = evidence["restart_doctor"][person]
         assert doctor["connection_ok"] and doctor["wake_verified"]
